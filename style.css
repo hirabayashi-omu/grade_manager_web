@@ -340,6 +340,36 @@ th {
     flex-direction: column;
 }
 
+/* Make inputs and selects in modals larger and easier to read */
+.modal input[type="text"],
+.modal input[type="number"],
+.modal input[type="password"],
+.modal select {
+    font-size: 1.2rem;
+    padding: 0.8rem 1rem;
+    border: 2px solid #e2e8f0;
+    border-radius: 0.6rem;
+    transition: var(--transition);
+    color: var(--text-main);
+    width: 100%;
+}
+
+.modal input:focus,
+.modal select:focus {
+    outline: none;
+    border-color: var(--primary);
+    background-color: #fff;
+    box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
+}
+
+.modal label {
+    font-weight: 600;
+    font-size: 1rem;
+    color: #475569;
+    margin-bottom: 0.5rem;
+    display: block;
+}
+
 .modal-overlay.open .modal {
     transform: scale(1);
 }

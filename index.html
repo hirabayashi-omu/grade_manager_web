@@ -24,6 +24,15 @@
                     d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
             </svg>
             Grade Manager
+            <button id="headerHelpBtn"
+                style="background:none; border:none; color:#94a3b8; cursor:pointer; padding:4px; display:inline-flex; align-items:center; border-radius:50%; transition:all 0.2s;"
+                title="使用方法・セキュリティポリシーを表示">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                    stroke-width="2" width="20" height="20">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008Z" />
+                </svg>
+            </button>
         </div>
 
         <div class="controls">
@@ -93,8 +102,73 @@
                 </svg>
                 Clear
             </button>
+            <button id="logoutBtn" class="btn btn-secondary" title="システムをロックしてログアウトします" style="display: none;">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                    stroke-width="2" width="16" height="16">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+                Logout
+            </button>
         </div>
     </header>
+
+    <!-- Authentication Overlays -->
+    <div id="authOverlay" class="modal-overlay" style="z-index: 10000; background: #f1f5f9;">
+        <!-- Setup Password (First time) -->
+        <div id="setupView" class="modal" style="display: none; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);">
+            <div class="modal-header">
+                <div class="modal-title">パスワードの初期設定</div>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 1.5rem; color: #64748b;">成績データを保護するため、ログインパスワードを設定してください。</p>
+                <div class="control-group" style="flex-direction: column; align-items: flex-start; gap: 0.8rem;">
+                    <label style="font-weight: 600;">新しいパスワード</label>
+                    <input type="password" id="setupPass1"
+                        style="width: 100%; border-width: 2px; font-size: 1.5rem; padding: 0.8rem; border-color: #e2e8f0; border-radius: 0.5rem;"
+                        placeholder="••••••••">
+                    <label style="font-weight: 600;">パスワード（確認）</label>
+                    <input type="password" id="setupPass2"
+                        style="width: 100%; border-width: 2px; font-size: 1.5rem; padding: 0.8rem; border-color: #e2e8f0; border-radius: 0.5rem;"
+                        placeholder="••••••••">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" style="width: 100%; height: 3.5rem; font-size: 1.1rem;"
+                    id="confirmSetupBtn">設定を保存して開始</button>
+            </div>
+        </div>
+
+        <!-- Login View -->
+        <div id="loginView" class="modal" style="display: none; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);">
+            <div class="modal-header">
+                <div class="modal-title">Grade Manager ログイン</div>
+            </div>
+            <div class="modal-body">
+                <div style="text-align: center; margin-bottom: 2rem;">
+                    <div
+                        style="width: 60px; height: 60px; background: #eef2ff; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem;">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="#4f46e5"
+                            stroke-width="2" width="32" height="32">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                    </div>
+                </div>
+                <div class="control-group" style="flex-direction: column; align-items: flex-start; gap: 0.8rem;">
+                    <label style="font-weight: 600;">パスワードを入力してください</label>
+                    <input type="password" id="loginPass"
+                        style="width: 100%; border-width: 2px; font-size: 2rem; padding: 0.8rem; text-align: center; letter-spacing: 0.5rem; border-color: #4f46e5; border-radius: 0.5rem;"
+                        placeholder="••••">
+                    <div id="loginError" style="color: #ef4444; font-size: 0.85rem; display: none;">パスワードが正しくありません</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" style="width: 100%; height: 3.5rem; font-size: 1.1rem;"
+                    id="doLoginBtn">ログイン</button>
+            </div>
+        </div>
+    </div>
 
     <main>
         <aside class="sidebar">
@@ -452,6 +526,10 @@
                             <p style="opacity: 0.9; font-size: 0.9rem;">学生名や科目定義の全般的な管理を行います。</p>
                         </div>
                         <div style="display: flex; gap: 1rem;">
+                            <button id="changePassBtn" class="btn"
+                                style="background: rgba(255,255,255,0.2); color: white; border: 1px solid white;">
+                                パスワード変更
+                            </button>
                             <button id="restoreDefaultsBtn" class="btn"
                                 style="background: rgba(255,255,255,0.2); color: white; border: 1px solid white;">
                                 デフォルトに戻す
@@ -535,6 +613,42 @@
 
             <!-- Help & Security View -->
             <div id="help-content" class="tab-content hidden fade-in">
+                <div class="card" style="background: #f8fafc; border-left: 5px solid var(--primary);">
+                    <div class="card-header">
+                        <h2 class="card-title">基本的な使用方法 (Basic Usage)</h2>
+                    </div>
+                    <div style="line-height: 1.8; color: #334155;">
+                        <ol style="margin-left: 1.5rem; display: flex; flex-direction: column; gap: 1rem;">
+                            <li><strong>1. 初期設定（学生・科目の登録）:</strong><br>
+                                「各種設定 (Settings)」タブで、クラスの学生名リストと、各学年の科目定義（単位数や種類）を整えます。CSVファイルからのインポートも可能です。
+                            </li>
+                            <li><strong>2. 成績の入力:</strong><br>
+                                「成績一覧 (Grades)」タブで、学生と学年を選択して点数を入力します。
+                                <br><span style="color: var(--primary); font-weight: 500;">★効率化テクニック:</span>
+                                表の見出しにある<span class="paste-icon"
+                                    style="opacity:1; vertical-align:middle; margin:0 4px;"><svg
+                                        xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round">
+                                        <path
+                                            d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2">
+                                        </path>
+                                        <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                                    </svg></span>アイコンをクリックすると、Excel等からコピーした1列分の成績をまとめて貼り付けできます。
+                            </li>
+                            <li><strong>3. 個人の分析:</strong><br>
+                                「統計・グラフ」タブで、偏差値の推移、順位の変動、学年ごとの評点平均(GPA)などを確認できます。
+                            </li>
+                            <li><strong>4. クラス全体の集計:</strong><br>
+                                「クラス統計」タブでは、特定のテスト時点におけるクラス全員の成績順位表を作成し、CSVやPDFで出力できます。
+                            </li>
+                            <li><strong>5. データの保存:</strong><br>
+                                入力したデータは随時ブラウザに保存されますが、バックアップとして定期的に「JSON」ボタンからファイルを保存することを推奨します。
+                            </li>
+                        </ol>
+                    </div>
+                </div>
+
                 <div class="card">
                     <div class="card-header">
                         <h2 class="card-title">セキュリティポリシー (Security Policy)</h2>

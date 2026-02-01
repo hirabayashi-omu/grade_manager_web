@@ -145,7 +145,9 @@ let state = {
     currentTab: 'grades',
     hideEmptySubjects: true,
     boxPlotYear: null, // Year for box plot (null = auto-detect latest)
-    boxPlotTest: null  // Test for box plot (null = auto-detect latest)
+    boxPlotTest: null,  // Test for box plot (null = auto-detect latest)
+    isLoggedIn: false,
+    passwordHash: localStorage.getItem('gm_auth_hash') || null
 };
 
 const SCORE_KEYS = ["前期中間", "前期末", "後期中間", "学年末"];
@@ -227,8 +229,138 @@ function init() {
         setDefaultYear();
     }
 
-    // Important: switchTab handles both state and UI visibility
-    switchTab(state.currentTab);
+    // Auth check
+    initAuth();
+}
+
+// ==================== AUTHENTICATION ====================
+async function hashPassword(password) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(password);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function initAuth() {
+    const overlay = document.getElementById('authOverlay');
+    const setupView = document.getElementById('setupView');
+    const loginView = document.getElementById('loginView');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const mainContent = document.querySelector('main');
+
+    if (!state.passwordHash) {
+        // No password set - First time setup
+        mainContent.style.visibility = 'hidden';
+        overlay.classList.add('open');
+        setupView.style.display = 'block';
+        loginView.style.display = 'none';
+        if (logoutBtn) logoutBtn.style.display = 'none';
+    } else if (!state.isLoggedIn) {
+        // Password exists but not logged in
+        mainContent.style.visibility = 'hidden';
+        overlay.classList.add('open');
+        setupView.style.display = 'none';
+        loginView.style.display = 'block';
+        if (logoutBtn) logoutBtn.style.display = 'none';
+        document.getElementById('loginPass').focus();
+    } else {
+        // Logged in
+        mainContent.style.visibility = 'visible';
+        overlay.classList.remove('open');
+        overlay.style.display = 'none'; // Ensure it's fully gone
+        if (logoutBtn) logoutBtn.style.display = 'inline-flex';
+        switchTab(state.currentTab);
+    }
+}
+
+async function handleLogin() {
+    const passInput = document.getElementById('loginPass');
+    const errorMsg = document.getElementById('loginError');
+    const password = passInput.value;
+
+    if (!password) {
+        alert('パスワードを入力してください。');
+        return;
+    }
+
+    const hash = await hashPassword(password);
+    if (hash === state.passwordHash) {
+        state.isLoggedIn = true;
+        errorMsg.style.display = 'none';
+        passInput.value = '';
+        initAuth(); // This will reveal the main content and hide overlay
+    } else {
+        errorMsg.style.display = 'block';
+        passInput.value = '';
+        passInput.focus();
+    }
+}
+
+async function handleSetup() {
+    const p1 = document.getElementById('setupPass1').value;
+    const p2 = document.getElementById('setupPass2').value;
+
+    if (!p1 || p1.length < 4) {
+        alert('パスワードは4文字以上で入力してください（これは新しく決めるパスワードです）。');
+        return;
+    }
+    if (p1 !== p2) {
+        alert('上の入力欄と下の確認用入力欄が一致しません。同じパスワードを2回入力してください。');
+        return;
+    }
+
+    const hash = await hashPassword(p1);
+    state.passwordHash = hash;
+    state.isLoggedIn = true;
+    localStorage.setItem('gm_auth_hash', hash);
+
+    alert('パスワードを設定しました。今後はこのパスワードでログインしてください。');
+    initAuth();
+}
+
+function handleLogout() {
+    state.isLoggedIn = false;
+    initAuth();
+}
+
+async function openPasswordChange() {
+    // Safety check
+    if (!state.passwordHash) {
+        alert('現在パスワードは設定されていません。初期設定ページへ移動します。');
+        initAuth();
+        return;
+    }
+
+    const currentPass = prompt('【確認】現在のパスワードを入力してください:');
+    if (currentPass === null) return;
+
+    const currentHash = await hashPassword(currentPass);
+    if (currentHash !== state.passwordHash) {
+        alert('入力された「現在のパスワード」が正しくありません。変更を中断します。');
+        return;
+    }
+
+    const newPass = prompt('【新規】新しく設定するパスワードを入力してください\n(空欄にして進むと、パスワード保護を「解除」できます):');
+    if (newPass === null) return;
+
+    if (newPass === '') {
+        if (confirm('パスワード保護を解除してもよろしいですか？\n解除すると誰でもデータを見れるようになります。')) {
+            state.passwordHash = null;
+            localStorage.removeItem('gm_auth_hash');
+            alert('パスワード保護を解除しました。');
+            initAuth();
+        }
+    } else {
+        if (newPass.length < 4) {
+            alert('新しいパスワードは4文字以上で設定してください。');
+            return;
+        }
+        const newHash = await hashPassword(newPass);
+        state.passwordHash = newHash;
+        localStorage.setItem('gm_auth_hash', newHash);
+        alert('パスワードを新しく更新しました。');
+    }
 }
 
 function setDefaultYear() {
@@ -524,6 +656,19 @@ function setupEventListeners() {
     document.getElementById('saveSubjectItemBtn').addEventListener('click', saveSubjectItem);
     document.getElementById('finalSaveSettingsBtn').addEventListener('click', saveFinalSettings);
     document.getElementById('restoreDefaultsBtn').addEventListener('click', restoreMasterDefaults);
+    document.getElementById('changePassBtn').addEventListener('click', openPasswordChange);
+    document.getElementById('headerHelpBtn').addEventListener('click', () => switchTab('help'));
+
+    // Auth Listeners
+    document.getElementById('doLoginBtn').addEventListener('click', handleLogin);
+    document.getElementById('loginPass').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') handleLogin();
+    });
+    document.getElementById('confirmSetupBtn').addEventListener('click', handleSetup);
+    document.getElementById('setupPass2').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') handleSetup();
+    });
+    document.getElementById('logoutBtn').addEventListener('click', handleLogout);
 
     const exportStudentsBtn = document.getElementById('exportStudentsCsvBtn');
     if (exportStudentsBtn) {
