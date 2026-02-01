@@ -247,28 +247,28 @@ function initAuth() {
     const setupView = document.getElementById('setupView');
     const loginView = document.getElementById('loginView');
     const logoutBtn = document.getElementById('logoutBtn');
-    const mainContent = document.querySelector('main');
+    const mainApp = document.getElementById('mainApp');
 
     if (!state.passwordHash) {
         // No password set - First time setup
-        mainContent.style.visibility = 'hidden';
+        mainApp.style.display = 'none';
         overlay.classList.add('open');
         setupView.style.display = 'block';
         loginView.style.display = 'none';
         if (logoutBtn) logoutBtn.style.display = 'none';
     } else if (!state.isLoggedIn) {
         // Password exists but not logged in
-        mainContent.style.visibility = 'hidden';
+        mainApp.style.display = 'none';
         overlay.classList.add('open');
         setupView.style.display = 'none';
         loginView.style.display = 'block';
         if (logoutBtn) logoutBtn.style.display = 'none';
         document.getElementById('loginPass').focus();
     } else {
-        // Logged in
-        mainContent.style.visibility = 'visible';
+        // Logged in - Unlock the app
+        mainApp.style.display = 'flex'; // sidebar layout uses flex
         overlay.classList.remove('open');
-        overlay.style.display = 'none'; // Ensure it's fully gone
+        overlay.style.display = 'none';
         if (logoutBtn) logoutBtn.style.display = 'inline-flex';
         switchTab(state.currentTab);
     }
