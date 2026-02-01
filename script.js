@@ -675,6 +675,15 @@ function setupEventListeners() {
         if (e.key === 'Enter') handleSetup();
     });
     document.getElementById('logoutBtn').addEventListener('click', handleLogout);
+    document.getElementById('forgotPassBtn').addEventListener('click', () => {
+        if (confirm('【警告】パスワードを忘れたため、システムを初期化しますか？\n\nこの操作を行うと、入力済みの成績データ、学生リスト、科目設定がすべて消去されます。元に戻すことはできません。')) {
+            if (confirm('本当によろしいですか？（すべてのデータが削除されます）')) {
+                localStorage.clear();
+                alert('すべてのデータを消去しました。ページを再読み込みします。');
+                location.reload();
+            }
+        }
+    });
 
     const exportStudentsBtn = document.getElementById('exportStudentsCsvBtn');
     if (exportStudentsBtn) {
