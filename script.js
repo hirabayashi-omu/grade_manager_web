@@ -197,6 +197,9 @@ function loadSessionState() {
 
 // ==================== INITIALIZATION ====================
 function init() {
+    // Auth check must happen first to block UI
+    initAuth();
+
     setupEventListeners();
     refreshMasterData();
     mockData();
@@ -228,9 +231,6 @@ function init() {
     if (!localStorage.getItem('gm_state_year')) {
         setDefaultYear();
     }
-
-    // Auth check
-    initAuth();
 }
 
 // ==================== AUTHENTICATION ====================
@@ -249,9 +249,12 @@ function initAuth() {
     const logoutBtn = document.getElementById('logoutBtn');
     const mainApp = document.getElementById('mainApp');
 
+    if (!overlay || !mainApp) return;
+
     if (!state.passwordHash) {
         // No password set - First time setup
         mainApp.style.display = 'none';
+        overlay.style.display = 'flex';
         overlay.classList.add('open');
         setupView.style.display = 'block';
         loginView.style.display = 'none';
@@ -259,11 +262,14 @@ function initAuth() {
     } else if (!state.isLoggedIn) {
         // Password exists but not logged in
         mainApp.style.display = 'none';
+        overlay.style.display = 'flex';
         overlay.classList.add('open');
         setupView.style.display = 'none';
         loginView.style.display = 'block';
         if (logoutBtn) logoutBtn.style.display = 'none';
-        document.getElementById('loginPass').focus();
+
+        // Auto-focus after a short delay to ensure modal is visible
+        setTimeout(() => document.getElementById('loginPass').focus(), 100);
     } else {
         // Logged in - Unlock the app
         mainApp.style.display = 'flex'; // sidebar layout uses flex
