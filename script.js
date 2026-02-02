@@ -268,6 +268,11 @@ function loadSessionState() {
     const savedHideEmpty = localStorage.getItem('gm_state_hide_empty');
     const savedBPYear = localStorage.getItem('gm_state_boxplot_year');
     const savedBPTest = localStorage.getItem('gm_state_boxplot_test');
+    const savedCourse = localStorage.getItem('gm_state_course');
+    const savedAtRiskThreshold = localStorage.getItem('gm_state_atrisk_threshold');
+    const savedAtRiskTest = localStorage.getItem('gm_state_atrisk_test');
+    const savedAtRiskYear = localStorage.getItem('gm_state_atrisk_year');
+    const savedAtRiskMode = localStorage.getItem('gm_state_atrisk_mode');
 
     if (savedTab) state.currentTab = savedTab;
     if (savedHideEmpty !== null) state.hideEmptySubjects = (savedHideEmpty === 'true');
