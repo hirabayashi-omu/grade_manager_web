@@ -40,10 +40,10 @@
                 <label for="subjectCourseFilterHeader">コース</label>
                 <select id="subjectCourseFilterHeader">
                     <option value="">未選択</option>
-                    <option value="Mコース">Mコース</option>
-                    <option value="Dコース">Dコース</option>
-                    <option value="Eコース">Eコース</option>
-                    <option value="Iコース">Iコース</option>
+                    <option value="エネルギー機械">エネルギー機械 (M)</option>
+                    <option value="プロダクトデザイン">プロダクトデザイン (D)</option>
+                    <option value="エレクトロニクス">エレクトロニクス (E)</option>
+                    <option value="知能情報">知能情報 (I)</option>
                 </select>
             </div>
 
@@ -85,7 +85,7 @@
                     <path stroke-linecap="round" stroke-linejoin="round"
                         d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                 </svg>
-                Export
+                PDF
             </button>
             <button id="exportJsonBtn" class="btn btn-secondary" title="成績データをJSON形式でダウンロードします">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
@@ -104,15 +104,7 @@
                 </svg>
                 Load
             </button>
-            <button id="clearBtn" class="btn btn-secondary" title="保存されている全ての成績データをクリアします"
-                style="background: #fee; color: #b91c1c; border-color: #fca5a5;">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                    stroke-width="2" width="16" height="16">
-                    <path stroke-linecap="round" stroke-linejoin="round"
-                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-                Clear
-            </button>
+            <!-- Clear button removed from here, moved to Settings -->
             <button id="logoutBtn" class="btn btn-secondary" title="システムをロックしてログアウトします" style="display: none;">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
                     stroke-width="2" width="16" height="16">
@@ -291,14 +283,14 @@
                         <table>
                             <thead>
                                 <tr>
-                                    <th width="200">授業科目</th>
-                                    <th width="60">単位</th>
-                                    <th width="80">区分</th>
-                                    <th width="80">分類</th>
-                                    <th width="80">前期中間</th>
-                                    <th width="80">前期末</th>
-                                    <th width="80">後期中間</th>
-                                    <th width="80">学年末</th>
+                                    <th width="200" title="科目の名称です">授業科目</th>
+                                    <th width="60" title="この科目の単位数です">単位</th>
+                                    <th width="80" title="必修・選択などの区分です">区分</th>
+                                    <th width="80" title="一般・専門などの分類です">分類</th>
+                                    <th width="80" title="前期中間試験の点数（クリックで貼付）">前期中間</th>
+                                    <th width="80" title="前期末試験の点数（クリックで貼付）">前期末</th>
+                                    <th width="80" title="後期中間試験の点数（クリックで貼付）">後期中間</th>
+                                    <th width="80" title="学年末試験の点数（クリックで貼付）">学年末</th>
                                 </tr>
                             </thead>
                             <tbody id="gradesBody">
@@ -317,11 +309,11 @@
                         <table>
                             <thead>
                                 <tr>
-                                    <th width="200">授業科目</th>
-                                    <th width="60">単位</th>
-                                    <th width="80">区分</th>
-                                    <th width="80">分類</th>
-                                    <th width="80">認定</th>
+                                    <th width="200" title="科目の名称です">授業科目</th>
+                                    <th width="60" title="単位数です">単位</th>
+                                    <th width="80" title="必修・選択などの区分です">区分</th>
+                                    <th width="80" title="分類です">分類</th>
+                                    <th width="80" title="単位認定（修得/認定など）を入力します">認定</th>
                                 </tr>
                             </thead>
                             <tbody id="specialGradesBody">
@@ -339,11 +331,11 @@
                         <table>
                             <thead>
                                 <tr>
-                                    <th width="200">授業科目</th>
-                                    <th width="60">単位</th>
-                                    <th width="80">区分</th>
-                                    <th width="80">分類</th>
-                                    <th width="80">認定</th>
+                                    <th width="200" title="科目の名称です">授業科目</th>
+                                    <th width="60" title="単位数です">単位</th>
+                                    <th width="80" title="必修・選択などの区分です">区分</th>
+                                    <th width="80" title="分類です">分類</th>
+                                    <th width="80" title="単位認定（修得/認定など）を入力します">認定</th>
                                 </tr>
                             </thead>
                             <tbody id="otherGradesBody">
@@ -357,8 +349,19 @@
             <!-- Graduation Requirements View -->
             <div id="grad_requirements-content" class="tab-content hidden fade-in">
                 <div class="card">
-                    <div class="card-header">
+                    <div class="card-header" style="justify-content: space-between; align-items: center;">
                         <div class="card-title">卒業要件 達成状況 (Graduation Requirements Progress)</div>
+                        <div style="display: flex; align-items: center; gap: 0.75rem;" class="no-print">
+                            <label style="font-size: 0.85rem; font-weight: 600; color: #64748b;">所属コース:</label>
+                            <select id="gradCourseFilter" class="no-print"
+                                style="padding: 0.4rem 0.8rem; border: 1px solid #cbd5e1; border-radius: 0.4rem; font-size: 0.85rem; background: #fff;">
+                                <option value="">未選択 (全科目表示)</option>
+                                <option value="エネルギー機械">エネルギー機械 (M)</option>
+                                <option value="プロダクトデザイン">プロダクトデザイン (D)</option>
+                                <option value="エレクトロニクス">エレクトロニクス (E)</option>
+                                <option value="知能情報">知能情報 (I)</option>
+                            </select>
+                        </div>
                     </div>
                     <div id="gradRequirementsSummary"
                         style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.5rem;">
@@ -374,11 +377,11 @@
                         <table>
                             <thead>
                                 <tr>
-                                    <th>要件項目</th>
-                                    <th>目標</th>
-                                    <th>現在の状況</th>
-                                    <th>達成度</th>
-                                    <th>判定</th>
+                                    <th title="卒業判定に必要な要件の項目です">要件項目</th>
+                                    <th title="必要な単位数などの目標値です">目標</th>
+                                    <th title="現在の修得状況です">現在の状況</th>
+                                    <th title="目標に対する達成率です">達成度</th>
+                                    <th title="要件を満たしているかの判定です">判定</th>
                                 </tr>
                             </thead>
                             <tbody id="gradRequirementsDetails">
@@ -412,32 +415,37 @@
                                 </tr>
                                 <tr>
                                     <!-- Late Mid -->
-                                    <th style="min-width:50px; text-align:center; border-left:1px solid #e2e8f0;">平均
+                                    <th style="min-width:40px; text-align:center; border-left:1px solid #e2e8f0;"
+                                        title="各試験の平均点です">平均
                                     </th>
-                                    <th style="min-width:50px; text-align:center;">順位</th>
+                                    <th style="min-width:40px; text-align:center;" title="各試験の順位です">順位</th>
                                     <!-- Late Final -->
-                                    <th style="min-width:50px; text-align:center; border-left:1px solid #e2e8f0;">平均
+                                    <th style="min-width:40px; text-align:center; border-left:1px solid #e2e8f0;"
+                                        title="各試験の平均点です">平均
                                     </th>
-                                    <th style="min-width:50px; text-align:center;">順位</th>
+                                    <th style="min-width:40px; text-align:center;" title="各試験の順位です">順位</th>
                                     <!-- Early Mid -->
-                                    <th style="min-width:50px; text-align:center; border-left:1px solid #e2e8f0;">平均
+                                    <th style="min-width:40px; text-align:center; border-left:1px solid #e2e8f0;"
+                                        title="各試験の平均点です">平均
                                     </th>
-                                    <th style="min-width:50px; text-align:center;">順位</th>
+                                    <th style="min-width:40px; text-align:center;" title="各試験の順位です">順位</th>
                                     <!-- Early Final -->
-                                    <th style="min-width:50px; text-align:center; border-left:1px solid #e2e8f0;">平均
+                                    <th style="min-width:50px; text-align:center; border-left:1px solid #e2e8f0;"
+                                        title="各試験の平均点です">平均
                                     </th>
-                                    <th style="min-width:50px; text-align:center;">順位</th>
-
+                                    <th style="min-width:50px; text-align:center;" title="各試験の順位です">順位</th>
                                     <!-- Credits -->
-                                    <th style="min-width:40px; text-align:center; border-left:1px solid #e2e8f0;">一般
+                                    <th style="min-width:40px; text-align:center; border-left:1px solid #e2e8f0;"
+                                        title="一般科目の修得単位数">一般
                                     </th>
-                                    <th style="min-width:40px; text-align:center;">専門</th>
-                                    <th style="min-width:40px; text-align:center;">合計</th>
-
+                                    <th style="min-width:40px; text-align:center;" title="専門科目の修得単位数">専門</th>
+                                    <th style="min-width:40px; text-align:center;" title="合計修得単位数">合計</th>
                                     <!-- Promotion -->
-                                    <th style="min-width:40px; text-align:center; border-left:1px solid #e2e8f0;">必要
+                                    <th style="min-width:40px; text-align:center; border-left:1px solid #e2e8f0;"
+                                        title="進級に必要な単位数">必要
                                     </th>
-                                    <th style="min-width:40px; text-align:center;">過不足</th>
+                                    <th style="min-width:40px; text-align:center;" title="進級要件に対する不足単位数（プラスなら充足）">過不足
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody id="statsBody">
@@ -656,18 +664,34 @@
                                 style="background: rgba(255,255,255,0.2); color: white; border: 1px solid white;">
                                 パスワード変更
                             </button>
+                            <button id="clearAllDataBtn" class="btn"
+                                style="background: #ef4444; color: white; border: 1px solid #b91c1c;">
+                                全データリセット
+                            </button>
                             <button id="restoreDefaultsBtn" class="btn"
                                 style="background: rgba(255,255,255,0.2); color: white; border: 1px solid white;">
-                                デフォルトに戻す
-                            </button>
-                            <button id="finalSaveSettingsBtn" class="btn"
-                                style="background: white; color: var(--primary); font-weight: bold; border: none;">
-                                すべての変更を確定保存 (Global Save)
+                                科目の初期化
                             </button>
                         </div>
                     </div>
+                    <div
+                        style="background: rgba(255,255,255,0.1); padding: 1rem; border-radius: 0.5rem; margin-top: 1rem; font-size: 0.9rem;">
+                        <ul style="list-style-type: disc; margin-left: 1.5rem; line-height: 1.6;">
+                            <li><strong>全データリセット (Clear):</strong> 成績データ、学生リスト、変更した科目定義など、<span
+                                    style="color: #fecaca; font-weight: bold;">全てのデータを消去</span>して工場出荷時に戻します。</li>
+                            <li><strong>科目の初期化 (Reset Subjects):</strong> 成績データや学生リストは<span
+                                    style="color: #bfdbfe; font-weight: bold;">保持したまま</span>、科目定義（単位数や必修区分など）のみを初期値に戻します。科目を間違って削除してしまった場合などに使用します。
+                            </li>
+                            <li><strong>パスワード変更:</strong> ログイン用のパスワードを変更します。</li>
+                        </ul>
+                    </div>
+                    <div style="margin-top: 1rem; text-align: right;">
+                        <button id="finalSaveSettingsBtn" class="btn"
+                            style="background: white; color: var(--primary); font-weight: bold; border: none;">
+                            すべての変更を確定保存 (Global Save)
+                        </button>
+                    </div>
                 </div>
-
                 <div style="display: grid; grid-template-columns: 320px 1fr; gap: 2rem;">
                     <!-- Left: Student List -->
                     <div class="card" style="height: fit-content;">
@@ -719,10 +743,10 @@
                                 <select id="subjectCourseFilter"
                                     style="padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 0.4rem; font-size: 0.85rem; margin-right: 0.5rem;">
                                     <option value="">未選択</option>
-                                    <option value="Mコース">Mコース</option>
-                                    <option value="Dコース">Dコース</option>
-                                    <option value="Eコース">Eコース</option>
-                                    <option value="Iコース">Iコース</option>
+                                    <option value="エネルギー機械">エネルギー機械 (M)</option>
+                                    <option value="プロダクトデザイン">プロダクトデザイン (D)</option>
+                                    <option value="エレクトロニクス">エレクトロニクス (E)</option>
+                                    <option value="知能情報">知能情報 (I)</option>
                                 </select>
                                 <div style="position: relative;">
                                     <input type="text" id="subjectSearchInput" placeholder="科目を検索..."
@@ -754,14 +778,13 @@
                     </div>
                     <div style="line-height: 1.8; color: #334155;">
                         <ol style="margin-left: 1.5rem; display: flex; flex-direction: column; gap: 1rem;">
-                            <li><strong>1. 初期設定（学生・科目の登録）:</strong><br>
-                                「各種設定 (Settings)」タブで、クラスの学生名リストと、各学年の科目定義（単位数や種類）を整えます。CSVファイルからのインポートも可能です。
+                            <li><strong>1. 初期設定とマスタ管理:</strong><br>
+                                「各種設定 (Settings)」タブで、学生名簿と各学年の科目定義（単位数・種別・DP等）を登録します。CSVの流し込みや個別の編集が可能です。変更後は「Global
+                                Save」で確定させてください。
                             </li>
-                            <li><strong>2. 成績の入力:</strong><br>
-                                「成績一覧 (Grades)」タブで、学生と学年を選択して点数を入力します。
-                                <br><span style="color: var(--primary); font-weight: 500;">★効率化テクニック:</span>
-                                表の見出しにある<span class="paste-icon"
-                                    style="opacity:1; vertical-align:middle; margin:0 4px;"><svg
+                            <li><strong>2. 成績データの入力:</strong><br>
+                                「成績一覧 (Grades)」タブで、対象学年と学生を選択します。各テスト点数を直接入力するか、表上部の<span class="paste-icon"
+                                    style="opacity:1; vertical-align:middle; margin:0 2px;"><svg
                                         xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
                                         fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
                                         stroke-linejoin="round">
@@ -769,16 +792,17 @@
                                             d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2">
                                         </path>
                                         <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
-                                    </svg></span>アイコンをクリックすると、Excel等からコピーした1列分の成績をまとめて貼り付けできます。
+                                    </svg></span>アイコンからExcel等のデータを一括貼り付けできます。
                             </li>
-                            <li><strong>3. 個人の分析:</strong><br>
-                                「統計・グラフ」タブで、偏差値の推移、順位の変動、学年ごとの評点平均(GPA)などを確認できます。
+                            <li><strong>3. 個別・累計分析:</strong><br>
+                                「分析1 (Stats)」で単一テストの分布図と順位推移、「分析2 (Stats2)」で複数年にわたるGPAと加重平均の累積推移を確認できます。
                             </li>
-                            <li><strong>4. クラス全体の集計:</strong><br>
-                                「クラス統計」タブでは、特定のテスト時点におけるクラス全員の成績順位表を作成し、CSVやPDFで出力できます。
+                            <li><strong>4. 卒業要件の確認:</strong><br>
+                                「卒業要件 (Grad
+                                Requirements)」では、現在の取得単位がDP（A~E）やSDGs、一般/専門科目、必修科目の基準をどの程度満たしているか自動集計します（コース選択が必要です）。
                             </li>
-                            <li><strong>5. データの保存:</strong><br>
-                                入力したデータは随時ブラウザに保存されますが、バックアップとして定期的に「JSON」ボタンからファイルを保存することを推奨します。
+                            <li><strong>5. クラス帳票と要注意抽出:</strong><br>
+                                「クラス統計 (Class Stats)」で全員の順位表を作成できます。また「要注意抽出 (At-Risk)」機能により、成績不振科目が複数ある学生を瞬時に特定します。
                             </li>
                         </ol>
                     </div>
@@ -786,57 +810,54 @@
 
                 <div class="card">
                     <div class="card-header">
-                        <h2 class="card-title">セキュリティポリシー (Security Policy)</h2>
+                        <h2 class="card-title">セキュリティとプライバシー (Security & Privacy)</h2>
                     </div>
                     <div style="line-height: 1.8; color: #334155;">
-                        <p>本システムは、学生の個人情報および成績データを安全に取り扱うため、以下の設計指針を遵守しています。</p>
-                        <ul style="margin-left: 1.5rem; margin-top: 1rem; margin-bottom: 1.5rem;">
-                            <li><strong>ネットワーク送信の有無:</strong>
-                                入力された学生名、科目、成績等のデータがインターネット上のサーバーに送信されることは<strong>一切ありません</strong>。すべての処理はブラウザ内で完結します。
-                            </li>
-                            <li><strong>データの保存場所:</strong>
-                                データは、現在使用しているブラウザの<strong>LocalStorage（ローカルストレージ）</strong>にのみ保存されます。ブラウザやPCを跨いでの同期機能もありません。
-                            </li>
-                            <li><strong>共有について:</strong>
-                                システムが自動的に他者とデータを共有することはありません。共有が必要な場合は、明示的に書き出したファイルを送受する必要があります。
-                            </li>
-                            <li style="color: #b91c1c; font-weight: bold;"><strong>利用端末の制限:</strong>
-                                第三者がアクセス可能な共用端末での使用は避け、必ず<strong>教員本人しかアクセスしない保護された端末</strong>で使用してください。
-                            </li>
+                        <p>本システムはオフライン第一の設計となっており、学生の機密情報を保持したまま安全に利用可能です。</p>
+                        <ul
+                            style="margin-left: 1.5rem; margin-top: 1rem; margin-bottom: 1.5rem; list-style-type: disc;">
+                            <li><strong>サーバー送信なし:</strong>
+                                データがインターネット上のサーバーに送信されることは<strong>一切ありません</strong>。すべての集計はブラウザ内で完結します。</li>
+                            <li><strong>ローカル保存:</strong> データはブラウザの <strong>LocalStorage</strong>
+                                に暗号化またはシリアル化されて保存されます。他のPCやブラウザとは同期されません。</li>
+                            <li><strong>パスワード保護:</strong> 起動時にSHA-256ハッシュによるパスワード認証が必要です。設定で変更や保護の解除も可能です。</li>
+                            <li style="color: #b91c1c; font-weight: bold;">使用上の注意:
+                                共用PCでは必ず「Logout」して終了してください（パスワード入力画面に戻ります）。</li>
                         </ul>
                     </div>
                 </div>
 
                 <div class="card">
                     <div class="card-header">
-                        <h2 class="card-title">生成可能ファイルと保存内容</h2>
+                        <h2 class="card-title">入出力ファイルと用途</h2>
                     </div>
                     <div class="table-container">
                         <table style="width: 100%; border-collapse: collapse;">
                             <thead>
                                 <tr style="background: #f1f5f9;">
-                                    <th style="padding: 10px; border: 1px solid #cbd5e1;">ファイル形式</th>
-                                    <th style="padding: 10px; border: 1px solid #cbd5e1;">主な用途</th>
-                                    <th style="padding: 10px; border: 1px solid #cbd5e1;">含まれる主要内容</th>
+                                    <th style="padding: 10px; border: 1px solid #cbd5e1;">形式</th>
+                                    <th style="padding: 10px; border: 1px solid #cbd5e1;">用途</th>
+                                    <th style="padding: 10px; border: 1px solid #cbd5e1;">内容</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr>
-                                    <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">PDF (印刷)
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">PDF</td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">配布・印刷用</td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">個人成績レポート、推移グラフ、クラス順位表、要抽出結果など
                                     </td>
-                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">成績レポート、帳票出力</td>
-                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">個人名、各テスト点数、平均・順位推移グラフ、分布図</td>
                                 </tr>
                                 <tr>
                                     <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">JSON</td>
-                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">全データの完全バックアップ</td>
-                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">学生リスト、科目定義、入力済みの全スコアデータ</td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">バックアップ</td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">学生・科目定義・全スコアを含む完全なデータのアーカイブ
+                                    </td>
                                 </tr>
                                 <tr>
-                                    <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">CSV (書き出し)
-                                    </td>
-                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">Excel等での分析・加工</td>
-                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">学生一覧、科目一覧、クラス成績統計表(点数・順位)</td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">CSV</td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">データ移行・加工</td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">
+                                        学生リスト、科目設定リスト、クラス統計一覧表（Excel等で閲覧可能）</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -848,9 +869,12 @@
                         <h2 class="card-title" style="color: #92400e;">重要・免責事項</h2>
                     </div>
                     <div style="line-height: 1.8; color: #334155;">
-                        <p style="font-weight: bold;">本システムで算出・表示されるデータは、あくまで学習指導の参考とするための「参考値」です。</p>
+                        <p style="font-weight: bold;">本システムで算出されるデータは、学習指導の参考とするための「参考値」です。</p>
                         <p style="margin-top: 1rem;">
-                            平均点、順位、GPA、累計単位数等の計算結果には、システム上の端数処理や各種推定値が含まれる場合があります。単位修得の可否や進級判定等の最終的かつ公式な判断は、必ず<strong>教務主事室が発行する正式な書類（通知表、成績証明書等）</strong>を正として判断してください。
+                            平均点、順位、GPA、累計単位数等の計算結果には、システム上の端数処理や各種推定値が含まれる場合があります。単位修得の可否や進級判定等の最終的かつ公式な判断は、必ず<strong>教務発行の正式な書類（通知表、成績証明書等）</strong>を正として判断してください。
+                        </p>
+                        <p style="margin-top: 0.5rem; color: #b91c1c; font-size: 0.9rem;">
+                            ※ 特別学修単位の算入には上限がありますが、本システムでは上限は考慮されませんのでご注意ください。
                         </p>
                     </div>
                 </div>
@@ -897,7 +921,8 @@
                             style="flex-direction: column; align-items: flex-start;">
                             <label>種別1 (区分)</label>
                             <select id="subjectType1Input" style="width: 100%;">
-                                <option value="必">必 (必修)</option>
+                                <option value="必履修">必履修 (要履修)</option>
+                                <option value="必修得">必修得 (要単位)</option>
                                 <option value="選">選 (選択)</option>
                                 <option value="選必">選必 (選択必修)</option>
                                 <option value="特別学修">特別学修</option>
@@ -907,7 +932,9 @@
                             <label>種別2 (一般/専門)</label>
                             <select id="subjectType2Input" style="width: 100%;">
                                 <option value="一般">一般</option>
-                                <option value="専門">専門</option>
+                                <option value="専門共通">専門共通</option>
+                                <option value="基盤専門">基盤専門</option>
+                                <option value="応用専門">応用専門</option>
                                 <option value="その他">その他</option>
                             </select>
                         </div>
@@ -932,10 +959,10 @@
                             placeholder="例: コース共通, Mコース, etc.">
                         <datalist id="type4Suggestions">
                             <option value="コース共通">
-                            <option value="Mコース">
-                            <option value="Dコース">
-                            <option value="Eコース">
-                            <option value="Iコース">
+                            <option value="エネルギー機械">
+                            <option value="プロダクトデザイン">
+                            <option value="エレクトロニクス">
+                            <option value="知能情報">
                         </datalist>
                     </div>
                     <!-- Stats Exclude Toggle -->

@@ -7,48 +7,48 @@ const DEFAULT_STUDENTS_RAW = `
 `;
 
 const DEFAULT_SUBJECTS_RAW = `授業科目,単位,学年,種別1,種別2,種別3,種別4,除外
-国語1,2,1,必,一般,DP-C,コース共通
-国語2,2,2,必,一般,DP-C,コース共通
-国語3,2,3,必,一般,DP-C,コース共通
-言語と文化,2,4,必,一般,DP-C,コース共通
-社会1,2,1,必,一般,DP-A,コース共通
-社会2,2,2,必,一般,DP-A,コース共通
-社会3,2,3,必,一般,DP-A,コース共通
-現代社会論,2,4,必,一般,DP-A,コース共通
+国語1,2,1,必履修,一般,DP-C,コース共通,
+国語2,2,2,必履修,一般,DP-C,コース共通,
+国語3,2,3,必履修,一般,DP-C,コース共通,
+言語と文化,2,4,必履修,一般,DP-C,コース共通,1
+社会1,2,1,必履修,一般,DP-A,コース共通,
+社会2,2,2,必履修,一般,DP-A,コース共通,
+社会3,2,3,必履修,一般,DP-A,コース共通,
+現代社会論,2,4,必履修,一般,DP-A,コース共通,
 法律,2,5,選,一般,DP-A,コース共通,1
 経済,2,5,選,一般,DP-A,コース共通,1
 哲学,2,5,選,一般,DP-A,コース共通,1
 心理学,2,5,選,一般,DP-A,コース共通,1
-基礎数学A,2,1,必,一般,DP-B,コース共通
-基礎数学B,2,1,必,一般,DP-B,コース共通
-基礎数学C,2,1,必,一般,DP-B,コース共通
-微分積分1,2,2,必,一般,DP-B,コース共通
-微分積分2,2,2,必,一般,DP-B,コース共通
-ベクトル・行列,2,2,必,一般,DP-B,コース共通
-解析1,2,3,必,一般,DP-B,コース共通
-解析2,2,3,必,一般,DP-B,コース共通
-線形代数・微分方程式,2,3,必,一般,DP-B,コース共通
-確率統計,2,4,必,一般,DP-B,コース共通
-基礎物理1,2,1,必,一般,DP-B,コース共通
-基礎物理2,2,2,必,一般,DP-B,コース共通
-基礎物理3,2,3,必,一般,DP-B,コース共通
+基礎数学A,2,1,必修得,一般,DP-B,コース共通,
+基礎数学B,2,1,必修得,一般,DP-B,コース共通,
+基礎数学C,2,1,必修得,一般,DP-B,コース共通,
+微分積分1,2,2,必履修,一般,DP-B,コース共通,
+微分積分2,2,2,必履修,一般,DP-B,コース共通,
+ベクトル・行列,2,2,必履修,一般,DP-B,コース共通,
+解析1,2,3,必履修,一般,DP-B,コース共通,
+解析2,2,3,必履修,一般,DP-B,コース共通,
+線形代数・微分方程式,2,3,必履修,一般,DP-B,コース共通,
+確率統計,2,4,必履修,一般,DP-B,コース共通,
+基礎物理1,2,1,必履修,一般,DP-B,コース共通,
+基礎物理2,2,2,必履修,一般,DP-B,コース共通,
+基礎物理3,2,3,必履修,一般,DP-B,コース共通,
 現代物理学概論,2,5,選,一般,DP-B,コース共通,1
-化学1,3,1,必,一般,DP-B,コース共通
-化学2,2,2,必,一般,DP-B,コース共通
-生物,2,2,必,一般,DP-B,コース共通
-保健・体育1,2,1,必,一般,DP-A,コース共通
-保健・体育2,2,2,必,一般,DP-A,コース共通
-保健・体育3,2,3,必,一般,DP-A,コース共通
-保健・体育4,2,4,必,一般,DP-A,コース共通
-英語1,2,1,必,一般,DP-C,コース共通
-英語2,2,1,必,一般,DP-C,コース共通
-英語3,2,2,必,一般,DP-C,コース共通
-英語4,2,2,必,一般,DP-C,コース共通
-英語5,2,3,必,一般,DP-C,コース共通
-英語6,2,4,必,一般,DP-C,コース共通
-英語表現1,2,1,必,一般,DP-C,コース共通
-英語表現2,2,2,必,一般,DP-C,コース共通
-英語表現3,2,3,必,一般,DP-C,コース共通
+化学1,3,1,必履修,一般,DP-B,コース共通,
+化学2,2,2,必履修,一般,DP-B,コース共通,
+生物,2,2,必履修,一般,DP-B,コース共通,
+保健・体育1,2,1,必履修,一般,DP-A,コース共通,
+保健・体育2,2,2,必履修,一般,DP-A,コース共通,
+保健・体育3,2,3,必履修,一般,DP-A,コース共通,
+保健・体育4,2,4,必履修,一般,DP-A,コース共通,
+英語1,2,1,必履修,一般,DP-C,コース共通,
+英語2,2,1,必履修,一般,DP-C,コース共通,
+英語3,2,2,必履修,一般,DP-C,コース共通,
+英語4,2,2,必履修,一般,DP-C,コース共通,
+英語5,2,3,必履修,一般,DP-C,コース共通,
+英語6,2,4,必履修,一般,DP-C,コース共通,
+英語表現1,2,1,必履修,一般,DP-C,コース共通,
+英語表現2,2,2,必履修,一般,DP-C,コース共通,
+英語表現3,2,3,必履修,一般,DP-C,コース共通,
 英語A,2,4,選,一般,DP-C,コース共通,1
 英語B,2,4,選,一般,DP-C,コース共通,1
 中国語,2,4,選,一般,DP-C,コース共通,1
@@ -56,168 +56,168 @@ const DEFAULT_SUBJECTS_RAW = `授業科目,単位,学年,種別1,種別2,種別3
 美術,2,1,選必,一般,DP-A,コース共通,1
 書道,2,1,選必,一般,DP-A,コース共通,1
 音楽,2,1,選必,一般,DP-A,コース共通,1
-総合工学システム概論,1,1,必,専門共通,DP-D,コース共通
-総合工学システム実験実習,4,1,必,専門共通,DP-D,コース共通
-情報1,2,1,必,専門共通,DP-D,コース共通
-情報2,2,2,必,専門共通,DP-D,コース共通
-情報3,2,3,必,専門共通,DP-D,コース共通
-ダイバーシティと人権,1,1,必,専門共通,"DP-A, SDGs",コース共通
-多文化共生,1,4,必,専門共通,"DP-A, SDGs",コース共通
-労働環境と人権,2,5,必,専門共通,"DP-A, SDGs",コース共通
-技術倫理,2,5,必,専門共通,"DP-A, SDGs",コース共通
-システム安全入門,1,5,選,専門共通,"DP-A, SDGs",コース共通
-環境システム工学,1,5,選,専門共通,"DP-A, SDGs",コース共通
-資源と産業,1,5,選,専門共通,"DP-A, SDGs",コース共通
-環境倫理,1,5,選,専門共通,"DP-A, SDGs",コース共通
-応用数学A,2,4,必,専門共通,DP-B,コース共通
-応用数学B,2,4,必,専門共通,DP-B,コース共通
-物理学A,2,4,必,専門共通,DP-B,コース共通
-物理学B,2,4,必,専門共通,DP-B,コース共通
-計測工学,2,5,必,専門共通,DP-D,コース共通
-技術英語,2,5,必,専門共通,DP-C,コース共通
-機械工学概論,1,2,必,基盤専門,DP-D,コース共通
-基礎製図,2,2,必,基盤専門,DP-D,Mコース
-電気・電子回路,1,2,必,基盤専門,DP-D,Mコース
-シーケンス制御,1,2,必,基盤専門,DP-D,Mコース
-機械工作実習1,4,2,必,基盤専門,DP-D,Mコース
-材料力学入門,1,3,必,基盤専門,DP-D,Mコース
-熱力学入門,1,3,必,基盤専門,DP-D,Mコース
-流体力学入門,1,3,必,基盤専門,DP-D,Mコース
-機械工作法,2,3,必,基盤専門,DP-D,Mコース
-CAD製図,2,3,必,基盤専門,DP-D,Mコース
-機械設計製図,2,3,必,基盤専門,DP-D,Mコース
-機械工作実習2,4,3,必,基盤専門,DP-D,Mコース
-材料力学,2,4,必,基盤専門,DP-D,Mコース
-熱力学,2,4,必,基盤専門,DP-D,Mコース
-流れ学,2,4,必,基盤専門,DP-D,Mコース
-機械力学,2,4,必,基盤専門,DP-D,Mコース
-材料学,2,4,必,基盤専門,DP-D,Mコース
-数値計算,2,4,必,基盤専門,DP-D,Mコース
-エネルギー機械実験1,4,4,必,基盤専門,DP-D,Mコース
-機械設計,2,5,必,基盤専門,DP-D,Mコース
-伝熱工学,2,5,必,基盤専門,DP-D,Mコース
-流体工学,2,5,必,基盤専門,DP-D,Mコース
-加工工学,2,5,必,基盤専門,DP-D,Mコース
-制御工学,2,5,必,基盤専門,DP-D,Mコース
-制御工学,2,5,必,基盤専門,DP-D,Dコース
-エネルギー変換工学,2,5,必,基盤専門,DP-D,Mコース
-エネルギー機械実験2,2,5,必,基盤専門,DP-D,Mコース
-卒業研究,6,5,必,基盤専門,DP-E,Mコース
-プロダクトデザイン概論,1,2,必,基盤専門,DP-D,Dコース
-製図基礎,2,2,必,基盤専門,DP-D,Dコース
-プログラミング基礎,1,2,必,基盤専門,DP-D,Dコース
-機械工作法,1,2,必,基盤専門,DP-D,Dコース
-機械工作実習,4,2,必,基盤専門,DP-D,Dコース
-工業力学,1,3,必,基盤専門,DP-D,Dコース
-CAD設計製図,2,3,必,基盤専門,DP-D,Dコース
-材料学,2,3,必,基盤専門,DP-D,Dコース
-加工学,2,3,必,基盤専門,DP-D,Dコース
-ユニバーサルデザイン,2,3,必,基盤専門,DP-D,Dコース
-生産機械実習,4,3,必,基盤専門,DP-D,Dコース
-材料力学,2,4,必,基盤専門,DP-D,Dコース
-熱力学,2,4,必,基盤専門,DP-D,Dコース
-流体力学,2,4,必,基盤専門,DP-D,Dコース
-機械力学,2,4,必,基盤専門,DP-D,Dコース
-メカトロニクス,2,4,必,基盤専門,DP-D,Dコース
-ロボット工学,2,4,必,基盤専門,DP-D,Dコース
-プロダクトデザイン実験,4,4,必,基盤専門,DP-D,Dコース
-プロダクトデザイン,2,5,必,基盤専門,DP-D,Dコース
-CAM/CAE,2,5,必,基盤専門,DP-D,Dコース
-生産システム工学,2,5,必,基盤専門,DP-D,Dコース
-感性工学,2,5,必,基盤専門,DP-D,Dコース
-プロダクトデザイン実習,2,5,必,基盤専門,DP-D,Dコース
-卒業研究,6,5,必,基盤専門,DP-E,Dコース
-エレクトロニクス概論,1,2,必,基盤専門,DP-D,Eコース
-電気設備,1,2,必,基盤専門,DP-D,Eコース
-電気回路1,1,2,必,基盤専門,DP-D,Eコース
-電子回路1,1,2,必,基盤専門,DP-D,Eコース
-電気電子材料1,1,2,必,基盤専門,DP-D,Eコース
-エレクトロニクス実験実習,4,2,必,基盤専門,DP-D,Eコース
-電気回路2,1,3,必,基盤専門,DP-D,Eコース
-電磁気学1,2,3,必,基盤専門,DP-D,Eコース
-電気電子材料2,2,3,必,基盤専門,DP-D,Eコース
-半導体工学1,2,3,必,基盤専門,DP-D,Eコース
-工学設計演習,2,3,必,基盤専門,DP-D,Eコース
-エレクトロニクス実験1,4,3,必,基盤専門,DP-D,Eコース
-電子回路2,2,4,必,基盤専門,DP-D,Eコース
-電気回路3,2,4,必,基盤専門,DP-D,Eコース
-電磁気学2,1,4,必,基盤専門,DP,Eコース
-電気電子材料3,2,4,必,基盤専門,DP-D,Eコース
-半導体工学2,2,4,必,基盤専門,DP-D,Eコース
-コンピュータ工学基礎,2,4,必,基盤専門,DP-D,Eコース
-制御工学1,1,4,必,基盤専門,DP-D,Eコース
-エレクトロニクス実験2,4,4,必,基盤専門,DP-D,Eコース
-制御工学2,1,5,必,基盤専門,DP-D,Eコース
-電気機器,1,5,必,基盤専門,DP-D,Eコース
-電力技術,2,5,必,基盤専門,DP-D,Eコース
-パワーエレクトロニクス,2,5,必,基盤専門,DP-D,Eコース
-信号処理,2,5,必,基盤専門,DP-D,Eコース
-電気化学,1,5,必,基盤専門,DP-D,Eコース
-センサー工学,2,5,必,基盤専門,DP-D,Eコース
-ワイヤレス技術,1,5,必,基盤専門,DP-D,Eコース
-エレクトロニクス実験3,2,5,必,基盤専門,DP-D,Eコース
-卒業研究,6,5,必,基盤専門,DP-E,Eコース
-メディアデザイン入門,1,2,必,基盤専門,DP-D,Iコース
-論理回路1,1,2,必,基盤専門,DP-D,E,Iコース
-マイクロコンピュータ,1,2,必,基盤専門,DP-D,Iコース
-プログラミング1,2,2,必,基盤専門,DP-D,Iコース
-工学基礎実習,4,2,必,基盤専門,DP-D,Iコース
-プログラミング2,2,3,必,基盤専門,DP-D,Iコース
-プログラミング3,2,3,必,基盤専門,DP-D,Iコース
-アルゴリズムとデータ構造1,1,3,必,基盤専門,DP-D,Iコース
-論理回路2,1,3,必,基盤専門,DP-D,Iコース
-電気電子回路1,1,3,必,基盤専門,DP-D,Iコース
-知識科学概論,2,3,必,基盤専門,DP-D,Iコース
-知能情報実験実習1,4,3,必,基盤専門,DP-D,Iコース
-アルゴリズムとデータ構造2,2,4,必,基盤専門,DP-D,Iコース
-電気電子回路2,2,4,必,基盤専門,DP-D,Iコース
-データベース工学,2,4,必,基盤専門,DP-D,Iコース
-マルチメディア情報処理,2,4,必,基盤専門,DP-D,Iコース
-情報通信ネットワーク,2,4,必,基盤専門,DP-D,Iコース
-コンピュータシステム,2,4,必,基盤専門,DP-D,Iコース
-知能情報実験実習2,4,4,必,基盤専門,DP-D,Iコース
-オートマトンと形式言語,2,5,必,基盤専門,DP-D,Iコース
-ソフトウェア工学,2,5,必,基盤専門,DP-D,Iコース
-知能情報実験実習3,2,5,必,基盤専門,DP-D,Iコース
-オペレーティングシステム,2,5,必,基盤専門,DP-D,Iコース
-人工知能,2,5,必,基盤専門,DP-D,Iコース
-情報理論,2,5,必,基盤専門,DP-D,Iコース
-コンピュータアーキテクチャ,2,5,必,基盤専門,DP-D,Iコース
-卒業研究,6,5,必,基盤専門,DP-E,Iコース
-応用専門概論,1,3,必,応用専門,DP-E,コース共通
-応用専門PBL1,1,3,必,応用専門,DP-E,コース共通
-応用専門PBL2,2,4,必,応用専門,DP-E,コース共通
-インターンシップ,1,4,選,応用専門,DP-E,コース共通
-生活と物質,1,4,選必,応用専門,DP-E,コース共通
-社会と環境,1,4,選必,応用専門,DP-E,コース共通
-食品エンジニアリング,2,5,選必,応用専門,DP-E,コース共通
-コスメティックス,2,5,選必,応用専門,DP-E,コース共通
-バイオテクノロジー,2,5,選必,応用専門,DP-E,コース共通
-高純度化技術,2,5,選必,応用専門,DP-E,コース共通
-環境モニタリング,2,5,選必,応用専門,DP-E,コース共通
-エネルギー変換デバイス,2,5,選必,応用専門,DP-E,コース共通
-食と健康のセンサ,2,5,選必,応用専門,DP-E,コース共通
-環境対応デバイス,2,5,選必,応用専門,DP-E,コース共通
-社会基盤構造,2,5,選必,応用専門,DP-E,コース共通
-環境衛生工学,2,5,選必,応用専門,DP-E,コース共通
-維持管理工学,2,5,選必,応用専門,DP-E,コース共通
-水環境工学,2,5,選必,応用専門,DP-E,コース共通
-環境デザイン論,2,5,選必,応用専門,DP-E,コース共通
-インクルーシブデザイン,2,5,選必,応用専門,DP-E,コース共通
-空間情報学,2,5,選必,応用専門,DP-E,コース共通
-環境行動,2,5,選必,応用専門,DP-E,コース共通
-特・特別活動1,0,1,必,その他,Other,コース共通,1
-特・特別活動2,0,2,必,その他,Other,コース共通,1
-特・特別活動3,0,3,必,その他,Other,コース共通,1
-特・防災リテラシー(1),1,0,選,専門,"DP-A, SDGs",コース共通,1
-特・防災リテラシー(2),2,0,選,専門,"DP-A, SDGs",コース共通,1
-特・防災リテラシー(3),3,0,選,専門,"DP-A, SDGs",コース共通,1
-特・総合課題実習1,1,2,選,特別学修,DP-E,コース共通,1
-特・総合課題実習1,1,3,選,特別学修,DP-E,コース共通,1
-特・総合課題実習2,1,3,選,特別学修,DP-E,コース共通,1
-特・総合課題実習2,1,4,選,特別学修,DP-E,コース共通,1
-特・総合課題実習3,1,4,選,特別学修,DP-E,コース共通,1
-特・総合課題実習3,1,5,選,特別学修,DP-E,コース共通,1`;
+総合工学システム概論,1,1,必修得,専門共通,DP-D,コース共通,
+総合工学システム実験実習,4,1,必修得,専門共通,DP-D,コース共通,
+情報1,2,1,必履修,専門共通,DP-D,コース共通,
+情報2,2,2,必履修,専門共通,DP-D,コース共通,
+情報3,2,3,必履修,専門共通,DP-D,コース共通,
+ダイバーシティと人権,1,1,必履修,専門共通,"DP-A, SDGs",コース共通,
+多文化共生,1,4,必履修,専門共通,"DP-A, SDGs",コース共通,
+労働環境と人権,2,5,必履修,専門共通,"DP-A, SDGs",コース共通,
+技術倫理,2,5,必履修,専門共通,"DP-A, SDGs",コース共通,
+システム安全入門,1,5,選,専門共通,"DP-A, SDGs",コース共通,
+環境システム工学,1,5,選,専門共通,"DP-A, SDGs",コース共通,
+資源と産業,1,5,選,専門共通,"DP-A, SDGs",コース共通,
+環境倫理,1,5,選,専門共通,"DP-A, SDGs",コース共通,
+応用数学A,2,4,必履修,専門共通,DP-B,コース共通,
+応用数学B,2,4,必履修,専門共通,DP-B,コース共通,
+物理学A,2,4,必履修,専門共通,DP-B,コース共通,
+物理学B,2,4,必履修,専門共通,DP-B,コース共通,
+計測工学,2,5,必履修,専門共通,DP-D,コース共通,
+技術英語,2,5,必履修,専門共通,DP-C,コース共通,
+機械工学概論,1,2,必履修,基盤専門,DP-D,エネルギー機械,
+基礎製図,2,2,必履修,基盤専門,DP-D,エネルギー機械,
+電気・電子回路,1,2,必履修,基盤専門,DP-D,エネルギー機械,
+シーケンス制御,1,2,必履修,基盤専門,DP-D,エネルギー機械,
+機械工作実習1,4,2,必修得,基盤専門,DP-D,エネルギー機械,
+材料力学入門,1,3,必履修,基盤専門,DP-D,エネルギー機械,
+熱力学入門,1,3,必履修,基盤専門,DP-D,エネルギー機械,
+流体力学入門,1,3,必履修,基盤専門,DP-D,エネルギー機械,
+機械工作法,2,3,必履修,基盤専門,DP-D,エネルギー機械,
+CAD製図,2,3,必履修,基盤専門,DP-D,エネルギー機械,
+機械設計製図,2,3,必履修,基盤専門,DP-D,エネルギー機械,
+機械工作実習2,4,3,必修得,基盤専門,DP-D,エネルギー機械,
+材料力学,2,4,必履修,基盤専門,DP-D,エネルギー機械,
+熱力学,2,4,必履修,基盤専門,DP-D,エネルギー機械,
+流れ学,2,4,必履修,基盤専門,DP-D,エネルギー機械,
+機械力学,2,4,必履修,基盤専門,DP-D,エネルギー機械,
+材料学,2,4,必履修,基盤専門,DP-D,エネルギー機械,
+数値計算,2,4,必履修,基盤専門,DP-D,エネルギー機械,
+エネルギー機械実験1,4,4,必修得,基盤専門,DP-D,エネルギー機械,
+機械設計,2,5,必履修,基盤専門,DP-D,エネルギー機械,
+伝熱工学,2,5,必履修,基盤専門,DP-D,エネルギー機械,
+流体工学,2,5,必履修,基盤専門,DP-D,エネルギー機械,
+生産加工工学,2,5,必履修,基盤専門,DP-D,エネルギー機械,
+制御工学,2,5,必履修,基盤専門,DP-D,エネルギー機械,
+制御工学,2,5,必履修,基盤専門,DP-D,プロダクトデザイン,
+エネルギー変換工学,2,5,必履修,基盤専門,DP-D,エネルギー機械,
+エネルギー機械実験2,2,5,必修得,基盤専門,DP-D,エネルギー機械,
+卒業研究,6,5,必修得,基盤専門,DP-E,エネルギー機械,
+プロダクトデザイン概論,1,2,必履修,基盤専門,DP-D,プロダクトデザイン,
+製図基礎,2,2,必履修,基盤専門,DP-D,プロダクトデザイン,
+プログラミング基礎,1,2,必履修,基盤専門,DP-D,プロダクトデザイン,
+機械工作法,1,2,必履修,基盤専門,DP-D,プロダクトデザイン,
+機械工作実習,4,2,必修得,基盤専門,DP-D,プロダクトデザイン,
+工業力学,1,3,必履修,基盤専門,DP-D,プロダクトデザイン,
+CAD設計製図,2,3,必履修,基盤専門,DP-D,プロダクトデザイン,
+材料学,2,3,必履修,基盤専門,DP-D,プロダクトデザイン,
+加工学,2,3,必履修,基盤専門,DP-D,プロダクトデザイン,
+ユニバーサルデザイン,2,3,必履修,基盤専門,DP-D,プロダクトデザイン,
+生産機械実習,4,3,必修得,基盤専門,DP-D,プロダクトデザイン,
+材料力学,2,4,必履修,基盤専門,DP-D,プロダクトデザイン,
+熱力学,2,4,必履修,基盤専門,DP-D,プロダクトデザイン,
+流体力学,2,4,必履修,基盤専門,DP-D,プロダクトデザイン,
+機械力学,2,4,必履修,基盤専門,DP-D,プロダクトデザイン,
+メカトロニクス,2,4,必履修,基盤専門,DP-D,プロダクトデザイン,
+ロボット工学,2,4,必履修,基盤専門,DP-D,プロダクトデザイン,
+プロダクトデザイン実験,4,4,必修得,基盤専門,DP-D,プロダクトデザイン,
+プロダクトデザイン,2,5,必履修,基盤専門,DP-D,プロダクトデザイン,
+CAM/CAE,2,5,必履修,基盤専門,DP-D,プロダクトデザイン,
+生産システム工学,2,5,必履修,基盤専門,DP-D,プロダクトデザイン,
+感性工学,2,5,必履修,基盤専門,DP-D,プロダクトデザイン,
+プロダクトデザイン実習,2,5,必修得,基盤専門,DP-D,プロダクトデザイン,
+卒業研究,6,5,必修得,基盤専門,DP-E,プロダクトデザイン,
+エレクトロニクス概論,1,2,必履修,基盤専門,DP-D,エレクトロニクス,
+電気設備,1,2,必履修,基盤専門,DP-D,エレクトロニクス,
+電気回路1,1,2,必履修,基盤専門,DP-D,エレクトロニクス,
+電子回路1,1,2,必履修,基盤専門,DP-D,エレクトロニクス,
+電気電子材料1,1,2,必履修,基盤専門,DP-D,エレクトロニクス,
+エレクトロニクス実験実習,4,2,必修得,基盤専門,DP-D,エレクトロニクス,
+電気回路2,1,3,必履修,基盤専門,DP-D,エレクトロニクス,
+電磁気学1,2,3,必履修,基盤専門,DP-D,エレクトロニクス,
+電気電子材料2,2,3,必履修,基盤専門,DP-D,エレクトロニクス,
+半導体工学1,2,3,必履修,基盤専門,DP-D,エレクトロニクス,
+工学設計演習,2,3,必履修,基盤専門,DP-D,エレクトロニクス,
+エレクトロニクス実験1,4,3,必修得,基盤専門,DP-D,エレクトロニクス,
+電子回路2,2,4,必履修,基盤専門,DP-D,エレクトロニクス,
+電気回路3,2,4,必履修,基盤専門,DP-D,エレクトロニクス,
+電磁気学2,1,4,必履修,基盤専門,DP,エレクトロニクス,
+電気電子材料3,2,4,必履修,基盤専門,DP-D,エレクトロニクス,
+半導体工学2,2,4,必履修,基盤専門,DP-D,エレクトロニクス,
+コンピュータ工学基礎,2,4,必履修,基盤専門,DP-D,エレクトロニクス,
+制御工学1,1,4,必履修,基盤専門,DP-D,エレクトロニクス,
+エレクトロニクス実験2,4,4,必修得,基盤専門,DP-D,エレクトロニクス,
+制御工学2,1,5,必履修,基盤専門,DP-D,エレクトロニクス,
+電気機器,1,5,必履修,基盤専門,DP-D,エレクトロニクス,
+電力技術,2,5,必履修,基盤専門,DP-D,エレクトロニクス,
+パワーエレクトロニクス,2,5,必履修,基盤専門,DP-D,エレクトロニクス,
+信号処理,2,5,必履修,基盤専門,DP-D,エレクトロニクス,
+電気化学,1,5,必履修,基盤専門,DP-D,エレクトロニクス,
+センサー工学,2,5,必履修,基盤専門,DP-D,エレクトロニクス,
+ワイヤレス技術,1,5,必履修,基盤専門,DP-D,エレクトロニクス,
+エレクトロニクス実験3,2,5,必修得,基盤専門,DP-D,エレクトロニクス,
+卒業研究,6,5,必修得,基盤専門,DP-E,エレクトロニクス,
+メディアデザイン入門,1,2,必履修,基盤専門,DP-D,知能情報,
+論理回路1,1,2,必履修,基盤専門,DP-D,知能情報,
+マイクロコンピュータ,1,2,必履修,基盤専門,DP-D,知能情報,
+プログラミング1,2,2,必履修,基盤専門,DP-D,知能情報,
+工学基礎実習,4,2,必修得,基盤専門,DP-D,知能情報,
+プログラミング2,2,3,必履修,基盤専門,DP-D,知能情報,
+プログラミング3,2,3,必履修,基盤専門,DP-D,知能情報,
+アルゴリズムとデータ構造1,1,3,必履修,基盤専門,DP-D,知能情報,
+論理回路2,1,3,必履修,基盤専門,DP-D,知能情報,
+電気電子回路1,1,3,必履修,基盤専門,DP-D,知能情報,
+知識科学概論,2,3,必履修,基盤専門,DP-D,知能情報,
+知能情報実験実習1,4,3,必修得,基盤専門,DP-D,知能情報,
+アルゴリズムとデータ構造2,2,4,必履修,基盤専門,DP-D,知能情報,
+電気電子回路2,2,4,必履修,基盤専門,DP-D,知能情報,
+データベース工学,2,4,必履修,基盤専門,DP-D,知能情報,
+マルチメディア情報処理,2,4,必履修,基盤専門,DP-D,知能情報,
+情報通信ネットワーク,2,4,必履修,基盤専門,DP-D,知能情報,
+コンピュータシステム,2,4,必履修,基盤専門,DP-D,知能情報,
+知能情報実験実習2,4,4,必修得,基盤専門,DP-D,知能情報,
+オートマトンと形式言語,2,5,必履修,基盤専門,DP-D,知能情報,
+ソフトウェア工学,2,5,必履修,基盤専門,DP-D,知能情報,
+知能情報実験実習3,2,5,必修得,基盤専門,DP-D,知能情報,
+オペレーティングシステム,2,5,必履修,基盤専門,DP-D,知能情報,
+人工知能,2,5,必履修,基盤専門,DP-D,知能情報,
+情報理論,2,5,必履修,基盤専門,DP-D,知能情報,
+コンピュータアーキテクチャ,2,5,必履修,基盤専門,DP-D,知能情報,
+卒業研究,6,5,必修得,基盤専門,DP-E,知能情報,
+応用専門概論,1,3,必修得,応用専門,DP-E,コース共通,
+応用専門PBL1,1,3,必修得,応用専門,DP-E,コース共通,
+応用専門PBL2,2,4,必修得,応用専門,DP-E,コース共通,
+インターンシップ,1,4,選,応用専門,DP-E,コース共通,
+生活と物質,1,4,選必,応用専門,DP-E,コース共通,
+社会と環境,1,4,選必,応用専門,DP-E,コース共通,
+物質プロセス基礎,2,5,選必,応用専門,DP-E,コース共通,
+物質デザイン概論,2,5,選必,応用専門,DP-E,コース共通,
+防災工学,2,4,選必,応用専門,DP-E,コース共通,
+エルゴノミクス,2,4,選必,応用専門,DP-E,コース共通,
+食品エンジニアリング,2,5,選必,応用専門,DP-E,コース共通,
+コスメティックス,2,5,選必,応用専門,DP-E,コース共通,
+バイオテクノロジー,2,5,選必,応用専門,DP-E,コース共通,
+高純度化技術,2,5,選必,応用専門,DP-E,コース共通,
+環境モニタリング,2,5,選必,応用専門,DP-E,コース共通,
+エネルギー変換デバイス,2,5,選必,応用専門,DP-E,コース共通,
+食と健康のセンサ,2,5,選必,応用専門,DP-E,コース共通,
+環境対応デバイス,2,5,選必,応用専門,DP-E,コース共通,
+社会基盤構造,2,5,選必,応用専門,DP-E,コース共通,
+環境衛生工学,2,5,選必,応用専門,DP-E,コース共通,
+維持管理工学,2,5,選必,応用専門,DP-E,コース共通,
+水環境工学,2,5,選必,応用専門,DP-E,コース共通,
+環境デザイン論,2,5,選必,応用専門,DP-E,コース共通,
+インクルーシブデザイン,2,5,選必,応用専門,DP-E,コース共通,
+空間情報学,2,5,選必,応用専門,DP-E,コース共通,
+環境行動,2,5,選必,応用専門,DP-E,コース共通,
+特・特別活動1,0,1,必修得,その他,Other,コース共通,
+特・特別活動2,0,2,必修得,その他,Other,コース共通,
+特・特別活動3,0,3,必修得,その他,Other,コース共通,
+特・防災リテラシー,1,0,選,専門,"DP-A, SDGs",コース共通,1
+特・総合課題実習1,1,0,選,特別学修,DP-E,コース共通,1
+特・総合課題実習2,1,0,選,特別学修,DP-E,コース共通,1
+特・総合課題実習3,1,0,選,特別学修,DP-E,コース共通,1
+`;
 
 // Load current master data from storage
 let STUDENTS_RAW = localStorage.getItem('gm_master_students') || DEFAULT_STUDENTS_RAW;
@@ -284,6 +284,17 @@ function loadSessionState() {
     if (savedAtRiskTest) state.atRiskTest = savedAtRiskTest;
     if (savedAtRiskYear) state.atRiskYear = parseInt(savedAtRiskYear);
     if (savedAtRiskMode) state.atRiskMode = savedAtRiskMode;
+
+    // MIGRATION: Rename courses to formal names
+    const courseMap = {
+        'Mコース': 'エネルギー機械',
+        'Dコース': 'プロダクトデザイン',
+        'Eコース': 'エレクトロニクス',
+        'Iコース': '知能情報'
+    };
+    if (courseMap[state.currentCourse]) {
+        state.currentCourse = courseMap[state.currentCourse];
+    }
 
     // Ensure the student exists in the current list
     if (savedStudent && state.students.includes(savedStudent)) {
@@ -385,6 +396,8 @@ function initAuth() {
 async function handleLogin() {
     const passInput = document.getElementById('loginPass');
     const errorMsg = document.getElementById('loginError');
+    if (!passInput) return;
+
     const password = passInput.value;
 
     if (!password) {
@@ -395,19 +408,23 @@ async function handleLogin() {
     const hash = await hashPassword(password);
     if (hash === state.passwordHash) {
         state.isLoggedIn = true;
-        errorMsg.style.display = 'none';
+        if (errorMsg) errorMsg.style.display = 'none';
         passInput.value = '';
         initAuth(); // This will reveal the main content and hide overlay
     } else {
-        errorMsg.style.display = 'block';
+        if (errorMsg) errorMsg.style.display = 'block';
         passInput.value = '';
         passInput.focus();
     }
 }
 
 async function handleSetup() {
-    const p1 = document.getElementById('setupPass1').value;
-    const p2 = document.getElementById('setupPass2').value;
+    const p1El = document.getElementById('setupPass1');
+    const p2El = document.getElementById('setupPass2');
+    if (!p1El || !p2El) return;
+
+    const p1 = p1El.value;
+    const p2 = p2El.value;
 
     if (!p1 || p1.length < 4) {
         alert('パスワードは4文字以上で入力してください（これは新しく決めるパスワードです）。');
@@ -598,6 +615,10 @@ function refreshMasterData() {
                     type3 = parts.length > 5 ? parts[5].trim() : '';
                     type4 = parts.length > 6 ? parts[6].trim() : '';
                     exclude = parts.length > 7 ? (parts[7].trim() === '1') : false;
+
+                    // Support Migration within refreshMasterData
+                    const cm = { 'Mコース': 'エネルギー機械', 'Dコース': 'プロダクトデザイン', 'Eコース': 'エレクトロニクス', 'Iコース': '知能情報' };
+                    if (cm[type4]) type4 = cm[type4];
                 } else {
                     // Legacy TSV: Name, Credits, Year, Type1, Type2, Exclude
                     exclude = parts.length > 5 ? (parts[5].trim() === '1') : false;
@@ -687,13 +708,12 @@ function populateControls() {
 }
 
 function setupEventListeners() {
-    document.getElementById('studentSelect').addEventListener('change', (e) => {
+    document.getElementById('studentSelect')?.addEventListener('change', (e) => {
         state.currentStudent = e.target.value;
         saveSessionState();
         render();
     });
-
-    document.getElementById('yearSelect').addEventListener('change', (e) => {
+    document.getElementById('yearSelect')?.addEventListener('change', (e) => {
         state.currentYear = parseInt(e.target.value);
         saveSessionState();
         // Update box plot to show this year's data
@@ -701,8 +721,7 @@ function setupEventListeners() {
         state.boxPlotTest = null;
         render();
     });
-
-    document.getElementById('hideEmptySubjects').addEventListener('change', (e) => {
+    document.getElementById('hideEmptySubjects')?.addEventListener('change', (e) => {
         state.hideEmptySubjects = e.target.checked;
         saveSessionState();
         render();
@@ -715,39 +734,35 @@ function setupEventListeners() {
             switchTab(tab);
         });
     });
-
-    document.getElementById('saveBtn').addEventListener('click', saveData);
-    document.getElementById('printBtn').addEventListener('click', () => window.print());
-    document.getElementById('exportJsonBtn').addEventListener('click', exportJson);
+    document.getElementById('saveBtn')?.addEventListener('click', saveData);
+    document.getElementById('printBtn')?.addEventListener('click', () => window.print());
+    document.getElementById('exportJsonBtn')?.addEventListener('click', exportJson);
 
     // Import CSV
-    document.getElementById('importBtn').addEventListener('click', () => {
-        document.getElementById('csvFileInput').click();
+    document.getElementById('importBtn')?.addEventListener('click', () => {
+        document.getElementById('csvFileInput')?.click();
     });
-    document.getElementById('csvFileInput').addEventListener('change', handleFileUpload);
-
-    // Clear All Data
-    document.getElementById('clearBtn').addEventListener('click', clearAllData);
+    document.getElementById('csvFileInput')?.addEventListener('change', handleFileUpload);
 
     // Paste Modal
-    document.getElementById('closeModalBtn').addEventListener('click', closePasteModal);
-    document.getElementById('cancelPasteBtn').addEventListener('click', closePasteModal);
-    document.getElementById('applyPasteBtn').addEventListener('click', applyPaste);
+    document.getElementById('closeModalBtn')?.addEventListener('click', closePasteModal);
+    document.getElementById('cancelPasteBtn')?.addEventListener('click', closePasteModal);
+    document.getElementById('applyPasteBtn')?.addEventListener('click', applyPaste);
 
     // Close modal on click outside
-    document.getElementById('pasteModal').addEventListener('click', (e) => {
+    document.getElementById('pasteModal')?.addEventListener('click', (e) => {
         if (e.target === document.getElementById('pasteModal')) closePasteModal();
     });
 
     // Box Plot Controls
-    document.getElementById('boxPlotYearSelect').addEventListener('change', (e) => {
+    document.getElementById('boxPlotYearSelect')?.addEventListener('change', (e) => {
         const val = e.target.value;
         state.boxPlotYear = val ? parseInt(val) : null;
         saveSessionState();
         renderBoxPlot();
     });
 
-    document.getElementById('boxPlotTestSelect').addEventListener('change', (e) => {
+    document.getElementById('boxPlotTestSelect')?.addEventListener('change', (e) => {
         state.boxPlotTest = e.target.value || null;
         saveSessionState();
         renderBoxPlot();
@@ -806,25 +821,26 @@ function setupEventListeners() {
     });
 
     // Setting Editor Controls
-    document.getElementById('addStudentBtn').addEventListener('click', addStudentSetting);
-    document.getElementById('addSubjectBtn').addEventListener('click', () => openSubjectModal());
-    document.getElementById('saveSubjectItemBtn').addEventListener('click', saveSubjectItem);
-    document.getElementById('finalSaveSettingsBtn').addEventListener('click', saveFinalSettings);
-    document.getElementById('restoreDefaultsBtn').addEventListener('click', restoreMasterDefaults);
-    document.getElementById('changePassBtn').addEventListener('click', openPasswordChange);
-    document.getElementById('headerHelpBtn').addEventListener('click', () => switchTab('help'));
+    document.getElementById('addStudentBtn')?.addEventListener('click', addStudentSetting);
+    document.getElementById('addSubjectBtn')?.addEventListener('click', () => openSubjectModal());
+    document.getElementById('saveSubjectItemBtn')?.addEventListener('click', saveSubjectItem);
+    document.getElementById('finalSaveSettingsBtn')?.addEventListener('click', saveFinalSettings);
+    document.getElementById('restoreDefaultsBtn')?.addEventListener('click', restoreMasterDefaults);
+    document.getElementById('changePassBtn')?.addEventListener('click', openPasswordChange);
+    document.getElementById('clearAllDataBtn')?.addEventListener('click', clearAllDataHard);
+    document.getElementById('headerHelpBtn')?.addEventListener('click', () => switchTab('help'));
 
     // Auth Listeners
-    document.getElementById('doLoginBtn').addEventListener('click', handleLogin);
-    document.getElementById('loginPass').addEventListener('keypress', (e) => {
+    document.getElementById('doLoginBtn')?.addEventListener('click', handleLogin);
+    document.getElementById('loginPass')?.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') handleLogin();
     });
-    document.getElementById('confirmSetupBtn').addEventListener('click', handleSetup);
-    document.getElementById('setupPass2').addEventListener('keypress', (e) => {
+    document.getElementById('confirmSetupBtn')?.addEventListener('click', handleSetup);
+    document.getElementById('setupPass2')?.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') handleSetup();
     });
-    document.getElementById('logoutBtn').addEventListener('click', handleLogout);
-    document.getElementById('forgotPassBtn').addEventListener('click', () => {
+    document.getElementById('logoutBtn')?.addEventListener('click', handleLogout);
+    document.getElementById('forgotPassBtn')?.addEventListener('click', () => {
         if (confirm('【警告】パスワードを忘れたため、システムを初期化しますか？\n\nこの操作を行うと、入力済みの成績データ、学生リスト、科目設定がすべて消去されます。元に戻すことはできません。')) {
             if (confirm('本当によろしいですか？（すべてのデータが削除されます）')) {
                 localStorage.clear();
@@ -834,51 +850,45 @@ function setupEventListeners() {
         }
     });
 
-    const exportStudentsBtn = document.getElementById('exportStudentsCsvBtn');
-    if (exportStudentsBtn) {
-        exportStudentsBtn.addEventListener('click', exportStudentsCsv);
-    }
-    const exportSubjectsBtn = document.getElementById('exportSubjectsCsvBtn');
-    if (exportSubjectsBtn) {
-        exportSubjectsBtn.addEventListener('click', exportSubjectsCsv);
-    }
+    document.getElementById('exportStudentsCsvBtn')?.addEventListener('click', exportStudentsCsv);
+    document.getElementById('exportSubjectsCsvBtn')?.addEventListener('click', exportSubjectsCsv);
 
-    const subjectSearch = document.getElementById('subjectSearchInput');
-    if (subjectSearch) {
-        subjectSearch.addEventListener('input', render);
-    }
-    const courseFilterHeader = document.getElementById('subjectCourseFilterHeader');
-    if (courseFilterHeader) {
-        courseFilterHeader.addEventListener('change', (e) => {
-            state.currentCourse = e.target.value;
-            const other = document.getElementById('subjectCourseFilter');
-            if (other) other.value = state.currentCourse;
-            saveSessionState();
-            render();
-        });
-    }
+    document.getElementById('subjectSearchInput')?.addEventListener('input', render);
 
-    const courseFilterSettings = document.getElementById('subjectCourseFilter');
-    if (courseFilterSettings) {
-        courseFilterSettings.addEventListener('change', (e) => {
-            state.currentCourse = e.target.value;
-            const other = document.getElementById('subjectCourseFilterHeader');
-            if (other) other.value = state.currentCourse;
-            saveSessionState();
-            render();
-        });
-    }
+    document.getElementById('subjectCourseFilterHeader')?.addEventListener('change', (e) => {
+        state.currentCourse = e.target.value;
+        const other = document.getElementById('subjectCourseFilter');
+        if (other) other.value = state.currentCourse;
+        saveSessionState();
+        render();
+    });
 
-    const isSpecialCheckbox = document.getElementById('isSpecialSubject');
-    if (isSpecialCheckbox) {
-        isSpecialCheckbox.addEventListener('change', (e) => {
-            const isSpecial = e.target.checked;
-            const yearWrapper = document.getElementById('subjectYearWrapper');
-            const type1Wrapper = document.getElementById('subjectType1Wrapper');
-            if (yearWrapper) yearWrapper.style.display = isSpecial ? 'none' : 'flex';
-            if (type1Wrapper) type1Wrapper.style.display = isSpecial ? 'none' : 'flex';
+    document.getElementById('subjectCourseFilter')?.addEventListener('change', (e) => {
+        state.currentCourse = e.target.value;
+        const other = document.getElementById('subjectCourseFilterHeader');
+        if (other) other.value = state.currentCourse;
+        saveSessionState();
+        render();
+    });
+
+    document.getElementById('gradCourseFilter')?.addEventListener('change', (e) => {
+        state.currentCourse = e.target.value;
+        // Sync other course selects if they exist
+        ['subjectCourseFilterHeader', 'subjectCourseFilter'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.value = state.currentCourse;
         });
-    }
+        saveSessionState();
+        render();
+    });
+
+    document.getElementById('isSpecialSubject')?.addEventListener('change', (e) => {
+        const isSpecial = e.target.checked;
+        const yearWrapper = document.getElementById('subjectYearWrapper');
+        const type1Wrapper = document.getElementById('subjectType1Wrapper');
+        if (yearWrapper) yearWrapper.style.display = isSpecial ? 'none' : 'flex';
+        if (type1Wrapper) type1Wrapper.style.display = isSpecial ? 'none' : 'flex';
+    });
 }
 
 function switchTab(tabName) {
@@ -930,27 +940,7 @@ function saveData() {
     alert('データが保存されました (Data Saved)');
 }
 
-function clearAllData() {
-    // Confirm before clearing
-    const confirmed = confirm(
-        '本当に全てのデータをクリアしますか？\n' +
-        'この操作は取り消せません。\n\n' +
-        'Are you sure you want to clear all data?\n' +
-        'This action cannot be undone.'
-    );
 
-    if (confirmed) {
-        // Clear EVERYTHING
-        localStorage.clear();
-
-        // Explicitly set as initialized but EMPTY students
-        localStorage.setItem('grade_manager_initialized', 'true');
-        localStorage.setItem('grade_manager_students', JSON.stringify([]));
-
-        alert('学生名を含め、全てのデータと設定がクリアされました。');
-        location.reload();
-    }
-}
 
 function exportJson() {
     // Prepare data for export
@@ -1556,15 +1546,41 @@ function saveFinalSettings() {
 }
 
 function restoreMasterDefaults() {
-    if (confirm('科目定義をデフォルトに戻し、学生リストを空にしますか？\n(現在の編集内容は失われます。保存済みの成績データは維持されます。)')) {
+    if (confirm('科目定義のみを初期値（デフォルト）に戻しますか？\n\n・現在編集中の科目定義は失われます。\n・学生リストや成績データは保持されます。')) {
         localStorage.removeItem('gm_master_subjects');
         localStorage.removeItem('gm_master_subjects_json'); // Clear JSON cache to force default reload
-        // Set students to empty but keep initialized flag so they don't come back
-        localStorage.setItem('grade_manager_students', JSON.stringify([]));
-        localStorage.setItem('grade_manager_initialized', 'true');
 
-        alert('学生リストを削除し、科目定義をリセットしました。');
+        // Do NOT touch students or scores
+        // localStorage.setItem('grade_manager_students', JSON.stringify([])); 
+        // localStorage.setItem('grade_manager_initialized', 'true');
+
+        alert('科目定義を初期値に戻しました。');
         location.reload();
+    }
+}
+
+function clearAllDataHard() {
+    if (confirm('【危険】全てのデータをリセットしますか？\n\n・学生リスト\n・科目定義\n・全ての成績データ\n\nが完全に削除され、初期状態に戻ります。\n(パスワード設定のみ保持されます)')) {
+        if (confirm('本当に実行してよろしいですか？\nこの操作は取り消せません。')) {
+            localStorage.removeItem('gm_master_subjects');
+            localStorage.removeItem('gm_master_subjects_json');
+            localStorage.removeItem('grade_manager_students');
+            localStorage.removeItem('grade_manager_scores');
+            // Remove initialized flag to force re-generation of defaults if code has them
+            localStorage.removeItem('grade_manager_initialized');
+
+            // Also clear state settings but keep auth
+            localStorage.removeItem('gm_state_tab');
+            localStorage.removeItem('gm_state_student');
+            localStorage.removeItem('gm_state_year');
+            localStorage.removeItem('gm_state_hide_empty');
+            localStorage.removeItem('gm_state_boxplot_year');
+            localStorage.removeItem('gm_state_boxplot_test');
+            localStorage.removeItem('gm_state_course');
+
+            alert('全データをリセットしました。アプリケーションを再読み込みします。');
+            location.reload();
+        }
     }
 }
 
@@ -1814,7 +1830,12 @@ function renderGraduationRequirements() {
 
     const summaryContainer = document.getElementById('gradRequirementsSummary');
     const detailsBody = document.getElementById('gradRequirementsDetails');
+    const courseFilterSelect = document.getElementById('gradCourseFilter');
     if (!summaryContainer || !detailsBody) return;
+
+    if (courseFilterSelect) {
+        courseFilterSelect.value = state.currentCourse || '';
+    }
 
     summaryContainer.innerHTML = '';
     detailsBody.innerHTML = '';
@@ -1831,8 +1852,7 @@ function renderGraduationRequirements() {
     let totalGeneralCredits = 0;
     let totalProfessionalCredits = 0;
 
-    // Caps
-    let capSpecialStudy = 60;
+    // Special Study units
     let earnedSpecialStudyRaw = 0;
 
     let dpACredits = 0;
@@ -1864,7 +1884,10 @@ function renderGraduationRequirements() {
         const type3 = (sub.type3 || '').toLowerCase();
 
         // (2) All Required completed
-        if (type1 === '必' || type1 === '必修') {
+        // User requested that "Required Subjects Completion" refers to '必修得' (Mandatory Credit).
+        // We include legacy '必'/'必修' for backward compatibility but exclude '必履修' (Mandatory Enrollment).
+        const isRequired = ['必', '必修', '必修得'].includes(type1);
+        if (isRequired) {
             totalRequiredCount++;
             if (passed) {
                 completedRequiredCount++;
@@ -1898,9 +1921,8 @@ function renderGraduationRequirements() {
         }
     });
 
-    // Handle Caps for Special Study (No more than 60 credits count towards Professional credits)
-    const appliedSpecialStudy = Math.min(earnedSpecialStudyRaw, capSpecialStudy);
-    totalProfessionalCredits += appliedSpecialStudy;
+    // Add Special Study to Professional credits (Upper limit not considered as per user request)
+    totalProfessionalCredits += earnedSpecialStudyRaw;
 
     const totalCredits = totalGeneralCredits + totalProfessionalCredits;
 
@@ -1932,18 +1954,18 @@ function renderGraduationRequirements() {
         },
         {
             name: "必修科目 完勝状況",
-            target: `全${totalRequiredCount}科目`,
-            current: `${completedRequiredCount}科目取得`,
-            percent: totalRequiredCount > 0 ? (completedRequiredCount / totalRequiredCount) * 100 : 100,
-            judge: allRequiredPassed,
+            target: courseFilter ? `全${totalRequiredCount}科目` : '-',
+            current: courseFilter ? `${completedRequiredCount}科目取得` : 'コース未選択',
+            percent: courseFilter && totalRequiredCount > 0 ? (completedRequiredCount / totalRequiredCount) * 100 : 0,
+            judge: courseFilter ? allRequiredPassed : false,
             id: "req-required"
         },
         {
             name: "DP-A 単位数",
-            target: "21単位以上",
+            target: "25単位以上",
             current: `${dpACredits.toFixed(1)}単位`,
-            percent: (dpACredits / 21) * 100,
-            judge: dpACredits >= 21,
+            percent: (dpACredits / 25) * 100,
+            judge: dpACredits >= 25,
             id: "req-dpa"
         },
         {
@@ -1980,10 +2002,10 @@ function renderGraduationRequirements() {
         },
         {
             name: "DP-E 単位数 (応用専門)",
-            target: "16単位以上",
+            target: "13単位以上",
             current: `${dpECredits.toFixed(1)}単位`,
-            percent: (dpECredits / 16) * 100,
-            judge: dpECredits >= 16,
+            percent: (dpECredits / 13) * 100,
+            judge: dpECredits >= 13,
             id: "req-dpe"
         }
     ];
@@ -2537,6 +2559,9 @@ function renderGradesTable() {
 
     const courseFilter = state.currentCourse;
 
+    // 0. Credits Counter
+    let totalCreditsCurrentYear = 0;
+
     const subjects = state.subjects.filter(s => {
         // 1. Course Filter
         if (courseFilter) {
@@ -2544,39 +2569,81 @@ function renderGradesTable() {
             if (t4 !== 'コース共通' && t4 !== courseFilter) return false;
         }
 
-        // Specific Year Finished Check for "特・特別活動1", "特・特別活動2" as requested
-        if (s.name === '特・特別活動1' || s.name === '特・特別活動2') {
-            if (!isYearFinished(state.currentStudent, s.year)) return false;
-        }
+        // 2. Year Match Logic
 
-        // 2. Year Match (Standard or Floater)
+        // A. Standard Year Specific Subjects
         if (s.year === state.currentYear) return true;
 
+        // B. Floater / Special Subjects (Year = 0)
         if (s.year === 0) {
             const scoreObj = (state.scores[state.currentStudent] || {})[s.name];
-            if (scoreObj && scoreObj.obtainedYear) {
-                return scoreObj.obtainedYear === state.currentYear;
+
+            // SPECIAL FIX: For "Special Activities 1-3", they correspond roughly to Year 1-3.
+            // If they are strictly named "特・特別活動N", map them to Year N.
+            const match = s.name.match(/特・特別活動(\d+)/);
+            if (match) {
+                const targetYear = parseInt(match[1]);
+                if (targetYear === state.currentYear) return true;
+                return false;
             }
+
+            // Other Special Subjects:
+            // If obtainedYear is recorded, Strict Check
+            if (scoreObj && scoreObj.obtainedYear) {
+                if (scoreObj.obtainedYear === state.currentYear) return true;
+                return false; // Belongs to another year
+            }
+
+            // If NO obtainedYear, default to SHOW (for new inputs)
             return true;
         }
+
         return false;
     });
     const studentScores = state.scores[state.currentStudent] || {};
+
+    // Check based on Summary Table logic (Visible subjects ONLY)
+    // If ANY subject in the current visible list has a "Year End" score, we consider the summary valid/year finished.
+    // EXCLUDE Special Activities themselves from this check to avoid circular logic or self-validation (as they are '0' year subjects usually)
+    const hasSummaryBaseData = subjects.some(s => {
+        if (s.name.startsWith('特・')) return false; // Ignore special subjects for base data check
+        const scoreObj = studentScores[s.name];
+        return scoreObj && scoreObj['学年末'] && scoreObj['学年末'] !== '';
+    });
 
     subjects.forEach(sub => {
         // Filter logic: if hiding empty, check if ANY score exists for this subject
         if (state.hideEmptySubjects) {
             const scoreObj = studentScores[sub.name];
-            // Do NOT hide Required (必) subjects for the current year, even if empty, to allow entry.
-            if (sub.type1 !== '必') {
-                if (!scoreObj) return;
 
-                const hasValue = SCORE_KEYS.some(key => {
-                    const val = scoreObj[key];
-                    return val !== undefined && val !== null && val !== '';
-                });
+            // EXCEPTION CHECK FIRST: Special Activities
+            // They should be displayed if criteria met (Summary table logic) regardless of whether they have local data scoreObj yet.
+            const isSpecialActivity = (sub.name === '特・特別活動1' || sub.name === '特・特別活動2' || sub.name === '特・特別活動3');
 
-                if (!hasValue) return;
+            if (isSpecialActivity) {
+                if (hasSummaryBaseData) {
+                    // Show ONLY if Summary Base Data exists (Year End of normal subjects is done)
+                } else {
+                    return; // Hide if Summary logic not met (even if it has data?) 
+                    // User said: "学年末が終わっていない学年すなわち、成績集計 (Summary)の学年末が空欄の学年も表示されます" -> implies they want it HIDDEN if year not done.
+                }
+            } else {
+                // Regular Hiding Logic
+
+                // Do NOT hide Required (必/必修得) subjects for the current year, even if empty, to allow entry.
+                // Note: Special Activities are '必修得' but handled above.
+                // Do NOT hide Required (必) subjects for the current year, even if empty, to allow entry.
+                // Note: Special Activities are '必修得' but handled above.
+                if (sub.type1 !== '必') {
+                    if (!scoreObj) return; // No data object at all -> Hide
+
+                    const hasValue = SCORE_KEYS.some(key => {
+                        const val = scoreObj[key];
+                        return val !== undefined && val !== null && val !== '';
+                    });
+
+                    if (!hasValue) return; // Object exists but no values -> Hide
+                }
             }
         }
 
@@ -2584,8 +2651,8 @@ function renderGradesTable() {
         let isSpecialRow = false;
 
         if (sub.name.startsWith('特・')) {
-            // "特・特別活動1/2" are explicitly requested to be in Others table
-            if (sub.name === '特・特別活動1' || sub.name === '特・特別活動2') {
+            // "特・特別活動1/2/3" are explicitly requested to be in Others table
+            if (sub.name === '特・特別活動1' || sub.name === '特・特別活動2' || sub.name === '特・特別活動3') {
                 targetTbody = otherTbody;
             } else {
                 targetTbody = specialTbody;
@@ -2611,10 +2678,15 @@ function renderGradesTable() {
             // Get actual value from data (prefer '学年末' - Final, or any existing)
             const scoreObj = studentScores[sub.name] || {};
             let currentVal = scoreObj['学年末'] || '';
+
+            // If Year End is empty, look for ANY other value (e.g. Early Mid, Late Mid, etc.)
+            // This is crucial for Special Activities which might have data in other columns depending on import or error.
             if (!currentVal) {
-                // Fallback: search other keys if Final is empty
                 for (const k of SCORE_KEYS) {
-                    if (scoreObj[k]) { currentVal = scoreObj[k]; break; }
+                    if (scoreObj[k]) {
+                        currentVal = scoreObj[k];
+                        break;
+                    }
                 }
             }
 
@@ -2629,6 +2701,7 @@ function renderGradesTable() {
             input.style.width = '60px';
             input.value = currentVal;
             input.placeholder = sub.name.includes('特別活動') ? '履' : '認'; // STATUS FIX: "履" for Special Activities
+            input.title = `${sub.name} - 認定/履修状況`;
 
             input.addEventListener('change', (e) => {
                 const newVal = e.target.value;
@@ -2672,6 +2745,7 @@ function renderGradesTable() {
                 input.type = 'text';
                 input.className = 'score-input';
                 input.value = val;
+                input.title = `${sub.name} - ${key}`;
 
                 validateInput(input, val, sub.name);
 
@@ -2686,9 +2760,46 @@ function renderGradesTable() {
             });
             if (targetTbody) targetTbody.appendChild(tr);
         }
+
+        // Add to Credit Count if passed
+        // Logic: specific keys or '学年末' >= 60 or '合/認/修/履'
+        let isPassed = false;
+        // Check representative value (Final)
+        let finalVal = (studentScores[sub.name] || {})['学年末'];
+
+        // Also check numerical scores in other tests if Final is empty (simple average check?) NO, usually credit is based on Final.
+        // But for Special Studies, we use '学年末' as slot.
+        const passingGrades = ['合', '認', '修', '履', 'S', 'A', 'B', 'C'];
+
+        if (passingGrades.includes(finalVal)) {
+            isPassed = true;
+        } else {
+            const n = parseFloat(finalVal);
+            if (!isNaN(n) && n >= 60) isPassed = true;
+        }
+
+        if (isPassed) {
+            totalCreditsCurrentYear += (sub.credits || 0);
+        }
     });
 
+    /* Summary Row (Total Credits) Disabled by user request
+    if (totalCreditsCurrentYear > 0 || hasYearEndData) {
+        // Code removed
+    } */
+
     const pasteIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>`;
+
+    // Hide empty Special/Other tables
+    const specialCard = specialTbody.closest('.card');
+    if (specialCard) {
+        specialCard.style.display = specialTbody.children.length > 0 ? 'block' : 'none';
+    }
+
+    const otherCard = otherTbody ? otherTbody.closest('.card') : null;
+    if (otherCard) {
+        otherCard.style.display = (otherTbody && otherTbody.children.length > 0) ? 'block' : 'none';
+    }
 
     const headers = document.querySelectorAll('th');
     // 1. Normal Subjects Table: 4 Tests (Index 4-7)
@@ -3905,25 +4016,44 @@ function initAtRiskDefaults() {
     const testSelect = document.getElementById('atRiskTestSelect');
     if (!yearSelect || !testSelect) return;
 
-    // Default to latest year available in data
-    let maxYear = 1;
-    state.subjects.forEach(s => { if (s.year > maxYear) maxYear = s.year; });
-    yearSelect.value = maxYear;
+    // 1. Set default year to the overall current year
+    if (state.currentYear) {
+        yearSelect.value = state.currentYear;
+    } else {
+        let maxYear = 1;
+        state.subjects.forEach(s => { if (s.year > maxYear) maxYear = s.year; });
+        yearSelect.value = maxYear;
+    }
 
-    // Default to latest test with significant data
-    const tests = ["前期中間", "前期末", "後期中間", "学年末"];
-    const testCounts = tests.map(t => {
-        let cnt = 0;
-        Object.values(state.scores).forEach(subScores => {
-            Object.values(subScores).forEach(testScores => {
-                if (testScores[t] && testScores[t] !== '-') cnt++;
-            });
-        });
-        return { name: t, count: cnt };
-    });
-    // Pick the last test that has at least some data, else '前期中間'
-    const latestTest = testCounts.reverse().find(tc => tc.count > 0);
-    if (latestTest) testSelect.value = latestTest.name;
+    const targetYear = parseInt(yearSelect.value);
+
+    // 2. Default to latest test with significant data in THAT year
+    const priorities = ["前期中間", "前期末", "後期中間", "学年末"];
+    let maxFoundIdx = -1;
+
+    // Search across all students to see what tests have data for the target year
+    outerLoop:
+    for (const s of state.students) {
+        const yearSubjects = state.subjects.filter(sub => sub.year === targetYear && !sub.exclude);
+        for (const sub of yearSubjects) {
+            for (let idx = 0; idx < priorities.length; idx++) {
+                if (idx > maxFoundIdx) {
+                    const key = priorities[idx];
+                    const v = getScore(s, sub.name, key);
+                    if (v !== undefined && v !== null && v !== '') {
+                        maxFoundIdx = idx;
+                        if (maxFoundIdx === 3) break outerLoop; // Found Year-End data, absolute max
+                    }
+                }
+            }
+        }
+    }
+
+    if (maxFoundIdx !== -1) {
+        testSelect.value = priorities[maxFoundIdx];
+    } else {
+        testSelect.value = "前期末"; // Default fallback
+    }
 }
 
 function renderAtRiskReport() {
