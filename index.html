@@ -36,6 +36,17 @@
         </div>
 
         <div class="controls">
+            <div class="control-group" title="表示する対象コースを選択してください">
+                <label for="subjectCourseFilterHeader">コース</label>
+                <select id="subjectCourseFilterHeader">
+                    <option value="">未選択</option>
+                    <option value="Mコース">Mコース</option>
+                    <option value="Dコース">Dコース</option>
+                    <option value="Eコース">Eコース</option>
+                    <option value="Iコース">Iコース</option>
+                </select>
+            </div>
+
             <div class="control-group" title="成績データが入力されていない科目を非表示にします">
                 <input type="checkbox" id="hideEmptySubjects" checked>
                 <label for="hideEmptySubjects">単位認定のない科目を隠す</label>
@@ -184,6 +195,14 @@
                 </svg>
                 成績一覧 (Grades)
             </div>
+            <div class="nav-item" data-tab="grad_requirements" title="卒業要件の達成状況を確認します">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                    stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                卒業要件 (Graduation)
+            </div>
             <div class="nav-item" data-tab="stats" title="成績の統計情報とグラフを表示します">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
                     stroke-width="2">
@@ -320,6 +339,41 @@
                                 </tr>
                             </thead>
                             <tbody id="otherGradesBody">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Graduation Requirements View -->
+            <div id="grad_requirements-content" class="tab-content hidden fade-in">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">卒業要件 達成状況 (Graduation Requirements Progress)</div>
+                    </div>
+                    <div id="gradRequirementsSummary"
+                        style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.5rem;">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">要件別 詳細 (Detailed Requirements)</div>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>要件項目</th>
+                                    <th>目標</th>
+                                    <th>現在の状況</th>
+                                    <th>達成度</th>
+                                    <th>判定</th>
+                                </tr>
+                            </thead>
+                            <tbody id="gradRequirementsDetails">
                                 <!-- Populated by JS -->
                             </tbody>
                         </table>
@@ -593,6 +647,15 @@
                                     </svg>
                                     CSV保存
                                 </button>
+                                <!-- Course Filter -->
+                                <select id="subjectCourseFilter"
+                                    style="padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 0.4rem; font-size: 0.85rem; margin-right: 0.5rem;">
+                                    <option value="">未選択</option>
+                                    <option value="Mコース">Mコース</option>
+                                    <option value="Dコース">Dコース</option>
+                                    <option value="Eコース">Eコース</option>
+                                    <option value="Iコース">Iコース</option>
+                                </select>
                                 <div style="position: relative;">
                                     <input type="text" id="subjectSearchInput" placeholder="科目を検索..."
                                         style="padding: 0.5rem 1rem 0.5rem 2.2rem; border: 1px solid #cbd5e1; border-radius: 9999px; font-size: 0.85rem; width: 220px;">
@@ -780,6 +843,32 @@
                                 <option value="その他">その他</option>
                             </select>
                         </div>
+                    </div>
+                    <div class="control-group" style="flex-direction: column; align-items: flex-start;">
+                        <label>種別3 (詳細・管理タグ)</label>
+                        <input type="text" id="subjectType3Input" list="type3Suggestions" style="width: 100%;"
+                            placeholder="例: DP-A, SDGs, etc.">
+                        <datalist id="type3Suggestions">
+                            <option value="DP-A">
+                            <option value="DP-B">
+                            <option value="DP-C">
+                            <option value="DP-D">
+                            <option value="DP-E">
+                            <option value="SDGs">
+                            <option value="Other">
+                        </datalist>
+                    </div>
+                    <div class="control-group" style="flex-direction: column; align-items: flex-start;">
+                        <label>種別4 (コース)</label>
+                        <input type="text" id="subjectType4Input" list="type4Suggestions" style="width: 100%;"
+                            placeholder="例: コース共通, Mコース, etc.">
+                        <datalist id="type4Suggestions">
+                            <option value="コース共通">
+                            <option value="Mコース">
+                            <option value="Dコース">
+                            <option value="Eコース">
+                            <option value="Iコース">
+                        </datalist>
                     </div>
                     <!-- Stats Exclude Toggle -->
                     <div class="control-group"

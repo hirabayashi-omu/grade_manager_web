@@ -6,130 +6,218 @@ const DEFAULT_STUDENTS_RAW = `
 学生太郎,学生次郎,学生花子,学生A,学生B,学生C,学生D,学生E
 `;
 
-const DEFAULT_SUBJECTS_RAW = `授業科目	単位	学年	種別1	種別2
-国語1	2	1	必	一般
-国語2	2	2	必	一般
-国語3	2	3	必	一般
-言語と文化	2	4	必	一般
-社会1	2	1	必	一般
-社会2	2	2	必	一般
-社会3	2	3	必	一般
-現代社会論	2	4	必	一般
-法律	2	5	選	一般
-経済	2	5	選	一般
-哲学	2	5	選	一般
-心理学	2	5	選	一般
-基礎数学A	2	1	必	一般
-基礎数学B	2	1	必	一般
-基礎数学C	2	1	必	一般
-微分積分1	2	2	必	一般
-微分積分2	2	2	必	一般
-ベクトル・行列	2	2	必	一般
-解析1	2	3	必	一般
-解析2	2	3	必	一般
-線形代数・微分方程式	2	3	必	一般
-確率統計	2	4	必	一般
-基礎物理1	2	1	必	一般
-基礎物理2	2	2	必	一般
-基礎物理3	2	3	必	一般
-現代物理概論	2	5	選	一般
-化学1	3	1	必	一般
-化学2	2	2	必	一般
-生物	2	2	必	一般
-保健・体育1	2	1	必	一般
-保健・体育2	2	2	必	一般
-保健・体育3	2	3	必	一般
-保健・体育4	2	4	必	一般
-英語1	2	1	必	一般
-英語2	2	1	必	一般
-英語3	2	2	必	一般
-英語4	2	2	必	一般
-英語5	2	3	必	一般
-英語6	2	4	必	一般
-英語表現1	2	1	必	一般
-英語表現2	2	2	必	一般
-英語表現3	2	3	必	一般
-英語A	2	4	選	一般
-英語B	2	4	選	一般
-中国語	2	4	選	一般
-ドイツ語	2	4	選	一般
-音楽	2	1	選必	一般
-美術	2	1	選必	一般
-書道	2	1	選必	一般
-総合工学システム概論	1	1	必	専門
-総合工学システム実験実習	4	1	必	専門
-情報1	2	1	必	専門
-情報2	2	2	必	専門
-情報3	2	3	必	専門
-ダイバーシティと人権	1	1	必	専門
-多文化共生	1	4	必	専門
-労働環境と人権	2	5	必	専門
-技術倫理	2	5	必	専門
-システム安全入門	1	5	選	専門
-環境システム工学	1	5	選	専門
-資源と産業	1	5	選	専門
-環境倫理	1	5	選	専門
-応用数学A	2	4	必	専門
-応用数学B	2	4	必	専門
-物理学A	2	4	必	専門
-物理学B	2	4	必	専門
-計測工学	2	5	必	専門
-技術英語	2	5	必	専門
-機械工学概論	1	2	必	専門
-基礎製図	2	2	必	専門
-電気・電子回路	1	2	必	専門
-シーケンス制御	1	2	必	専門
-機械工作実習1	4	2	必	専門
-材料力学入門	1	3	必	専門
-熱力学入門	1	3	必	専門
-流体力学入門	1	3	必	専門
-機械工作法	2	3	必	専門
-CAD製図	2	3	必	専門
-機械設計製図	2	3	必	専門
-機械工作実習2	4	3	必	専門
-材料力学	2	4	必	専門
-熱力学	2	4	必	専門
-流れ学	2	4	必	専門
-機械力学	2	4	必	専門
-エネルギー機械実験1	4	4	必	専門
-機械設計	2	5	必	専門
-伝熱工学	2	5	必	専門
-流体工学	2	5	必	専門
-生産加工工学	2	5	必	専門
-制御工学	2	5	必	専門
-エネルギー変換工学	2	5	必	専門
-エネルギー機械実験2	2	5	必	専門
-卒業研究	6	5	必	専門
-応用専門概論	1	3	必	専門
-応用専門PBL1	1	3	必	専門
-応用専門PBL2	2	4	必	専門
-インターンシップ	1	4	選	専門
-生活と物質	1	4	選必	専門
-社会と環境	1	4	選必	専門
-物質プロセス基礎	2	4	選必	専門
-食品エンジニアリング	2	5	選必	専門
-コスメティックス	2	5	選必	専門
-バイオテクノロジー	2	5	選必	専門
-高純度化化学	2	5	選必	専門
-物質デザイン概論	2	4	選必	専門
-環境モニタリング	2	5	選必	専門
-エネルギー変換デバイス	2	5	選必	専門
-食と健康のセンサ	2	5	選必	専門
-環境対応デバイス	2	5	選必	専門
-防災工学	2	4	選必	専門
-社会基盤構造	2	5	選必	専門
-環境衛生工学	2	5	選必	専門
-維持管理工学	2	5	選必	専門
-水環境工学	2	5	選必	専門
-エルゴノミクス	2	4	選必	専門
-環境デザイン論	2	5	選必	専門
-インクルーシブデザイン	2	5	選必	専門
-環境情報学	2	5	選必	専門
-環境行動	2	5	選必	専門
-防災リテラシー	1	1	必	専門
-特・特別活動1	0	1	必	その他
-特・特別活動2	0	2	必	その他
-特・特別活動3	0	3	必	その他`;
+const DEFAULT_SUBJECTS_RAW = `授業科目,単位,学年,種別1,種別2,種別3,種別4,除外
+国語1,2,1,必,一般,DP-C,コース共通
+国語2,2,2,必,一般,DP-C,コース共通
+国語3,2,3,必,一般,DP-C,コース共通
+言語と文化,2,4,必,一般,DP-C,コース共通
+社会1,2,1,必,一般,DP-A,コース共通
+社会2,2,2,必,一般,DP-A,コース共通
+社会3,2,3,必,一般,DP-A,コース共通
+現代社会論,2,4,必,一般,DP-A,コース共通
+法律,2,5,選,一般,DP-A,コース共通,1
+経済,2,5,選,一般,DP-A,コース共通,1
+哲学,2,5,選,一般,DP-A,コース共通,1
+心理学,2,5,選,一般,DP-A,コース共通,1
+基礎数学A,2,1,必,一般,DP-B,コース共通
+基礎数学B,2,1,必,一般,DP-B,コース共通
+基礎数学C,2,1,必,一般,DP-B,コース共通
+微分積分1,2,2,必,一般,DP-B,コース共通
+微分積分2,2,2,必,一般,DP-B,コース共通
+ベクトル・行列,2,2,必,一般,DP-B,コース共通
+解析1,2,3,必,一般,DP-B,コース共通
+解析2,2,3,必,一般,DP-B,コース共通
+線形代数・微分方程式,2,3,必,一般,DP-B,コース共通
+確率統計,2,4,必,一般,DP-B,コース共通
+基礎物理1,2,1,必,一般,DP-B,コース共通
+基礎物理2,2,2,必,一般,DP-B,コース共通
+基礎物理3,2,3,必,一般,DP-B,コース共通
+現代物理学概論,2,5,選,一般,DP-B,コース共通,1
+化学1,3,1,必,一般,DP-B,コース共通
+化学2,2,2,必,一般,DP-B,コース共通
+生物,2,2,必,一般,DP-B,コース共通
+保健・体育1,2,1,必,一般,DP-A,コース共通
+保健・体育2,2,2,必,一般,DP-A,コース共通
+保健・体育3,2,3,必,一般,DP-A,コース共通
+保健・体育4,2,4,必,一般,DP-A,コース共通
+英語1,2,1,必,一般,DP-C,コース共通
+英語2,2,1,必,一般,DP-C,コース共通
+英語3,2,2,必,一般,DP-C,コース共通
+英語4,2,2,必,一般,DP-C,コース共通
+英語5,2,3,必,一般,DP-C,コース共通
+英語6,2,4,必,一般,DP-C,コース共通
+英語表現1,2,1,必,一般,DP-C,コース共通
+英語表現2,2,2,必,一般,DP-C,コース共通
+英語表現3,2,3,必,一般,DP-C,コース共通
+英語A,2,4,選,一般,DP-C,コース共通,1
+英語B,2,4,選,一般,DP-C,コース共通,1
+中国語,2,4,選,一般,DP-C,コース共通,1
+ドイツ語,2,4,選,一般,DP-C,コース共通,1
+美術,2,1,選必,一般,DP-A,コース共通,1
+書道,2,1,選必,一般,DP-A,コース共通,1
+音楽,2,1,選必,一般,DP-A,コース共通,1
+総合工学システム概論,1,1,必,専門共通,DP-D,コース共通
+総合工学システム実験実習,4,1,必,専門共通,DP-D,コース共通
+情報1,2,1,必,専門共通,DP-D,コース共通
+情報2,2,2,必,専門共通,DP-D,コース共通
+情報3,2,3,必,専門共通,DP-D,コース共通
+ダイバーシティと人権,1,1,必,専門共通,"DP-A, SDGs",コース共通
+多文化共生,1,4,必,専門共通,"DP-A, SDGs",コース共通
+労働環境と人権,2,5,必,専門共通,"DP-A, SDGs",コース共通
+技術倫理,2,5,必,専門共通,"DP-A, SDGs",コース共通
+システム安全入門,1,5,選,専門共通,"DP-A, SDGs",コース共通
+環境システム工学,1,5,選,専門共通,"DP-A, SDGs",コース共通
+資源と産業,1,5,選,専門共通,"DP-A, SDGs",コース共通
+環境倫理,1,5,選,専門共通,"DP-A, SDGs",コース共通
+応用数学A,2,4,必,専門共通,DP-B,コース共通
+応用数学B,2,4,必,専門共通,DP-B,コース共通
+物理学A,2,4,必,専門共通,DP-B,コース共通
+物理学B,2,4,必,専門共通,DP-B,コース共通
+計測工学,2,5,必,専門共通,DP-D,コース共通
+技術英語,2,5,必,専門共通,DP-C,コース共通
+機械工学概論,1,2,必,基盤専門,DP-D,コース共通
+基礎製図,2,2,必,基盤専門,DP-D,Mコース
+電気・電子回路,1,2,必,基盤専門,DP-D,Mコース
+シーケンス制御,1,2,必,基盤専門,DP-D,Mコース
+機械工作実習1,4,2,必,基盤専門,DP-D,Mコース
+材料力学入門,1,3,必,基盤専門,DP-D,Mコース
+熱力学入門,1,3,必,基盤専門,DP-D,Mコース
+流体力学入門,1,3,必,基盤専門,DP-D,Mコース
+機械工作法,2,3,必,基盤専門,DP-D,Mコース
+CAD製図,2,3,必,基盤専門,DP-D,Mコース
+機械設計製図,2,3,必,基盤専門,DP-D,Mコース
+機械工作実習2,4,3,必,基盤専門,DP-D,Mコース
+材料力学,2,4,必,基盤専門,DP-D,Mコース
+熱力学,2,4,必,基盤専門,DP-D,Mコース
+流れ学,2,4,必,基盤専門,DP-D,Mコース
+機械力学,2,4,必,基盤専門,DP-D,Mコース
+材料学,2,4,必,基盤専門,DP-D,Mコース
+数値計算,2,4,必,基盤専門,DP-D,Mコース
+エネルギー機械実験1,4,4,必,基盤専門,DP-D,Mコース
+機械設計,2,5,必,基盤専門,DP-D,Mコース
+伝熱工学,2,5,必,基盤専門,DP-D,Mコース
+流体工学,2,5,必,基盤専門,DP-D,Mコース
+加工工学,2,5,必,基盤専門,DP-D,Mコース
+制御工学,2,5,必,基盤専門,DP-D,Mコース
+制御工学,2,5,必,基盤専門,DP-D,Dコース
+エネルギー変換工学,2,5,必,基盤専門,DP-D,Mコース
+エネルギー機械実験2,2,5,必,基盤専門,DP-D,Mコース
+卒業研究,6,5,必,基盤専門,DP-E,Mコース
+プロダクトデザイン概論,1,2,必,基盤専門,DP-D,Dコース
+製図基礎,2,2,必,基盤専門,DP-D,Dコース
+プログラミング基礎,1,2,必,基盤専門,DP-D,Dコース
+機械工作法,1,2,必,基盤専門,DP-D,Dコース
+機械工作実習,4,2,必,基盤専門,DP-D,Dコース
+工業力学,1,3,必,基盤専門,DP-D,Dコース
+CAD設計製図,2,3,必,基盤専門,DP-D,Dコース
+材料学,2,3,必,基盤専門,DP-D,Dコース
+加工学,2,3,必,基盤専門,DP-D,Dコース
+ユニバーサルデザイン,2,3,必,基盤専門,DP-D,Dコース
+生産機械実習,4,3,必,基盤専門,DP-D,Dコース
+材料力学,2,4,必,基盤専門,DP-D,Dコース
+熱力学,2,4,必,基盤専門,DP-D,Dコース
+流体力学,2,4,必,基盤専門,DP-D,Dコース
+機械力学,2,4,必,基盤専門,DP-D,Dコース
+メカトロニクス,2,4,必,基盤専門,DP-D,Dコース
+ロボット工学,2,4,必,基盤専門,DP-D,Dコース
+プロダクトデザイン実験,4,4,必,基盤専門,DP-D,Dコース
+プロダクトデザイン,2,5,必,基盤専門,DP-D,Dコース
+CAM/CAE,2,5,必,基盤専門,DP-D,Dコース
+生産システム工学,2,5,必,基盤専門,DP-D,Dコース
+感性工学,2,5,必,基盤専門,DP-D,Dコース
+プロダクトデザイン実習,2,5,必,基盤専門,DP-D,Dコース
+卒業研究,6,5,必,基盤専門,DP-E,Dコース
+エレクトロニクス概論,1,2,必,基盤専門,DP-D,Eコース
+電気設備,1,2,必,基盤専門,DP-D,Eコース
+電気回路1,1,2,必,基盤専門,DP-D,Eコース
+電子回路1,1,2,必,基盤専門,DP-D,Eコース
+電気電子材料1,1,2,必,基盤専門,DP-D,Eコース
+エレクトロニクス実験実習,4,2,必,基盤専門,DP-D,Eコース
+電気回路2,1,3,必,基盤専門,DP-D,Eコース
+電磁気学1,2,3,必,基盤専門,DP-D,Eコース
+電気電子材料2,2,3,必,基盤専門,DP-D,Eコース
+半導体工学1,2,3,必,基盤専門,DP-D,Eコース
+工学設計演習,2,3,必,基盤専門,DP-D,Eコース
+エレクトロニクス実験1,4,3,必,基盤専門,DP-D,Eコース
+電子回路2,2,4,必,基盤専門,DP-D,Eコース
+電気回路3,2,4,必,基盤専門,DP-D,Eコース
+電磁気学2,1,4,必,基盤専門,DP,Eコース
+電気電子材料3,2,4,必,基盤専門,DP-D,Eコース
+半導体工学2,2,4,必,基盤専門,DP-D,Eコース
+コンピュータ工学基礎,2,4,必,基盤専門,DP-D,Eコース
+制御工学1,1,4,必,基盤専門,DP-D,Eコース
+エレクトロニクス実験2,4,4,必,基盤専門,DP-D,Eコース
+制御工学2,1,5,必,基盤専門,DP-D,Eコース
+電気機器,1,5,必,基盤専門,DP-D,Eコース
+電力技術,2,5,必,基盤専門,DP-D,Eコース
+パワーエレクトロニクス,2,5,必,基盤専門,DP-D,Eコース
+信号処理,2,5,必,基盤専門,DP-D,Eコース
+電気化学,1,5,必,基盤専門,DP-D,Eコース
+センサー工学,2,5,必,基盤専門,DP-D,Eコース
+ワイヤレス技術,1,5,必,基盤専門,DP-D,Eコース
+エレクトロニクス実験3,2,5,必,基盤専門,DP-D,Eコース
+卒業研究,6,5,必,基盤専門,DP-E,Eコース
+メディアデザイン入門,1,2,必,基盤専門,DP-D,Iコース
+論理回路1,1,2,必,基盤専門,DP-D,E,Iコース
+マイクロコンピュータ,1,2,必,基盤専門,DP-D,Iコース
+プログラミング1,2,2,必,基盤専門,DP-D,Iコース
+工学基礎実習,4,2,必,基盤専門,DP-D,Iコース
+プログラミング2,2,3,必,基盤専門,DP-D,Iコース
+プログラミング3,2,3,必,基盤専門,DP-D,Iコース
+アルゴリズムとデータ構造1,1,3,必,基盤専門,DP-D,Iコース
+論理回路2,1,3,必,基盤専門,DP-D,Iコース
+電気電子回路1,1,3,必,基盤専門,DP-D,Iコース
+知識科学概論,2,3,必,基盤専門,DP-D,Iコース
+知能情報実験実習1,4,3,必,基盤専門,DP-D,Iコース
+アルゴリズムとデータ構造2,2,4,必,基盤専門,DP-D,Iコース
+電気電子回路2,2,4,必,基盤専門,DP-D,Iコース
+データベース工学,2,4,必,基盤専門,DP-D,Iコース
+マルチメディア情報処理,2,4,必,基盤専門,DP-D,Iコース
+情報通信ネットワーク,2,4,必,基盤専門,DP-D,Iコース
+コンピュータシステム,2,4,必,基盤専門,DP-D,Iコース
+知能情報実験実習2,4,4,必,基盤専門,DP-D,Iコース
+オートマトンと形式言語,2,5,必,基盤専門,DP-D,Iコース
+ソフトウェア工学,2,5,必,基盤専門,DP-D,Iコース
+知能情報実験実習3,2,5,必,基盤専門,DP-D,Iコース
+オペレーティングシステム,2,5,必,基盤専門,DP-D,Iコース
+人工知能,2,5,必,基盤専門,DP-D,Iコース
+情報理論,2,5,必,基盤専門,DP-D,Iコース
+コンピュータアーキテクチャ,2,5,必,基盤専門,DP-D,Iコース
+卒業研究,6,5,必,基盤専門,DP-E,Iコース
+応用専門概論,1,3,必,応用専門,DP-E,コース共通
+応用専門PBL1,1,3,必,応用専門,DP-E,コース共通
+応用専門PBL2,2,4,必,応用専門,DP-E,コース共通
+インターンシップ,1,4,選,応用専門,DP-E,コース共通
+生活と物質,1,4,選必,応用専門,DP-E,コース共通
+社会と環境,1,4,選必,応用専門,DP-E,コース共通
+食品エンジニアリング,2,5,選必,応用専門,DP-E,コース共通
+コスメティックス,2,5,選必,応用専門,DP-E,コース共通
+バイオテクノロジー,2,5,選必,応用専門,DP-E,コース共通
+高純度化技術,2,5,選必,応用専門,DP-E,コース共通
+環境モニタリング,2,5,選必,応用専門,DP-E,コース共通
+エネルギー変換デバイス,2,5,選必,応用専門,DP-E,コース共通
+食と健康のセンサ,2,5,選必,応用専門,DP-E,コース共通
+環境対応デバイス,2,5,選必,応用専門,DP-E,コース共通
+社会基盤構造,2,5,選必,応用専門,DP-E,コース共通
+環境衛生工学,2,5,選必,応用専門,DP-E,コース共通
+維持管理工学,2,5,選必,応用専門,DP-E,コース共通
+水環境工学,2,5,選必,応用専門,DP-E,コース共通
+環境デザイン論,2,5,選必,応用専門,DP-E,コース共通
+インクルーシブデザイン,2,5,選必,応用専門,DP-E,コース共通
+空間情報学,2,5,選必,応用専門,DP-E,コース共通
+環境行動,2,5,選必,応用専門,DP-E,コース共通
+特・特別活動1,0,1,必,その他,Other,コース共通,1
+特・特別活動2,0,2,必,その他,Other,コース共通,1
+特・特別活動3,0,3,必,その他,Other,コース共通,1
+特・防災リテラシー(1),1,0,選,専門,"DP-A, SDGs",コース共通,1
+特・防災リテラシー(2),2,0,選,専門,"DP-A, SDGs",コース共通,1
+特・防災リテラシー(3),3,0,選,専門,"DP-A, SDGs",コース共通,1
+特・総合課題実習1,1,2,選,特別学修,DP-E,コース共通,1
+特・総合課題実習1,1,3,選,特別学修,DP-E,コース共通,1
+特・総合課題実習2,1,3,選,特別学修,DP-E,コース共通,1
+特・総合課題実習2,1,4,選,特別学修,DP-E,コース共通,1
+特・総合課題実習3,1,4,選,特別学修,DP-E,コース共通,1
+特・総合課題実習3,1,5,選,特別学修,DP-E,コース共通,1`;
 
 // Load current master data from storage
 let STUDENTS_RAW = localStorage.getItem('gm_master_students') || DEFAULT_STUDENTS_RAW;
@@ -146,6 +234,7 @@ let state = {
     hideEmptySubjects: true,
     boxPlotYear: null, // Year for box plot (null = auto-detect latest)
     boxPlotTest: null,  // Test for box plot (null = auto-detect latest)
+    currentCourse: localStorage.getItem('gm_state_course') || '',
     isLoggedIn: false,
     passwordHash: localStorage.getItem('gm_auth_hash') || null
 };
@@ -164,6 +253,7 @@ function saveSessionState() {
     localStorage.setItem('gm_state_hide_empty', state.hideEmptySubjects);
     localStorage.setItem('gm_state_boxplot_year', state.boxPlotYear || '');
     localStorage.setItem('gm_state_boxplot_test', state.boxPlotTest || '');
+    localStorage.setItem('gm_state_course', state.currentCourse || '');
 
     // Auto-save the actual lists and scores so everything is remembered on reload
     localStorage.setItem('grade_manager_students', JSON.stringify(state.students));
@@ -184,6 +274,8 @@ function loadSessionState() {
     if (savedYear) state.currentYear = parseInt(savedYear);
     if (savedBPYear) state.boxPlotYear = parseInt(savedBPYear);
     if (savedBPTest) state.boxPlotTest = savedBPTest;
+    const savedCourse = localStorage.getItem('gm_state_course');
+    if (savedCourse !== null) state.currentCourse = savedCourse;
 
     // Ensure the student exists in the current list
     if (savedStudent && state.students.includes(savedStudent)) {
@@ -465,17 +557,55 @@ function refreshMasterData() {
         const lines = rawSubjects.trim().split('\n');
         // Skip header and parse lines
         for (let i = 1; i < lines.length; i++) {
-            let parts = lines[i].trim().split('\t');
-            if (parts.length < 5) parts = lines[i].trim().split(/\s+/);
+            let line = lines[i].trim();
+            if (!line) continue;
+
+            let parts;
+            let isCsv = false;
+
+            if (line.includes('\t')) {
+                parts = line.split('\t');
+            } else if (line.includes(',')) {
+                // Improved CSV split to handle quoted fields
+                parts = line.match(/(".*?"|[^",\r\n]+)(?=\s*,|\s*$)/g);
+                if (parts) {
+                    parts = parts.map(p => p.startsWith('"') && p.endsWith('"') ? p.slice(1, -1) : p.trim());
+                } else {
+                    parts = line.split(',');
+                }
+                isCsv = true;
+            } else {
+                parts = line.split(/\s+/);
+            }
 
             if (parts.length >= 5) {
+                let type3 = '';
+                let type4 = '';
+                let exclude = false;
+
+                if (isCsv) {
+                    // CSV format: Name, Credits, Year, Type1, Type2, Type3, Type4, Exclude
+                    type3 = parts.length > 5 ? parts[5].trim() : '';
+                    type4 = parts.length > 6 ? parts[6].trim() : '';
+                    exclude = parts.length > 7 ? (parts[7].trim() === '1') : false;
+                } else {
+                    // Legacy TSV: Name, Credits, Year, Type1, Type2, Exclude
+                    exclude = parts.length > 5 ? (parts[5].trim() === '1') : false;
+                }
+
+                // Handle academic year better (parseInt handles numeric prefixes like '1年' but fails on '特別')
+                let yearVal = parseInt(parts[2]);
+                if (isNaN(yearVal)) yearVal = 1; // Default to 1 if parsing fails
+
                 state.subjects.push({
                     name: parts[0].trim(),
-                    credits: parseInt(parts[1]),
-                    year: parseInt(parts[2]),
+                    credits: parseInt(parts[1]) || 0,
+                    year: yearVal,
                     type1: parts[3].trim(),
                     type2: parts[4].trim(),
-                    exclude: parts.length > 5 ? (parts[5].trim() === '1') : false
+                    type3: type3,
+                    type4: type4,
+                    exclude: exclude
                 });
             }
         }
@@ -535,9 +665,15 @@ function populateControls() {
     const statsYearSelect = document.getElementById('boxPlotYearSelect');
     if (statsYearSelect) {
         // Sync stats year with current year initially
-        if (!state.boxPlotYear) state.boxPlotYear = state.currentYear;
+        state.boxPlotYear = state.currentYear;
         statsYearSelect.value = state.boxPlotYear || '';
     }
+
+    // 4. Course Select Sync
+    const courseFilterHeader = document.getElementById('subjectCourseFilterHeader');
+    if (courseFilterHeader) courseFilterHeader.value = state.currentCourse;
+    const courseFilterSettings = document.getElementById('subjectCourseFilter');
+    if (courseFilterSettings) courseFilterSettings.value = state.currentCourse;
 }
 
 function setupEventListeners() {
@@ -609,6 +745,9 @@ function setupEventListeners() {
 
     // Class Stats Listener
     document.getElementById('generateClassStatsBtn')?.addEventListener('click', () => {
+        generateClassStats();
+    });
+    document.getElementById('classStatsTest')?.addEventListener('change', () => {
         generateClassStats();
     });
 
@@ -696,7 +835,28 @@ function setupEventListeners() {
 
     const subjectSearch = document.getElementById('subjectSearchInput');
     if (subjectSearch) {
-        subjectSearch.addEventListener('input', renderSettings);
+        subjectSearch.addEventListener('input', render);
+    }
+    const courseFilterHeader = document.getElementById('subjectCourseFilterHeader');
+    if (courseFilterHeader) {
+        courseFilterHeader.addEventListener('change', (e) => {
+            state.currentCourse = e.target.value;
+            const other = document.getElementById('subjectCourseFilter');
+            if (other) other.value = state.currentCourse;
+            saveSessionState();
+            render();
+        });
+    }
+
+    const courseFilterSettings = document.getElementById('subjectCourseFilter');
+    if (courseFilterSettings) {
+        courseFilterSettings.addEventListener('change', (e) => {
+            state.currentCourse = e.target.value;
+            const other = document.getElementById('subjectCourseFilterHeader');
+            if (other) other.value = state.currentCourse;
+            saveSessionState();
+            render();
+        });
     }
 
     const isSpecialCheckbox = document.getElementById('isSpecialSubject');
@@ -740,6 +900,8 @@ function switchTab(tabName) {
         renderStats();
     } else if (tabName === 'stats2') {
         renderStats2();
+    } else if (tabName === 'grad_requirements') {
+        renderGraduationRequirements();
     } else if (tabName === 'class_stats') {
         initClassStats();
     } else if (tabName === 'settings') {
@@ -818,10 +980,15 @@ function renderSettings() {
     state.students.forEach((s, idx) => {
         const item = document.createElement('div');
         item.style.cssText = 'display: flex; align-items: center; justify-content: space-between; background: white; padding: 0.6rem 0.8rem; border-radius: 0.5rem; border: 1px solid #e2e8f0; font-size: 0.9rem; transition: all 0.2s;';
+        const isCurrent = (s === state.currentStudent);
+        if (isCurrent) {
+            item.style.background = '#eff6ff';
+            item.style.borderColor = '#3b82f6';
+        }
         item.innerHTML = `
-            <div style="display: flex; align-items: center; gap: 0.6rem;">
-                <div style="width: 24px; height: 24px; background: #f1f5f9; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; color: #64748b;">${idx + 1}</div>
-                <span style="font-weight: 500;">${s}</span>
+            <div style="display: flex; align-items: center; gap: 0.6rem; overflow: hidden; cursor: pointer;" onclick="document.getElementById('studentSelect').value='${s}'; state.currentStudent='${s}'; saveSessionState(); renderSettings();">
+                <div style="width: 24px; height: 24px; background: ${isCurrent ? '#bfdbfe' : '#f1f5f9'}; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; color: ${isCurrent ? '#1e40af' : '#64748b'};">${idx + 1}</div>
+                <span style="font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; ${isCurrent ? 'color: #1d4ed8;' : ''}">${s} ${isCurrent ? '<span style="font-size:0.7em; color:#3b82f6; border:1px solid #3b82f6; padding:1px 4px; border-radius:4px; margin-left:4px;">選択中</span>' : ''}</span>
             </div>
             <div style="display: flex; gap: 0.2rem;">
                 <button onclick="editStudentSetting(${idx})" style="border:none; background:none; color:#94a3b8; cursor:pointer; padding: 0.2rem; display: flex;" title="編集">
@@ -834,40 +1001,79 @@ function renderSettings() {
         `;
         studentsList.appendChild(item);
     });
+    updatePlaceholderNames();
 
     // 2. Render Subjects (Grouped List)
-    const container = document.getElementById('subjectsGroupedList');
+    const container = document.getElementById('subjectsGroupedList'); // Ensure this ID matches HTML
+    // Note: Originally it was subjectsContainer. Previous code used subjectsContainer. 
+    // Step 129 used subjectsContainer in renderSettings. 
+    // Step 186 snippet used subjectsContainer (passed as arg? No, selected).
+    // Let's use subjectsContainer to be safe, but the user snippet above had 'subjectsGroupedList'.
+    // I will check if 'subjectsGroupedList' exists in HTML.
+    // If unsure, use 'subjectsContainer' which was standard. 
+    // Wait, the viewed code had 'subjectsGroupedList' at line 947 in previous turn. So I stick with it.
+    if (!container) return;
     container.innerHTML = '';
 
     const searchQuery = document.getElementById('subjectSearchInput')?.value.toLowerCase() || '';
+    const courseFilter = state.currentCourse;
 
-    // Filter and Group
-    const filtered = state.subjects.filter(s => {
-        return s.name.toLowerCase().includes(searchQuery) ||
+    // A. PREPARE SORTED COPY (Sort by Year ASC to prioritize earliest year for duplicates)
+    // Also handling non-numeric years gracefully if any (though we import safe integers)
+    const sortedSubjects = [...state.subjects].sort((a, b) => (a.year || 0) - (b.year || 0));
+
+    // B. FILTER & DEDUPLICATE
+    const seenNames = new Set();
+    const visibleSubjects = sortedSubjects.filter(s => {
+        // 1. Search Query Filter
+        const matchesSearch = s.name.toLowerCase().includes(searchQuery) ||
             s.type1?.toLowerCase().includes(searchQuery) ||
             s.type2?.toLowerCase().includes(searchQuery);
+        if (!matchesSearch) return false;
+
+        // 2. Course Filter
+        if (courseFilter) {
+            const t4 = s.type4 || 'コース共通'; // Default to common if undefined
+            // Logic: Show if subject is Common OR belongs to the specific course
+            let matchesCourse = false;
+            if (t4 === 'コース共通') {
+                matchesCourse = true;
+            } else {
+                if (t4 === courseFilter) matchesCourse = true;
+            }
+            if (!matchesCourse) return false;
+        }
+
+        // 3. Deduplication (Distinct Name)
+        // Only keep the first occurrence of a subject name from the sorted (lowest year) list
+        if (seenNames.has(s.name)) return false;
+        seenNames.add(s.name);
+
+        return true;
     });
 
+    // C. GROUPING
     const groups = {};
-    filtered.forEach(sub => {
-        // Exclude Special Studies
-        if (sub.name.startsWith('特・') && sub.type2 !== 'その他') return;
-        // Exclude Others
-        if (sub.type2 === 'その他') return;
+    visibleSubjects.forEach(sub => {
+        // Exclude Special Studies and Others from the main year groups
+        if (sub.name.startsWith('特・') || sub.type2 === 'その他') return;
 
         if (!groups[sub.year]) groups[sub.year] = [];
         groups[sub.year].push(sub);
     });
 
-    // 2. Render Normal Subjects (Years 1 to 5)
+    // D. RENDER NORMAL YEAR GROUPS
     for (let year = 1; year <= 5; year++) {
-        if (!groups[year] && searchQuery) continue;
+        // Only render year group if it has subjects or if there's a search query 
+        // (If filters active and no match, skip unless user expects 'Empty' block)
+        // If courseFilter is active and no subjects match for this year, we skip usually.
+        if (!groups[year] && (searchQuery || courseFilter)) continue;
 
         const yearGroup = document.createElement('div');
         const listId = `year-${year}-list`;
         yearGroup.innerHTML = `
-            <h3 style="font-size: 1.15rem; border-left: 5px solid var(--primary); padding: 0.2rem 0 0.2rem 1rem; margin-bottom: 1.2rem; color: #1e293b; margin-top: 2rem; display: flex; align-items: center; justify-content: space-between;">
-                <span>${year}年生</span>
+            <h3 style="font-size: 1.15rem; border-left: 5px solid ${getYearColor(year)}; padding: 0.2rem 0 0.2rem 1rem; margin-bottom: 1.2rem; color: #1e293b; margin-top: 2rem; display: flex; align-items: center; justify-content: space-between;">
+                <span>${year}年 (Year ${year})</span>
                 <span style="font-size: 0.85rem; font-weight: normal; color: #64748b; background: #f1f5f9; padding: 0.2rem 0.6rem; border-radius: 999px;">
                     ${groups[year]?.length || 0} 科目
                 </span>
@@ -883,17 +1089,15 @@ function renderSettings() {
                 const typeA = a.type2 || '';
                 const typeB = b.type2 || '';
 
-                // If one is specialized and other is not, specialized comes first
                 if (typeA.includes('専門') && !typeB.includes('専門')) return -1;
                 if (!typeA.includes('専門') && typeB.includes('専門')) return 1;
 
-                // Otherwise alphabetical
                 return a.name.localeCompare(b.name);
             }).forEach(sub => {
                 const card = document.createElement('div');
                 card.style.cssText = 'background: white; border: 1px solid #e2e8f0; border-radius: 0.8rem; padding: 1.2rem; position: relative; transition: all 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 0.8rem;';
                 card.innerHTML = `
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                     <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                         <span style="font-weight: 600; color: #1e293b; font-size: 1rem; line-height: 1.3;">${sub.name}</span>
                         <div style="display: flex; gap: 0.5rem; flex-shrink: 0;">
                             <button class="btn-icon" onclick="openSubjectModal('${sub.name.replace(/'/g, "\\'")}')" title="編集">
@@ -908,27 +1112,37 @@ function renderSettings() {
                         <span style="background: #eff6ff; color: #3b82f6; padding: 0.15rem 0.6rem; border-radius: 0.4rem; font-size: 0.75rem; font-weight: 500;">${sub.credits} 単位</span>
                         <span style="background: #f8fafc; color: #64748b; padding: 0.15rem 0.6rem; border-radius: 0.4rem; font-size: 0.75rem; border: 1px solid #f1f5f9;">${sub.type1 || '-'}</span>
                         <span style="background: #f8fafc; color: #64748b; padding: 0.15rem 0.6rem; border-radius: 0.4rem; font-size: 0.75rem; border: 1px solid #f1f5f9;">${sub.type2 || '-'}</span>
+                        ${sub.type3 ? `<span style="background: #f0fdf4; color: #166534; padding: 0.15rem 0.6rem; border-radius: 0.4rem; font-size: 0.75rem; border: 1px solid #dcfce7;">${sub.type3}</span>` : ''}
+                        ${sub.type4 ? `<span style="background: #faf5ff; color: #6b21a8; padding: 0.15rem 0.6rem; border-radius: 0.4rem; font-size: 0.75rem; border: 1px solid #e9d5ff;">${sub.type4}</span>` : ''}
                         ${sub.exclude ? '<span style="background: #fee2e2; color: #ef4444; padding: 0.15rem 0.6rem; border-radius: 0.4rem; font-size: 0.75rem;">GPA対象外</span>' : ''}
                     </div>
                 `;
                 listContainer.appendChild(card);
             });
-        } else if (!searchQuery) {
+        } else if (!searchQuery && !courseFilter) {
             listContainer.innerHTML = `
                 <div style="grid-column: 1 / -1; background: #f8fafc; border: 1px dashed #e2e8f0; border-radius: 0.8rem; padding: 2rem; text-align: center; color: #94a3b8; font-size: 0.9rem;">
-                    登録されている科目はありません
+                    この学年の科目はありません
+                </div>
+            `;
+        } else {
+            // Filters Active but no content
+            listContainer.innerHTML = `
+                <div style="grid-column: 1 / -1; background: #f8fafc; border: 1px dashed #e2e8f0; border-radius: 0.8rem; padding: 2rem; text-align: center; color: #94a3b8; font-size: 0.9rem;">
+                    検索条件に一致する科目はありません
                 </div>
             `;
         }
     }
 
-    // 3. Render Others (Special Activities etc.)
+    // 3. Render Others (Using visibleSubjects so defaults/filters apply)
     const othersGroup = document.createElement('div');
+    const othersSubjects = visibleSubjects.filter(s => s.type2 === 'その他');
     othersGroup.innerHTML = `
         <h3 style="font-size: 1.15rem; border-left: 5px solid #8b5cf6; padding: 0.2rem 0 0.2rem 1rem; margin-bottom: 1.2rem; color: #1e293b; margin-top: 3rem; display: flex; align-items: center; justify-content: space-between;">
             <span>その他・特別活動 (Others)</span>
             <span style="font-size: 0.85rem; font-weight: normal; color: #5b21b6; background: #f3e8ff; padding: 0.2rem 0.6rem; border-radius: 999px;">
-                ${state.subjects.filter(s => s.type2 === 'その他').length} 科目
+                ${othersSubjects.length} 科目
             </span>
         </h3>
         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.2rem;" id="others-subjects-list"></div>
@@ -936,11 +1150,8 @@ function renderSettings() {
     container.appendChild(othersGroup);
 
     const othersList = othersGroup.querySelector('#others-subjects-list');
-    const othersSubjects = state.subjects.filter(s => s.type2 === 'その他');
-
     if (othersSubjects.length > 0) {
         othersSubjects.sort((a, b) => {
-            // Sort by year first, then name
             if (a.year !== b.year) return a.year - b.year;
             return a.name.localeCompare(b.name);
         }).forEach(sub => {
@@ -963,6 +1174,8 @@ function renderSettings() {
                 <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
                     <span style="background: white; color: #64748b; padding: 0.15rem 0.6rem; border-radius: 0.4rem; font-size: 0.75rem; border: 1px solid #e2e8f0;">${sub.year}年</span>
                     <span style="background: white; color: #64748b; padding: 0.15rem 0.6rem; border-radius: 0.4rem; font-size: 0.75rem; border: 1px solid #e2e8f0;">${sub.credits} 単位</span>
+                    ${sub.type3 ? `<span style="background: #f0fdf4; color: #166534; padding: 0.15rem 0.6rem; border-radius: 0.4rem; font-size: 0.75rem; border: 1px solid #dcfce7;">${sub.type3}</span>` : ''}
+                    ${sub.type4 ? `<span style="background: #faf5ff; color: #6b21a8; padding: 0.15rem 0.6rem; border-radius: 0.4rem; font-size: 0.75rem; border: 1px solid #e9d5ff;">${sub.type4}</span>` : ''}
                     ${sub.exclude ? '<span style="background: #fee2e2; color: #ef4444; padding: 0.15rem 0.6rem; border-radius: 0.4rem; font-size: 0.75rem;">GPA対象外</span>' : ''}
                 </div>
             `;
@@ -972,13 +1185,15 @@ function renderSettings() {
         othersList.innerHTML = '<div style="grid-column: 1 / -1; background: #f3e8ff; border: 1px dashed #d8b4fe; border-radius: 0.8rem; padding: 2rem; text-align: center; color: #6b21a8; font-size: 0.9rem;">その他・特別活動の登録はありません</div>';
     }
 
-    // 4. Render Special Studies Subjects
+    // 4. Render Special Studies Subjects (filtered and deduped)
     const specialGroup = document.createElement('div');
+    const specialSubjects = visibleSubjects.filter(s => s.name.startsWith('特・') && s.type2 !== 'その他');
+
     specialGroup.innerHTML = `
         <h3 style="font-size: 1.15rem; border-left: 5px solid #f59e0b; padding: 0.2rem 0 0.2rem 1rem; margin-bottom: 1.2rem; color: #1e293b; margin-top: 3rem; display: flex; align-items: center; justify-content: space-between;">
             <span>特別学修科目 (Special Studies)</span>
             <span style="font-size: 0.85rem; font-weight: normal; color: #b45309; background: #fffbeb; padding: 0.2rem 0.6rem; border-radius: 999px;">
-                ${state.subjects.filter(s => s.name.startsWith('特・') && s.type2 !== 'その他').length} 科目
+                ${specialSubjects.length} 科目
             </span>
         </h3>
         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.2rem;" id="special-subjects-list"></div>
@@ -986,7 +1201,6 @@ function renderSettings() {
     container.appendChild(specialGroup);
 
     const specialList = specialGroup.querySelector('#special-subjects-list');
-    const specialSubjects = state.subjects.filter(s => s.name.startsWith('特・') && s.type2 !== 'その他');
 
     if (specialSubjects.length > 0) {
         specialSubjects.sort((a, b) => a.name.localeCompare(b.name)).forEach(sub => {
@@ -1008,6 +1222,8 @@ function renderSettings() {
                 </div>
                 <div style="display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.5rem;">
                      <span style="background: white; color: #b45309; padding: 0.15rem 0.6rem; border-radius: 0.4rem; font-size: 0.75rem; border: 1px solid #fde68a;">${sub.credits} 単位</span>
+                     ${sub.type3 ? `<span style="background: #f0fdf4; color: #166534; padding: 0.15rem 0.6rem; border-radius: 0.4rem; font-size: 0.75rem; border: 1px solid #dcfce7;">${sub.type3}</span>` : ''}
+                     ${sub.type4 ? `<span style="background: #faf5ff; color: #6b21a8; padding: 0.15rem 0.6rem; border-radius: 0.4rem; font-size: 0.75rem; border: 1px solid #e9d5ff;">${sub.type4}</span>` : ''}
                      ${sub.exclude ? '<span style="background: #fee2e2; color: #ef4444; padding: 0.15rem 0.6rem; border-radius: 0.4rem; font-size: 0.75rem;">GPA対象外</span>' : ''}
                 </div>
             `;
@@ -1133,6 +1349,8 @@ function openSubjectModal(subjectName = null) {
             document.getElementById('subjectYearInput').value = sub.year;
             document.getElementById('subjectType1Input').value = sub.type1 || '';
             document.getElementById('subjectType2Input').value = sub.type2 || '';
+            document.getElementById('subjectType3Input').value = sub.type3 || '';
+            document.getElementById('subjectType4Input').value = sub.type4 || '';
             document.getElementById('isSpecialSubject').checked = isSpecial;
             document.getElementById('excludeFromGpa').checked = sub.exclude || false;
 
@@ -1146,9 +1364,10 @@ function openSubjectModal(subjectName = null) {
         document.getElementById('subjectNameInput').value = '';
         document.getElementById('subjectCreditsInput').value = 0;
         document.getElementById('subjectYearInput').value = 0;
-        document.getElementById('subjectType1Input').value = '';
-        document.getElementById('subjectType2Input').value = '';
-        document.getElementById('subjectType2Input').value = '';
+        document.getElementById('subjectType1Input').value = '必';
+        document.getElementById('subjectType2Input').value = '一般';
+        document.getElementById('subjectType3Input').value = '';
+        document.getElementById('subjectType4Input').value = 'コース共通';
         document.getElementById('isSpecialSubject').checked = false;
         document.getElementById('excludeFromGpa').checked = false;
         document.getElementById('subjectYearWrapper').style.display = 'flex';
@@ -1170,6 +1389,8 @@ function saveSubjectItem() {
     const type1Input = document.getElementById('subjectType1Input');
     let type1 = type1Input.value;
     const type2 = document.getElementById('subjectType2Input').value.trim();
+    const type3 = document.getElementById('subjectType3Input').value.trim();
+    const type4 = document.getElementById('subjectType4Input').value.trim();
     const isSpecial = document.getElementById('isSpecialSubject').checked;
     const exclude = document.getElementById('excludeFromGpa').checked;
 
@@ -1200,7 +1421,7 @@ function saveSubjectItem() {
 
         const idx = state.subjects.findIndex(s => s.name === oldName);
         if (idx !== -1) {
-            state.subjects[idx] = { name: newName, credits, year, type1, type2, exclude };
+            state.subjects[idx] = { name: newName, credits, year, type1, type2, type3, type4, exclude };
         }
 
         // Migrate scores if name changed (e.g., normal <-> Special Study)
@@ -1218,7 +1439,7 @@ function saveSubjectItem() {
             alert('その科目名は既に存在します。');
             return;
         }
-        state.subjects.push({ name: newName, credits, year, type1, type2, exclude });
+        state.subjects.push({ name: newName, credits, year, type1, type2, type3, type4, exclude });
     }
 
     saveSessionState();
@@ -1257,13 +1478,15 @@ function exportSubjectsCsv() {
     }
 
     const BOM = '\uFEFF';
-    const header = ['授業科目', '単位', '学年', '種別1', '種別2'].join(',');
+    const header = ['授業科目', '単位', '学年', '種別1', '種別2', '種別3', '種別4'].join(',');
     const rows = state.subjects.map(s => [
         s.name,
         s.credits,
         s.year,
         s.type1 || '',
-        s.type2 || ''
+        s.type2 || '',
+        s.type3 || '',
+        s.type4 || ''
     ].join(','));
 
     const csvContent = BOM + [header, ...rows].join('\n');
@@ -1301,10 +1524,10 @@ function saveFinalSettings() {
         localStorage.setItem('gm_master_students', studentsRaw);
 
         // 2. Save subjects string for master
-        // Format: Name\tCredits\tYear\tType1\tType2\tExclude
-        const header = "授業科目\t単位\t学年\t種別1\t種別2\t除外";
+        // Format: Name,Credits,Year,Type1,Type2,Type3,Type4,Exclude
+        const header = "授業科目,単位,学年,種別1,種別2,種別3,種別4,除外";
         const rows = state.subjects
-            .map(s => `${s.name}\t${s.credits}\t${s.year}\t${s.type1 || ''}\t${s.type2 || ''}\t${s.exclude ? '1' : ''}`);
+            .map(s => `${s.name},${s.credits},${s.year},${s.type1 || ''},${s.type2 || ''},${s.type3 || ''},${s.type4 || ''},${s.exclude ? '1' : ''}`);
         const subjectsRaw = [header, ...rows].join('\n');
         localStorage.setItem('gm_master_subjects', subjectsRaw);
 
@@ -1323,6 +1546,7 @@ function saveFinalSettings() {
 function restoreMasterDefaults() {
     if (confirm('科目定義をデフォルトに戻し、学生リストを空にしますか？\n(現在の編集内容は失われます。保存済みの成績データは維持されます。)')) {
         localStorage.removeItem('gm_master_subjects');
+        localStorage.removeItem('gm_master_subjects_json'); // Clear JSON cache to force default reload
         // Set students to empty but keep initialized flag so they don't come back
         localStorage.setItem('grade_manager_students', JSON.stringify([]));
         localStorage.setItem('grade_manager_initialized', 'true');
@@ -1394,7 +1618,14 @@ function handleFileUpload(e) {
     reader.onload = function (evt) {
         const text = evt.target.result;
         try {
-            const rows = text.replace(/\r/g, '').split('\n').map(row => row.split(','));
+            // Improved CSV split to handle quoted fields
+            const rows = text.replace(/\r/g, '').split('\n').map(line => {
+                let parts = line.match(/(".*?"|[^",\r\n]+)(?=\s*,|\s*$)/g);
+                if (parts) {
+                    return parts.map(p => p.startsWith('"') && p.endsWith('"') ? p.slice(1, -1) : p.trim());
+                }
+                return line.split(',');
+            });
             if (rows.length < 2) throw new Error("Empty or invalid CSV");
 
             const header = rows[0];
@@ -1425,20 +1656,27 @@ function handleFileUpload(e) {
             }
 
             // CASE 2: Subject Definitions List
-            // Header: 授業科目, 単位, 学年, 種別1, 種別2
-            if (header.length <= 6 && header[0].trim() === '授業科目') {
+            // Header: 授業科目, 単位, 学年, 種別1, 種別2, [種別3], [種別4], [除外]
+            if (header.length <= 9 && header[0].trim() === '授業科目') {
                 const newSubjects = [];
                 rows.slice(1).forEach(row => {
                     if (row.length < 3) return;
                     const name = row[0].trim();
                     if (!name) return;
 
+                    // Support numeric year or map '特別' to 0/1
+                    let y = parseInt(row[2]);
+                    if (isNaN(y)) y = 1;
+
                     newSubjects.push({
                         name: name,
                         credits: parseInt(row[1]) || 0,
-                        year: parseInt(row[2]) || 1,
+                        year: y,
                         type1: row[3]?.trim() || '',
-                        type2: row[4]?.trim() || ''
+                        type2: row[4]?.trim() || '',
+                        type3: row.length > 5 ? row[5]?.trim() : '',
+                        type4: row.length > 6 ? row[6]?.trim() : '',
+                        exclude: row.length > 7 ? (row[7]?.trim() === '1') : false
                     });
                 });
 
@@ -1487,7 +1725,20 @@ function handleFileUpload(e) {
 
                 // Normalize name for lookup
                 const normalizedSubjectName = normalizeName(subjectName);
-                let subject = state.subjects.find(s => normalizeName(s.name) === normalizedSubjectName);
+                const courseFilter = state.currentCourse;
+
+                // Prioritize Course Match
+                let subject = state.subjects.find(s => {
+                    if (normalizeName(s.name) !== normalizedSubjectName) return false;
+                    const t4 = s.type4 || 'コース共通';
+                    if (courseFilter && t4 !== 'コース共通' && t4 !== courseFilter) return false;
+                    return true;
+                });
+
+                // Fallback to any subject with that name
+                if (!subject) {
+                    subject = state.subjects.find(s => normalizeName(s.name) === normalizedSubjectName);
+                }
 
                 if (!subject) {
                     // Add new subject
@@ -1496,20 +1747,22 @@ function handleFileUpload(e) {
                         credits: !isNaN(csvCredits) ? csvCredits : 0,
                         year: !isNaN(csvYear) ? csvYear : 1,
                         type1: row[3] || '不明',
-                        type2: row[4] || '一般'
+                        type2: row[4] || '一般',
+                        type4: courseFilter || 'コース共通'
                     };
                     state.subjects.push(newSubject);
                 } else {
                     // Update existing
                     // Only update credits if we have a valid positive number (prevent overwriting with 0)
-                    if (!isNaN(csvCredits) && csvCredits > 0 && subject.credits !== csvCredits) {
+                    if (!isNaN(csvCredits) && csvCredits > 0 && (!subject.credits || subject.credits === 0)) {
                         subject.credits = csvCredits;
                     }
-                    if (!isNaN(csvYear) && subject.year !== csvYear) {
+                    if (!isNaN(csvYear) && (!subject.year || subject.year === 0)) {
                         subject.year = csvYear;
                     }
-                    if (row[3] && subject.type1 !== row[3]) subject.type1 = row[3];
-                    if (row[4] && subject.type2 !== row[4]) subject.type2 = row[4];
+                    // Only update Types if they are currently missing (don't overwrite with old CSV data)
+                    if (row[3] && !subject.type1) subject.type1 = row[3];
+                    if (row[4] && !subject.type2) subject.type2 = row[4];
                 }
 
                 if (!state.scores[studentName]) state.scores[studentName] = {};
@@ -1542,6 +1795,236 @@ function handleFileUpload(e) {
     reader.readAsText(file);
 }
 
+// --- Graduation Requirements Logic ---
+function renderGraduationRequirements() {
+    const studentName = state.currentStudent;
+    if (!studentName) return;
+
+    const summaryContainer = document.getElementById('gradRequirementsSummary');
+    const detailsBody = document.getElementById('gradRequirementsDetails');
+    if (!summaryContainer || !detailsBody) return;
+
+    summaryContainer.innerHTML = '';
+    detailsBody.innerHTML = '';
+
+    // Logic to identify passed subjects
+    const isPassed = (sub) => {
+        const score = getScore(studentName, sub.name, '学年末');
+        if (score === '認' || score === '履' || score === '修' || score === '合') return true;
+        const n = parseFloat(score);
+        return !isNaN(n) && n >= 60;
+    };
+
+    // Filters and counts
+    let totalGeneralCredits = 0;
+    let totalProfessionalCredits = 0;
+
+    // Caps
+    let capSpecialStudy = 60;
+    let earnedSpecialStudyRaw = 0;
+
+    let dpACredits = 0;
+    let dpBCredits = 0;
+    let dpCCredits = 0;
+    let dpDCredits = 0;
+    let dpECredits = 0;
+    let sdgsCount = 0;
+
+    let allRequiredPassed = true;
+    let totalRequiredCount = 0;
+    let completedRequiredCount = 0;
+
+    // Filter subjects by selected course
+    const courseFilter = state.currentCourse;
+    const subjects = state.subjects.filter(s => {
+        if (courseFilter) {
+            const t4 = s.type4 || 'コース共通';
+            if (t4 !== 'コース共通' && t4 !== courseFilter) return false;
+        }
+        return true;
+    });
+
+    subjects.forEach(sub => {
+        const passed = isPassed(sub);
+        const credits = parseFloat(sub.credits) || 0;
+        const type1 = sub.type1 || '';
+        const type2 = sub.type2 || '';
+        const type3 = (sub.type3 || '').toLowerCase();
+
+        // (2) All Required completed
+        if (type1 === '必' || type1 === '必修') {
+            totalRequiredCount++;
+            if (passed) {
+                completedRequiredCount++;
+            } else {
+                allRequiredPassed = false;
+            }
+        }
+
+        if (passed) {
+            // (1) General vs Professional count
+            if (type2 === '一般') {
+                totalGeneralCredits += credits;
+            } else if (type2 !== 'その他') {
+                // Professional usually includes 専門共通, 基盤専門, 応用専門, 特別学修
+                if (type2 === '特別学修') {
+                    earnedSpecialStudyRaw += credits;
+                } else {
+                    totalProfessionalCredits += credits;
+                }
+            }
+
+            // (3)-(7) DPs and SDGs
+            if (type3.includes('sdgs')) {
+                sdgsCount++;
+            }
+            if (type3.includes('dp-a')) dpACredits += credits;
+            if (type3.includes('dp-b')) dpBCredits += credits;
+            if (type3.includes('dp-c')) dpCCredits += credits;
+            if (type3.includes('dp-d')) dpDCredits += credits;
+            if (type3.includes('dp-e')) dpECredits += credits;
+        }
+    });
+
+    // Handle Caps for Special Study (No more than 60 credits count towards Professional credits)
+    const appliedSpecialStudy = Math.min(earnedSpecialStudyRaw, capSpecialStudy);
+    totalProfessionalCredits += appliedSpecialStudy;
+
+    const totalCredits = totalGeneralCredits + totalProfessionalCredits;
+
+    // Requirements Data
+    const requirements = [
+        {
+            name: "卒業所要単位 (合計)",
+            target: "167単位以上",
+            current: `${totalCredits.toFixed(1)}単位`,
+            percent: (totalCredits / 167) * 100,
+            judge: totalCredits >= 167,
+            id: "req-total"
+        },
+        {
+            name: "一般科目 単位数",
+            target: "75単位以上",
+            current: `${totalGeneralCredits.toFixed(1)}単位`,
+            percent: (totalGeneralCredits / 75) * 100,
+            judge: totalGeneralCredits >= 75,
+            id: "req-general"
+        },
+        {
+            name: "専門科目 単位数",
+            target: "82単位以上",
+            current: `${totalProfessionalCredits.toFixed(1)}単位`,
+            percent: (totalProfessionalCredits / 82) * 100,
+            judge: totalProfessionalCredits >= 82,
+            id: "req-professional"
+        },
+        {
+            name: "必修科目 完勝状況",
+            target: `全${totalRequiredCount}科目`,
+            current: `${completedRequiredCount}科目取得`,
+            percent: totalRequiredCount > 0 ? (completedRequiredCount / totalRequiredCount) * 100 : 100,
+            judge: allRequiredPassed,
+            id: "req-required"
+        },
+        {
+            name: "DP-A 単位数",
+            target: "21単位以上",
+            current: `${dpACredits.toFixed(1)}単位`,
+            percent: (dpACredits / 21) * 100,
+            judge: dpACredits >= 21,
+            id: "req-dpa"
+        },
+        {
+            name: "SDGs 取得科目数",
+            target: "5科目以上",
+            current: `${sdgsCount}科目`,
+            percent: (sdgsCount / 5) * 100,
+            judge: sdgsCount >= 5,
+            id: "req-sdgs"
+        },
+        {
+            name: "DP-B 単位数 (数・理・情)",
+            target: "39単位以上",
+            current: `${dpBCredits.toFixed(1)}単位`,
+            percent: (dpBCredits / 39) * 100,
+            judge: dpBCredits >= 39,
+            id: "req-dpb"
+        },
+        {
+            name: "DP-C 単位数 (Com)",
+            target: "20単位以上",
+            current: `${dpCCredits.toFixed(1)}単位`,
+            percent: (dpCCredits / 20) * 100,
+            judge: dpCCredits >= 20,
+            id: "req-dpc"
+        },
+        {
+            name: "DP-D 単位数 (基盤専門)",
+            target: "50単位以上",
+            current: `${dpDCredits.toFixed(1)}単位`,
+            percent: (dpDCredits / 50) * 100,
+            judge: dpDCredits >= 50,
+            id: "req-dpd"
+        },
+        {
+            name: "DP-E 単位数 (応用専門)",
+            target: "16単位以上",
+            current: `${dpECredits.toFixed(1)}単位`,
+            percent: (dpECredits / 16) * 100,
+            judge: dpECredits >= 16,
+            id: "req-dpe"
+        }
+    ];
+
+    // Card colors
+    const getThemeColor = (req) => req.judge ? '#10b981' : (req.percent > 80 ? '#f59e0b' : '#ef4444');
+
+    requirements.forEach(req => {
+        // Summary Card
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.style.padding = '1.25rem';
+        card.style.marginBottom = '0'; // use gap instead
+        card.style.borderTop = `4px solid ${getThemeColor(req)}`;
+        card.innerHTML = `
+            <div style="font-size: 0.85rem; font-weight: 600; color: #64748b; margin-bottom: 0.75rem; display: flex; justify-content: space-between;">
+                ${req.name}
+                ${req.judge ? '<span style="color:#10b981">●達成</span>' : ''}
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 0.5rem;">
+                <div style="font-size: 1.5rem; font-weight: 700; color: #1e293b;">${req.current}</div>
+                <div style="font-size: 0.8rem; color: #94a3b8; padding-bottom: 0.2rem;">目標: ${req.target}</div>
+            </div>
+            <div style="height: 6px; background: #f1f5f9; border-radius: 3px; overflow: hidden; margin-top: 0.5rem;">
+                <div style="height: 100%; width: ${Math.min(req.percent, 100)}%; background: ${getThemeColor(req)}; transition: width 0.5s ease-out;"></div>
+            </div>
+        `;
+        summaryContainer.appendChild(card);
+
+        // Details Row
+        const tr = document.createElement('tr');
+        const statusHTML = req.judge
+            ? `<span style="background: #dcfce7; color: #166534; padding: 0.2rem 0.6rem; border-radius: 1rem; font-size: 0.75rem; font-weight: 700;">達成</span>`
+            : `<span style="background: #fee2e2; color: #991b1b; padding: 0.2rem 0.6rem; border-radius: 1rem; font-size: 0.75rem; font-weight: 700;">未達成</span>`;
+
+        tr.innerHTML = `
+            <td style="font-weight: 600;">${req.name}</td>
+            <td style="color: #64748b;">${req.target}</td>
+            <td style="font-weight: 600;">${req.current}</td>
+            <td>
+                <div style="display: flex; align-items: center; gap: 0.8rem;">
+                    <div style="flex: 1; height: 6px; background: #f1f5f9; border-radius: 3px; overflow: hidden; min-width: 60px;">
+                        <div style="height: 100%; width: ${Math.min(req.percent, 100)}%; background: ${getThemeColor(req)};"></div>
+                    </div>
+                    <span style="font-size: 0.8rem; font-weight: 600; width: 40px;">${req.percent.toFixed(0)}%</span>
+                </div>
+            </td>
+            <td style="text-align: center;">${statusHTML}</td>
+        `;
+        detailsBody.appendChild(tr);
+    });
+}
+
 // ==================== RENDERING ====================
 function render() {
     updatePrintHeader();
@@ -1552,6 +2035,8 @@ function render() {
         renderStats();
     } else if (state.currentTab === 'stats2') {
         renderStats2();
+    } else if (state.currentTab === 'grad_requirements') {
+        renderGraduationRequirements();
     } else if (state.currentTab === 'class_stats') {
         initClassStats();
     } else if (state.currentTab === 'settings') {
@@ -1593,6 +2078,72 @@ function updatePrintHeader() {
 let stats2ChartInstance = null;
 let stats2RankChartInstance = null;
 
+// --- GPA / Year Utilities ---
+
+// Helper: Filter subjects based on UI settings (Course, etc.)
+const getTargetSubjects = (predicate) => {
+    const courseFilter = state.currentCourse;
+    return state.subjects.filter(s => {
+        if (!predicate(s)) return false;
+        if (s.exclude) return false;
+
+        // Course Filter
+        if (courseFilter) {
+            const t4 = s.type4 || 'コース共通';
+            if (courseFilter === 'コース未配属') {
+                if (t4 !== 'コース共通') return false;
+            } else {
+                if (t4 !== 'コース共通' && t4 !== courseFilter) return false;
+            }
+        }
+        return true;
+    });
+};
+
+// Check if a year is "Finished"
+const isYearFinished = (studentName, year) => {
+    // Check availability of next year data
+    const subjectsNext = getTargetSubjects(s => {
+        const nextY = year + 1;
+        if (s.year === nextY) return true;
+        if (s.year === 0) {
+            const scoreObj = (state.scores[studentName] || {})[s.name];
+            return scoreObj && scoreObj.obtainedYear === nextY;
+        }
+        return false;
+    });
+    let hasNextData = false;
+    for (const sub of subjectsNext) {
+        const keys = ["学年末", "後期中間", "前期末", "前期中間"];
+        for (const k of keys) {
+            const v = getScore(studentName, sub.name, k);
+            if (v !== undefined && v !== null && v !== '') { hasNextData = true; break; }
+        }
+        if (hasNextData) break;
+    }
+    if (hasNextData) return true;
+
+    const subjects = getTargetSubjects(s => {
+        if (s.year === year) return true;
+        if (s.year === 0) {
+            const scoreObj = (state.scores[studentName] || {})[s.name];
+            return scoreObj && scoreObj.obtainedYear === year;
+        }
+        return false;
+    });
+    if (subjects.length === 0) return true;
+
+    let hasYearEnd = false;
+    for (const sub of subjects) {
+        const v = getScore(studentName, sub.name, '学年末');
+        if (v !== undefined && v !== null && v !== '') {
+            hasYearEnd = true;
+            break;
+        }
+    }
+    return hasYearEnd;
+};
+
 function renderStats2() {
     const tbody = document.getElementById('stats2Body');
     tbody.innerHTML = '';
@@ -1610,51 +2161,11 @@ function renderStats2() {
 
     // --- Helpers ---
 
-    // 1. Check if a year is "Finished" for a student
-    // Definition: All subjects registered for this year have a "Year End" (学年末) score.
-    // (Or simpler: If "Year End" exists for the *majority*? Let's be strict: if any subject has data but no Year End, it's In Progress.
-    //  Actually, safest is: If 'Year End' exists for ANY subject, assume finished? No, that's partial.
-    //  Let's stick to the prompt implication: "Year End exam finished" -> Results available.
-    //  Let's check if the specific subject has Year End.
-    //  But the policy applies to the *Grade*.
-    //  Logic: If the student has ANY score for a later year, this year is definitely Finished.
-    //  If this is the latest year, check if Year End scores are populated.
-    const isYearFinished = (studentName, year) => {
-        // Check availability of next year data
-        const subjectsNext = state.subjects.filter(s => s.year === year + 1 && !s.exclude);
-        let hasNextData = false;
-        for (const sub of subjectsNext) {
-            const keys = ["学年末", "後期中間", "前期末", "前期中間"];
-            for (const k of keys) {
-                const v = getScore(studentName, sub.name, k);
-                if (v !== undefined && v !== null && v !== '') { hasNextData = true; break; }
-            }
-            if (hasNextData) break;
-        }
-        if (hasNextData) return true;
-
-        // If no next year data, check this year's "Year End" completeness
-        // If > 50% of registered subjects have Year End, consider it Finished? 
-        // Or simply: If we have ANY "Year End" score, treat as finished? 
-        // Given the request "Grades where Year End is not finished", implies current active term.
-        // Let's assume if there is ANY "Year End" score, it's finished. (Simple trigger).
-        // User might paste all Year End scores at once.
-        const subjects = state.subjects.filter(s => s.year === year && !s.exclude);
-        if (subjects.length === 0) return true; // No subjects = finished/skipped
-
-        let hasYearEnd = false;
-        for (const sub of subjects) {
-            const v = getScore(studentName, sub.name, '学年末');
-            if (v !== undefined && v !== null && v !== '') {
-                hasYearEnd = true;
-                break;
-            }
-        }
-        return hasYearEnd;
-    };
+    // Helper: Filter subjects based on UI settings (Course, etc.)
+    // --- GPA Calculation Part ---
 
 
-    // 2. Get Stats for "Term A" (Current Year, All Regular Exams)
+    // 2. Get Stats for "Term A"
     const getTermA = (studentName, year) => {
         let sum = 0;
         let count = 0;
@@ -1663,10 +2174,17 @@ function renderStats2() {
         let gpWSum = 0;
         let gpCreds = 0;
 
-        const subjects = state.subjects.filter(s => s.year === year && !s.exclude);
+        const subjects = getTargetSubjects(s => {
+            if (s.year === year) return true;
+            if (s.year === 0) {
+                const scoreObj = (state.scores[studentName] || {})[s.name];
+                return scoreObj && scoreObj.obtainedYear === year;
+            }
+            return false;
+        });
 
         subjects.forEach(sub => {
-            // Average of all available regular exams for this subject
+            // ... rest of function logic ...
             const keys = ["学年末", "後期中間", "前期末", "前期中間"];
             let subValSum = 0;
             let subValCount = 0;
@@ -1680,22 +2198,18 @@ function renderStats2() {
             });
 
             if (subValCount > 0) {
-                const subAvg = subValSum / subValCount; // Unweighted average of exams
-
+                const subAvg = subValSum / subValCount;
                 sum += subAvg;
                 count++;
-
                 const c = sub.credits || 0;
                 wSum += subAvg * c;
                 creds += c;
-
                 let gp = 0;
                 if (subAvg >= 90) gp = 4.0;
                 else if (subAvg >= 80) gp = 3.0;
                 else if (subAvg >= 70) gp = 2.0;
                 else if (subAvg >= 60) gp = 1.0;
                 else gp = 0.0;
-
                 gpWSum += gp * c;
                 gpCreds += c;
             }
@@ -1710,7 +2224,7 @@ function renderStats2() {
         };
     };
 
-    // 3. Get Stats for "Term B" (Cumulative Year End up to limitYear)
+    // 3. Get Stats for "Term B"
     const getTermB = (studentName, limitYear) => {
         let sum = 0;
         let count = 0;
@@ -1719,27 +2233,31 @@ function renderStats2() {
         let gpWSum = 0;
         let gpCreds = 0;
 
-        const subjects = state.subjects.filter(s => s.year <= limitYear && !s.exclude);
+        const subjects = getTargetSubjects(s => {
+            if (s.year > 0 && s.year <= limitYear) return true;
+            if (s.year === 0) {
+                const scoreObj = (state.scores[studentName] || {})[s.name];
+                return scoreObj && scoreObj.obtainedYear > 0 && scoreObj.obtainedYear <= limitYear;
+            }
+            return false;
+        });
 
         subjects.forEach(sub => {
-            // ONLY Year End scores
+            // ... rest ...
             const v = getScore(studentName, sub.name, '学年末');
             if (v !== undefined && v !== null && v !== '' && !isNaN(parseFloat(v))) {
                 const val = parseFloat(v);
                 sum += val;
                 count++;
-
                 const c = sub.credits || 0;
                 wSum += val * c;
                 creds += c;
-
                 let gp = 0;
                 if (val >= 90) gp = 4.0;
                 else if (val >= 80) gp = 3.0;
                 else if (val >= 70) gp = 2.0;
                 else if (val >= 60) gp = 1.0;
                 else gp = 0.0;
-
                 gpWSum += gp * c;
                 gpCreds += c;
             }
@@ -1755,8 +2273,15 @@ function renderStats2() {
 
     // Combined Stats Calculation
     const getStudentFinalStats = (studentName, year) => {
-        // Check if ANY data exists for this year
-        const subjects = state.subjects.filter(s => s.year === year && !s.exclude);
+        const subjects = getTargetSubjects(s => {
+            if (s.year === year) return true;
+            if (s.year === 0) {
+                const scoreObj = (state.scores[studentName] || {})[s.name];
+                return scoreObj && scoreObj.obtainedYear === year;
+            }
+            return false;
+        });
+        // ... rest ...
         let hasAnyData = false;
         for (const sub of subjects) {
             const keys = ["学年末", "後期中間", "前期末", "前期中間"];
@@ -1769,39 +2294,23 @@ function renderStats2() {
 
         if (!hasAnyData) return { hasData: false };
 
-        // Policy Check
-        // If finished: Use Term B (Cumulative up to current year) - wait, "That grade's final grades".
-        // Re-reading Policy 1: "Grades where Year End is finished -> Final grades (Year End)". 
-        // Does it mean Cumulative up to Year? Or Just This Year?
-        // Context: "Stats 2" was "Cumulative". 
-        // I will assume Policy 1 is: Term B(year). (Cumulative Year End).
-
         const finished = isYearFinished(studentName, year);
 
         if (finished) {
-            // Policy 1
             const res = getTermB(studentName, year);
             return { hasData: res !== null, ...res };
         } else {
-            // Policy 2
-            // Average of (Term A(year)) and (Term B(year-1))
             const termA = getTermA(studentName, year);
-
-            // Term B is cumulative up to year-1
-            // If year=1, Term B is null (or 0?). 
-            // If year=1 in progress, we basically just show Term A.
             let termB = null;
             if (year > 1) {
                 termB = getTermB(studentName, year - 1);
             }
 
-            if (!termA) return { hasData: false }; // No current data
+            if (!termA) return { hasData: false };
 
             if (!termB) {
-                // Only Term A available
                 return { hasData: true, ...termA };
             } else {
-                // Average of A and B
                 return {
                     hasData: true,
                     simple: (termA.simple + termB.simple) / 2,
@@ -2122,32 +2631,64 @@ function renderGradesTable() {
     specialTbody.innerHTML = '';
     if (otherTbody) otherTbody.innerHTML = '';
 
-    const subjects = state.subjects.filter(s => s.year === state.currentYear);
+    const courseFilter = state.currentCourse;
+
+    const subjects = state.subjects.filter(s => {
+        // 1. Course Filter
+        if (courseFilter) {
+            const t4 = s.type4 || 'コース共通';
+            if (t4 !== 'コース共通' && t4 !== courseFilter) return false;
+        }
+
+        // Specific Year Finished Check for "特・特別活動1", "特・特別活動2" as requested
+        if (s.name === '特・特別活動1' || s.name === '特・特別活動2') {
+            if (!isYearFinished(state.currentStudent, s.year)) return false;
+        }
+
+        // 2. Year Match (Standard or Floater)
+        if (s.year === state.currentYear) return true;
+
+        if (s.year === 0) {
+            const scoreObj = (state.scores[state.currentStudent] || {})[s.name];
+            if (scoreObj && scoreObj.obtainedYear) {
+                return scoreObj.obtainedYear === state.currentYear;
+            }
+            return true;
+        }
+        return false;
+    });
     const studentScores = state.scores[state.currentStudent] || {};
 
     subjects.forEach(sub => {
         // Filter logic: if hiding empty, check if ANY score exists for this subject
         if (state.hideEmptySubjects) {
             const scoreObj = studentScores[sub.name];
-            if (!scoreObj) return; // Student does not have this subject initialized
+            // Do NOT hide Required (必) subjects for the current year, even if empty, to allow entry.
+            if (sub.type1 !== '必') {
+                if (!scoreObj) return;
 
-            // Check for ANY value in any slot (applies to Normal, Special, and Others)
-            const hasValue = SCORE_KEYS.some(key => {
-                const val = scoreObj[key];
-                return val !== undefined && val !== null && val !== '';
-            });
+                const hasValue = SCORE_KEYS.some(key => {
+                    const val = scoreObj[key];
+                    return val !== undefined && val !== null && val !== '';
+                });
 
-            if (!hasValue) return; // Skip this subject if no data exists
+                if (!hasValue) return;
+            }
         }
 
         let targetTbody = tbody;
         let isSpecialRow = false;
 
-        if (sub.type2 === 'その他') {
-            targetTbody = otherTbody;
+        if (sub.name.startsWith('特・')) {
+            // "特・特別活動1/2" are explicitly requested to be in Others table
+            if (sub.name === '特・特別活動1' || sub.name === '特・特別活動2') {
+                targetTbody = otherTbody;
+            } else {
+                targetTbody = specialTbody;
+            }
             isSpecialRow = true;
-        } else if (sub.name.startsWith('特・')) {
-            targetTbody = specialTbody;
+        } else if (sub.type2 === 'その他') {
+            targetTbody = otherTbody;
             isSpecialRow = true;
         } else {
             targetTbody = tbody;
@@ -2333,6 +2874,21 @@ function updateScore(student, subject, key, value) {
     if (!state.scores[student]) state.scores[student] = {};
     if (!state.scores[student][subject]) state.scores[student][subject] = {};
 
+    // For year-0 subjects (Floaters), pin them to the year they were first entered
+    const courseFilter = state.currentCourse;
+    const subDef = state.subjects.find(s => {
+        if (s.name !== subject) return false;
+        const t4 = s.type4 || 'コース共通';
+        if (courseFilter && t4 !== 'コース共通' && t4 !== courseFilter) return false;
+        return true;
+    }) || state.subjects.find(s => s.name === subject);
+
+    if (subDef && subDef.year === 0) {
+        if (!state.scores[student][subject].obtainedYear) {
+            state.scores[student][subject].obtainedYear = state.currentYear;
+        }
+    }
+
     // Only parse as float if it's a numeric subject and looks like a number
     if (isNumericSubject(subject) && value !== '' && !isNaN(value)) {
         state.scores[student][subject][key] = parseFloat(value);
@@ -2377,6 +2933,7 @@ function applyPaste() {
     const student = state.currentStudent;
     if (!state.scores[student]) state.scores[student] = {};
 
+    const courseFilter = state.currentCourse;
     const subjectMap = {};
     state.subjects.forEach(s => {
         subjectMap[normalizeStr(s.name)] = s;
@@ -2414,12 +2971,31 @@ function applyPaste() {
         const scoreStr = parts[2].trim();
         const evalStr = parts.length > 3 ? parts[3].trim() : '';
 
+        const courseFilter = state.currentCourse;
         const normName = normalizeStr(subjectName);
-        let existingSub = state.subjects.find(s => normalizeStr(s.name) === normName);
 
-        // Fuzzy Match: Try adding "特・" prefix if not found (common for Special Activities)
+        // Preferred Match: Name AND (Course Match OR Common)
+        let existingSub = state.subjects.find(s => {
+            if (normalizeStr(s.name) !== normName) return false;
+            const t4 = s.type4 || 'コース共通';
+            if (courseFilter && t4 !== 'コース共通' && t4 !== courseFilter) return false;
+            return true;
+        });
+
+        // Fallback 1: Just Name match
         if (!existingSub) {
-            existingSub = state.subjects.find(s => normalizeStr(s.name) === "特・" + normName);
+            existingSub = state.subjects.find(s => normalizeStr(s.name) === normName);
+        }
+
+        // Fallback 2: Fuzzy Match with prefix, prioritizing course
+        if (!existingSub) {
+            const fuzzy = "特・" + normName;
+            existingSub = state.subjects.find(s => {
+                if (normalizeStr(s.name) !== fuzzy) return false;
+                const t4 = s.type4 || 'コース共通';
+                if (courseFilter && t4 !== 'コース共通' && t4 !== courseFilter) return false;
+                return true;
+            }) || state.subjects.find(s => normalizeStr(s.name) === fuzzy);
         }
 
         if (existingSub) {
@@ -2490,7 +3066,39 @@ function renderStats() {
 
     for (let year = 1; year <= 5; year++) {
         // Find subject data for this year
-        const subjects = state.subjects.filter(s => s.year === year);
+        // Apply filters: Course Filter & Hide Empty
+        const courseFilter = state.currentCourse;
+
+        const subjects = state.subjects.filter(s => {
+            // 1. Year Match (Standard or Floater)
+            let yearMatches = (s.year === year);
+            if (s.year === 0) {
+                const scoreObj = (state.scores[state.currentStudent] || {})[s.name];
+                yearMatches = (scoreObj && scoreObj.obtainedYear === year);
+            }
+            if (!yearMatches) return false;
+
+            // 2. Course Filter
+            if (courseFilter) {
+                const t4 = s.type4 || 'コース共通';
+                if (t4 !== 'コース共通' && t4 !== courseFilter) return false;
+            }
+
+            // 3. Hide Empty (No Credit / No Score)
+            if (state.hideEmptySubjects) {
+                const scoreObj = state.scores[state.currentStudent] && state.scores[state.currentStudent][s.name];
+                if (!scoreObj) return false;
+
+                const hasValue = SCORE_KEYS.some(key => {
+                    const val = scoreObj[key];
+                    return val !== undefined && val !== null && val !== '';
+                });
+                if (!hasValue) return false;
+            }
+
+            return true;
+        });
+
         if (subjects.length === 0) continue;
 
         // Row
@@ -2732,7 +3340,37 @@ function renderBoxPlot() {
         }
 
         // Prepare BoxPlot Data
-        const subjects = state.subjects.filter(s => s.year === latestYear && !s.name.startsWith('特・'));
+        const courseFilter = state.currentCourse;
+
+        const subjects = state.subjects.filter(s => {
+            if (s.year !== latestYear) return false;
+            if (s.name.startsWith('特・')) return false;
+
+            // Course Filter
+            if (courseFilter) {
+                const t4 = s.type4 || 'コース共通';
+                if (courseFilter === 'コース未配属') {
+                    if (t4 !== 'コース共通') return false;
+                } else {
+                    if (t4 !== 'コース共通' && t4 !== courseFilter) return false;
+                }
+            }
+
+            // Hide Empty (If enabled, show only if current student has ANY data for this subject)
+            if (state.hideEmptySubjects) {
+                const scoreObj = state.scores[state.currentStudent] && state.scores[state.currentStudent][s.name];
+                if (!scoreObj) return false;
+                const keys = ["前期中間", "前期末", "後期中間", "学年末"];
+                const hasValue = keys.some(k => {
+                    const v = scoreObj[k];
+                    return v !== undefined && v !== null && v !== '';
+                });
+                if (!hasValue) return false;
+            }
+
+            return true;
+        });
+
         const subjectLabels = subjects.map(s => s.name);
 
         // Data: Array of arrays.
@@ -2900,6 +3538,9 @@ function renderTrendChart() {
     const ctx = document.getElementById('trendChart').getContext('2d');
     if (trendChartInstance) trendChartInstance.destroy();
 
+    const courseFilter = state.currentCourse;
+    const hideEmpty = state.hideEmptySubjects;
+
     // Collect all timepoints (Year-Test combinations)
     // Iterate 1 to 5 (asc)
     const labels = [];
@@ -2908,7 +3549,36 @@ function renderTrendChart() {
 
     // We iterate 1..5. Always include axis even if empty.
     for (let y = 1; y <= 5; y++) {
-        const subs = state.subjects.filter(s => s.year === y && !s.name.startsWith('特・'));
+        // Filter subjects
+        const subs = state.subjects.filter(s => {
+            // 1. Year Match (Standard or Floater)
+            let yearMatches = (s.year === y);
+            if (s.year === 0) {
+                const scoreObj = (state.scores[state.currentStudent] || {})[s.name];
+                yearMatches = (scoreObj && scoreObj.obtainedYear === y);
+            }
+            if (!yearMatches) return false;
+
+            if (s.name.startsWith('特・')) return false;
+
+            // 2. Course Filter
+            if (courseFilter) {
+                const t4 = s.type4 || 'コース共通';
+                if (t4 !== 'コース共通' && t4 !== courseFilter) return false;
+            }
+
+            // 3. Hide Empty
+            if (hideEmpty) {
+                const scoreObj = state.scores[state.currentStudent] && state.scores[state.currentStudent][s.name];
+                if (!scoreObj) return false;
+                const hasValue = SCORE_KEYS.some(k => {
+                    const v = scoreObj[k];
+                    return v !== undefined && v !== null && v !== '';
+                });
+                if (!hasValue) return false;
+            }
+            return true;
+        });
 
         // For each test type
         SCORE_KEYS.forEach(test => {
@@ -3120,6 +3790,195 @@ function renderTrendChart() {
         }
     });
 
+}
+
+// ==================== CLASS STATS ====================
+
+function initClassStats() {
+    // Initial render or clear?
+    // User needs to click 'Generate' to see stats usually, or we can auto-generate.
+    // Let's auto-generate using default '学年末' if container is empty.
+    const container = document.getElementById('classStatsContainer');
+    if (container && container.innerHTML.trim() === '') {
+        document.getElementById('classStatsTest').value = '学年末'; // Default
+        generateClassStats();
+    }
+}
+
+function generateClassStats() {
+    const testKey = document.getElementById('classStatsTest').value;
+    const container = document.getElementById('classStatsContainer');
+    if (!container) return;
+
+    container.innerHTML = '<p>集計中 (Calculating)...</p>';
+
+    // Filter Subjects based on User Settings
+    // 1. Course Filter
+    // 2. Hide Empty (personal relevance)
+    const courseFilter = state.currentCourse;
+    const hideEmpty = state.hideEmptySubjects; // "単位認定のない科目を隠す"
+
+    // Group subjects by Year? Or just flat list?
+    // Class Stats usually implies "All Class Subjects".
+    // Let's list by Year then Subject.
+
+    // Filter
+    const targetSubjects = state.subjects.filter(s => {
+        if (s.exclude) return false;
+
+        // Course Filter
+        if (courseFilter) {
+            const t4 = s.type4 || 'コース共通';
+            if (t4 !== 'コース共通' && t4 !== courseFilter) return false;
+        }
+
+        // Hide Empty: Check if CURRENT STUDENT has data
+        // This makes the report "My Relevant Class Stats"
+        if (hideEmpty) {
+            const scoreObj = state.scores[state.currentStudent] && state.scores[state.currentStudent][s.name];
+            if (!scoreObj) return false;
+            const keys = ["前期中間", "前期末", "後期中間", "学年末"];
+            const hasValue = keys.some(k => {
+                const v = scoreObj[k];
+                return v !== undefined && v !== null && v !== '';
+            });
+            if (!hasValue) return false;
+        }
+
+        return true;
+    });
+
+    if (targetSubjects.length === 0) {
+        container.innerHTML = '<p>表示する科目がありません (No subjects match filter).</p>';
+        return;
+    }
+
+    // Sort by Year, then Name
+    targetSubjects.sort((a, b) => {
+        if (a.year !== b.year) return a.year - b.year;
+        return a.name.localeCompare(b.name, 'ja');
+    });
+
+    // Generate Table Data
+    let html = `
+        <table class="report-table" style="font-size: 0.9rem; width: 100%;">
+            <thead>
+                <tr>
+                    <th style="width: 50px;">学年</th>
+                    <th>科目名 (Subject)</th>
+                    <th style="width: 60px;">単位</th>
+                    <th style="width: 80px;">コース</th>
+                    <th style="width: 60px;">平均</th>
+                    <th style="width: 60px;">最高</th>
+                    <th style="width: 60px;">最低</th>
+                    <th style="width: 80px;">受験者数</th>
+                    <th style="width: 60px;">自分の点</th>
+                    <th style="width: 60px;">偏差値</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    targetSubjects.forEach(sub => {
+        // Calculate Class Stats
+        let total = 0;
+        let count = 0;
+        let min = 100;
+        let max = 0;
+        const scores = [];
+
+        state.students.forEach(std => {
+            const val = getScore(std, sub.name, testKey);
+            if (typeof val === 'number') {
+                scores.push(val);
+                total += val;
+                count++;
+                if (val < min) min = val;
+                if (val > max) max = val;
+            }
+        });
+
+        if (count === 0) {
+            // No data for this subject in the class
+            // Skip or show empty? Show empty to indicate it exists.
+            // Wait, if hideEmpty is checked, we might have skipped it if *I* didn't take it.
+            // If I took it but nobody has scores yet (e.g. future test), show dash.
+            html += `
+                <tr>
+                    <td style="text-align: center;">${sub.year}</td>
+                    <td>${sub.name}</td>
+                    <td style="text-align: center;">${sub.credits}</td>
+                    <td style="text-align: center;"><span class="badge badge-purple">${sub.type4 || '-'}</span></td>
+                    <td style="text-align: center;">-</td>
+                    <td style="text-align: center;">-</td>
+                    <td style="text-align: center;">-</td>
+                    <td style="text-align: center;">0</td>
+                    <td style="text-align: center;">-</td>
+                    <td style="text-align: center;">-</td>
+                </tr>
+            `;
+            return;
+        }
+
+        const avg = total / count;
+
+        // Std Dev
+        let sumSqDiff = 0;
+        scores.forEach(s => sumSqDiff += Math.pow(s - avg, 2));
+        const variance = sumSqDiff / count; // Population or Sample? Usually population for class stats
+        const stdDev = Math.sqrt(variance);
+
+        // My Score
+        const myScore = getScore(state.currentStudent, sub.name, testKey);
+        let myScoreDisplay = '-';
+        let myDevDisplay = '-';
+
+        if (typeof myScore === 'number') {
+            myScoreDisplay = myScore;
+            if (stdDev > 0) {
+                const dev = 50 + 10 * ((myScore - avg) / stdDev);
+                myDevDisplay = dev.toFixed(1);
+            } else {
+                myDevDisplay = '50.0';
+            }
+        } else if (myScore) {
+            myScoreDisplay = myScore; // String value (Pass, etc)
+        }
+
+        html += `
+            <tr>
+                <td style="text-align: center;">${sub.year === 0 ? ((state.scores[state.currentStudent]?.[sub.name]?.obtainedYear) || '特別') : sub.year}</td>
+                <td><div style="font-weight: 600;">${sub.name}</div></td>
+                <td style="text-align: center;">${sub.credits}</td>
+                <td style="text-align: center;"><span class="badge ${sub.type4 ? 'badge-purple' : 'badge-gray'}" style="${sub.type4 ? 'background:#faf5ff; color:#6b21a8; border-color:#e9d5ff;' : ''}">${sub.type4 || '-'}</span></td>
+                <td style="text-align: center;">${avg.toFixed(1)}</td>
+                <td style="text-align: center;">${max}</td>
+                <td style="text-align: center;">${min}</td>
+                <td style="text-align: center;">${count}</td>
+                <td style="text-align: center; font-weight: bold; ${typeof myScore === 'number' && myScore < 60 ? 'color: red;' : ''}">${myScoreDisplay}</td>
+                <td style="text-align: center;">${myDevDisplay}</td>
+            </tr>
+        `;
+    });
+
+    html += `</tbody></table>`;
+
+    // Add Summary
+    html += `<div style="margin-top: 1rem; text-align: right; color: #64748b; font-size: 0.85rem;">対象科目数: ${targetSubjects.length}</div>`;
+
+    container.innerHTML = html;
+}
+
+// Helpers
+function getYearColor(year) {
+    const colors = {
+        1: '#3b82f6', // Year 1: Blue
+        2: '#10b981', // Year 2: Green
+        3: '#f59e0b', // Year 3: Amber
+        4: '#ef4444', // Year 4: Red
+        5: '#8b5cf6'  // Year 5: Purple
+    };
+    return colors[year] || '#94a3b8'; // Default: Slate
 }
 
 // Start
