@@ -227,6 +227,14 @@
                 </svg>
                 クラス統計 (Class Stats)
             </div>
+            <div class="nav-item" data-tab="at_risk" title="成績不振な学生を抽出します">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                    stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                要注意学生 (Risk)
+            </div>
             <div class="nav-item" data-tab="settings" title="学生名や科目定義を直接編集します">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
                     stroke-width="2">
@@ -510,14 +518,19 @@
                         ※ 平均点(加重): Σ(点数×単位数) / Σ単位数<br>
                         ※ GPA: Σ(GP×単位数) / Σ単位数 (S:90~=4, A:80~=3, B:70~=2, C:60~=1, D/F:~59=0)
                     </div>
-                    <div class="charts-grid" style="margin-top: 1.5rem;">
+                    <div class="charts-grid"
+                        style="margin-top: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));">
                         <div class="chart-container"
-                            style="border: 1px solid #e2e8f0; border-radius: 0.5rem; padding: 1rem;">
-                            <canvas id="stats2Chart"></canvas>
+                            style="border: 1px solid #e2e8f0; border-radius: 0.5rem; padding: 1rem; height: 350px;">
+                            <canvas id="stats2SimpleChart"></canvas>
                         </div>
                         <div class="chart-container"
-                            style="border: 1px solid #e2e8f0; border-radius: 0.5rem; padding: 1rem;">
-                            <canvas id="stats2RankChart"></canvas>
+                            style="border: 1px solid #e2e8f0; border-radius: 0.5rem; padding: 1rem; height: 350px;">
+                            <canvas id="stats2WeightedChart"></canvas>
+                        </div>
+                        <div class="chart-container"
+                            style="border: 1px solid #e2e8f0; border-radius: 0.5rem; padding: 1rem; height: 350px;">
+                            <canvas id="stats2GpaChart"></canvas>
                         </div>
                     </div>
 
@@ -570,6 +583,61 @@
                             </button>
                         </div>
                         <div id="classStatsContainer" style="margin-top: 2rem; overflow-x: auto;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- At Risk Students View -->
+            <div id="at_risk-content" class="tab-content hidden fade-in">
+                <div class="card">
+                    <div class="card-header" style="justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+                        <h2 class="card-title">要注意学生の抽出 (Risk Student Extraction)</h2>
+                        <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;"
+                            class="no-print">
+                            <div class="control-group">
+                                <label>抽出基準:</label>
+                                <select id="atRiskTypeSelect" onchange="toggleAtRiskInputs()">
+                                    <option value="test">試験1回ごとの成績</option>
+                                    <option value="year_avg">科目ごとの通年平均</option>
+                                </select>
+                            </div>
+                            <div class="control-group">
+                                <label>学年:</label>
+                                <select id="atRiskYearSelect">
+                                    <option value="1">1年</option>
+                                    <option value="2">2年</option>
+                                    <option value="3">3年</option>
+                                    <option value="4">4年</option>
+                                    <option value="5">5年</option>
+                                </select>
+                            </div>
+                            <div class="control-group" id="atRiskTestWrapper">
+                                <label>対象試験:</label>
+                                <select id="atRiskTestSelect">
+                                    <option value="前期中間">前期中間</option>
+                                    <option value="前期末" selected>前期末</option>
+                                    <option value="後期中間">後期中間</option>
+                                    <option value="学年末">学年末</option>
+                                </select>
+                            </div>
+                            <button class="btn btn-primary" onclick="renderAtRiskReport()">抽出実行</button>
+                        </div>
+                    </div>
+                    <div id="atRiskInstructions" class="no-print"
+                        style="margin-bottom: 1.5rem; padding: 1rem; background: #fff1f2; border-radius: 0.5rem; color: #991b1b; font-size: 0.85rem; border: 1px solid #fecaca;">
+                        <div id="instr-test">
+                            <strong>【試験1回ベース】</strong> 以下のいずれかに該当する学生を抽出：<br>
+                            ・59点以下が4科目以上 / ・49点以下が3科目以上 / ・39点以下が2科目以上
+                        </div>
+                        <div id="instr-year_avg" class="hidden">
+                            <strong>【通年平均ベース】</strong> 以下のいずれかに該当する学生を抽出：<br>
+                            ・平均59点以下が3科目以上 / ・平均49点以下が2科目以上 / ・平均39点以下が1科目以上
+                        </div>
+                    </div>
+                    <div id="atRiskReportArea">
+                        <div style="text-align: center; padding: 3rem; color: #94a3b8;">
+                            条件を選択して「抽出実行」をクリックしてください。
+                        </div>
                     </div>
                 </div>
             </div>

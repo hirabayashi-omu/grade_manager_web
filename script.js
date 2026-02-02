@@ -274,8 +274,11 @@ function loadSessionState() {
     if (savedYear) state.currentYear = parseInt(savedYear);
     if (savedBPYear) state.boxPlotYear = parseInt(savedBPYear);
     if (savedBPTest) state.boxPlotTest = savedBPTest;
-    const savedCourse = localStorage.getItem('gm_state_course');
     if (savedCourse !== null) state.currentCourse = savedCourse;
+    if (savedAtRiskThreshold) state.atRiskThreshold = parseInt(savedAtRiskThreshold);
+    if (savedAtRiskTest) state.atRiskTest = savedAtRiskTest;
+    if (savedAtRiskYear) state.atRiskYear = parseInt(savedAtRiskYear);
+    if (savedAtRiskMode) state.atRiskMode = savedAtRiskMode;
 
     // Ensure the student exists in the current list
     if (savedStudent && state.students.includes(savedStudent)) {
@@ -323,6 +326,8 @@ function init() {
     if (!localStorage.getItem('gm_state_year')) {
         setDefaultYear();
     }
+
+    initAtRiskDefaults();
 }
 
 // ==================== AUTHENTICATION ====================
@@ -904,6 +909,8 @@ function switchTab(tabName) {
         renderGraduationRequirements();
     } else if (tabName === 'class_stats') {
         initClassStats();
+    } else if (tabName === 'at_risk') {
+        // Just switch, user clicks button
     } else if (tabName === 'settings') {
         renderSettings();
     }
@@ -2075,8 +2082,9 @@ function updatePrintHeader() {
 }
 
 // Chart instance variables
-let stats2ChartInstance = null;
-let stats2RankChartInstance = null;
+let stats2SimpleChartInstance = null;
+let stats2WeightedChartInstance = null;
+let stats2GpaChartInstance = null;
 
 // --- GPA / Year Utilities ---
 
@@ -2404,144 +2412,42 @@ function renderStats2() {
         }
     }
 
-    // --- Chart 1: Scores & GPA ---
-    const ctx = document.getElementById('stats2Chart')?.getContext('2d');
-    if (ctx) {
-        if (stats2ChartInstance) stats2ChartInstance.destroy();
-        stats2ChartInstance = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: labels,
-                datasets: [
-                    {
-                        label: '平均点 (単純)',
-                        data: simpleAvgData,
-                        borderColor: '#2563eb', // Blue
-                        backgroundColor: '#2563eb',
-                        yAxisID: 'y',
-                        tension: 0.1,
-                        borderWidth: 2
-                    },
-                    {
-                        label: '平均点 (加重)',
-                        data: weightedAvgData,
-                        borderColor: '#f59e0b', // Amber
-                        backgroundColor: '#f59e0b',
-                        yAxisID: 'y',
-                        tension: 0.1,
-                        borderWidth: 2,
-                        borderDash: [5, 5] // Dashed for distinction
-                    },
-                    {
-                        label: 'GPA',
-                        data: gpaData,
-                        borderColor: '#2563eb',
-                        backgroundColor: '#2563eb',
-                        yAxisID: 'y1',
-                        tension: 0.1,
-                        borderWidth: 3, // Very thick for GPA
-                        pointStyle: 'rectRot' // Different marker
-                    }
-                ]
-            },
-            plugins: [{
-                id: 'plotAreaBorder',
-                beforeDraw(chart) {
-                    const { ctx, chartArea: { top, bottom, left, right } } = chart;
-                    ctx.save();
-                    ctx.strokeStyle = '#000000'; // Clear black border
-                    ctx.lineWidth = 1.5;
-                    ctx.strokeRect(left, top, right - left, bottom - top);
-                    ctx.restore();
-                }
-            }],
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                layout: {
-                    padding: {
-                        top: 50,
-                        bottom: 10
-                    }
-                },
-                plugins: {
-                    title: { display: true, text: '平均点・GPA推移', font: { weight: 'bold', size: 16 } },
-                    legend: { display: false }
-                },
-                scales: {
-                    x: {
-                        grid: { display: true, color: 'rgba(0,0,0,0.15)' },
-                        border: { display: true, color: '#000', width: 1.5 },
-                        ticks: {
-                            color: '#000',
-                            minRotation: 90,
-                            maxRotation: 90,
-                            autoSkip: false
-                        },
-                        afterFit: (axis) => { axis.height = 80; }
-                    },
-                    y: {
-                        type: 'linear',
-                        position: 'left',
-                        min: 0,
-                        max: 100,
-                        title: { display: true, text: '点数', font: { weight: 'bold' } },
-                        grid: { color: 'rgba(0,0,0,0.2)' },
-                        border: { display: true, color: '#000', width: 1.5 },
-                        ticks: { color: '#000' },
-                        afterFit: (axis) => { axis.width = 60; }
-                    },
-                    y1: {
-                        type: 'linear',
-                        position: 'right',
-                        min: 0,
-                        max: 4.0,
-                        grid: { drawOnChartArea: false },
-                        title: { display: true, text: 'GPA', font: { weight: 'bold' } },
-                        border: { display: true, color: '#000', width: 1.5 },
-                        ticks: { color: '#000' },
-                        afterFit: (axis) => { axis.width = 60; }
-                    }
-                }
-            }
-        });
-    }
+    // --- Helper to create a dual-axis chart for Stats2 ---
+    const createStats2Chart = (canvasId, label, valueData, rankData, instanceVar, valueMax, valueTitle) => {
+        const ctx = document.getElementById(canvasId)?.getContext('2d');
+        if (!ctx) return null;
 
-    // --- Chart 2: Rank ---
-    const ctx2 = document.getElementById('stats2RankChart')?.getContext('2d');
-    if (ctx2) {
-        if (stats2RankChartInstance) stats2RankChartInstance.destroy();
-        stats2RankChartInstance = new Chart(ctx2, {
+        // Destroy old instance if it exists
+        if (instanceVar && typeof instanceVar.destroy === 'function') {
+            instanceVar.destroy();
+        }
+
+        return new Chart(ctx, {
             type: 'line',
             data: {
                 labels: labels,
                 datasets: [
                     {
-                        label: '順位 (単純)',
-                        data: rankSimpleData,
-                        borderColor: '#64748b', // Gray
-                        backgroundColor: '#64748b',
-                        tension: 0.1,
-                        borderWidth: 2,
-                        pointRadius: 4
-                    },
-                    {
-                        label: '順位 (加重)',
-                        data: rankWeightedData,
-                        borderColor: '#f59e0b', // Amber
-                        backgroundColor: '#f59e0b',
-                        tension: 0.1,
-                        borderWidth: 2,
-                        pointRadius: 4
-                    },
-                    {
-                        label: '順位 (GPA)',
-                        data: rankGpaData,
+                        label: label,
+                        data: valueData,
                         borderColor: '#2563eb', // Blue
                         backgroundColor: '#2563eb',
+                        yAxisID: 'y',
                         tension: 0.1,
                         borderWidth: 3,
-                        pointRadius: 4
+                        pointRadius: 5
+                    },
+                    {
+                        label: '順位',
+                        data: rankData,
+                        borderColor: '#ef4444', // Red
+                        backgroundColor: '#ef4444',
+                        yAxisID: 'y1',
+                        tension: 0.1,
+                        borderWidth: 2,
+                        borderDash: [5, 5],
+                        pointRadius: 4,
+                        pointStyle: 'rectRot'
                     }
                 ]
             },
@@ -2559,64 +2465,57 @@ function renderStats2() {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                layout: {
-                    padding: {
-                        top: 50,
-                        bottom: 10
-                    }
-                },
-                interaction: {
-                    mode: 'index',
-                    intersect: false,
-                },
+                layout: { padding: { top: 30, bottom: 10 } },
+                interaction: { mode: 'index', intersect: false },
                 plugins: {
-                    title: { display: true, text: '順位推移 (Rank Trend)', font: { size: 16, weight: 'bold' } },
-                    legend: { display: false },
+                    title: { display: true, text: label + ' 推移', font: { weight: 'bold', size: 16 } },
+                    legend: { display: true, position: 'top' },
                     tooltip: {
                         callbacks: {
                             label: function (context) {
-                                return `${context.dataset.label}: ${context.parsed.y}位 / ${state.students.length}人`;
+                                if (context.datasetIndex === 1) {
+                                    return `順位: ${context.parsed.y}位 / ${state.students.length}人`;
+                                }
+                                return `${label}: ${context.parsed.y.toFixed(2)}`;
                             }
                         }
                     }
                 },
                 scales: {
                     x: {
-                        grid: { display: true, color: 'rgba(0,0,0,0.15)' },
+                        grid: { display: true, color: 'rgba(0,0,0,0.1)' },
                         border: { display: true, color: '#000', width: 1.5 },
-                        ticks: {
-                            color: '#000',
-                            minRotation: 90,
-                            maxRotation: 90,
-                            autoSkip: false
-                        },
-                        afterFit: (axis) => { axis.height = 80; }
+                        ticks: { color: '#000' }
                     },
                     y: {
                         type: 'linear',
-                        reverse: true,
-                        min: 1,
-                        max: state.students.length > 10 ? state.students.length : 10,
-                        title: { display: true, text: '順位 (位)', font: { weight: 'bold' } },
-                        grid: { color: 'rgba(0,0,0,0.2)' },
+                        position: 'left',
+                        min: 0,
+                        max: valueMax,
+                        title: { display: true, text: valueTitle, font: { weight: 'bold' } },
+                        grid: { color: 'rgba(0,0,0,0.1)' },
                         border: { display: true, color: '#000', width: 1.5 },
-                        ticks: { color: '#000' },
-                        afterFit: (axis) => { axis.width = 60; }
+                        ticks: { color: '#000' }
                     },
-                    yPaddingRight: {
+                    y1: {
                         type: 'linear',
                         position: 'right',
-                        display: true,
-                        title: { display: false },
-                        ticks: { display: false },
+                        reverse: true,
+                        min: 1,
+                        max: Math.max(state.students.length, 1),
+                        title: { display: true, text: '順位', font: { weight: 'bold' } },
                         grid: { drawOnChartArea: false },
-                        border: { display: false },
-                        afterFit: (axis) => { axis.width = 60; }
+                        border: { display: true, color: '#000', width: 1.5 },
+                        ticks: { color: '#000', stepSize: 1, callback: (v) => Math.floor(v) === v ? v : '' }
                     }
                 }
             }
         });
-    }
+    };
+
+    stats2SimpleChartInstance = createStats2Chart('stats2SimpleChart', '平均点 (単純)', simpleAvgData, rankSimpleData, stats2SimpleChartInstance, 100, '点数');
+    stats2WeightedChartInstance = createStats2Chart('stats2WeightedChart', '平均点 (加重)', weightedAvgData, rankWeightedData, stats2WeightedChartInstance, 100, '点数');
+    stats2GpaChartInstance = createStats2Chart('stats2GpaChart', 'GPA', gpaData, rankGpaData, stats2GpaChartInstance, 4.0, 'GPA');
 }
 
 // Event listener for toggle
@@ -3983,3 +3882,200 @@ function getYearColor(year) {
 
 // Start
 document.addEventListener('DOMContentLoaded', init);
+
+// --- At Risk Students Report ---
+function toggleAtRiskInputs() {
+    const type = document.getElementById('atRiskTypeSelect')?.value;
+    const testWrapper = document.getElementById('atRiskTestWrapper');
+    const instrTest = document.getElementById('instr-test');
+    const instrYear = document.getElementById('instr-year_avg');
+
+    if (testWrapper) testWrapper.style.display = (type === 'test') ? 'flex' : 'none';
+    if (instrTest) instrTest.classList.toggle('hidden', type !== 'test');
+    if (instrYear) instrYear.classList.toggle('hidden', type !== 'year_avg');
+}
+
+function initAtRiskDefaults() {
+    const yearSelect = document.getElementById('atRiskYearSelect');
+    const testSelect = document.getElementById('atRiskTestSelect');
+    if (!yearSelect || !testSelect) return;
+
+    // Default to latest year available in data
+    let maxYear = 1;
+    state.subjects.forEach(s => { if (s.year > maxYear) maxYear = s.year; });
+    yearSelect.value = maxYear;
+
+    // Default to latest test with significant data
+    const tests = ["前期中間", "前期末", "後期中間", "学年末"];
+    const testCounts = tests.map(t => {
+        let cnt = 0;
+        Object.values(state.scores).forEach(subScores => {
+            Object.values(subScores).forEach(testScores => {
+                if (testScores[t] && testScores[t] !== '-') cnt++;
+            });
+        });
+        return { name: t, count: cnt };
+    });
+    // Pick the last test that has at least some data, else '前期中間'
+    const latestTest = testCounts.reverse().find(tc => tc.count > 0);
+    if (latestTest) testSelect.value = latestTest.name;
+}
+
+function renderAtRiskReport() {
+    const type = document.getElementById('atRiskTypeSelect')?.value;
+    const yearSelect = document.getElementById('atRiskYearSelect');
+    const testSelect = document.getElementById('atRiskTestSelect');
+    if (!yearSelect || !testSelect) return;
+
+    const year = yearSelect.value;
+    const test = testSelect.value;
+    const reportArea = document.getElementById('atRiskReportArea');
+    if (!reportArea) return;
+
+    const yearSubjects = state.subjects.filter(s => s.year == year && !s.exclude);
+    const results = [];
+
+    state.students.forEach(studentName => {
+        let count59 = 0;
+        let count49 = 0;
+        let count39 = 0;
+        const lowScores = [];
+
+        yearSubjects.forEach(sub => {
+            let scoreValue = NaN;
+
+            if (type === 'test') {
+                scoreValue = parseFloat(getScore(studentName, sub.name, test));
+            } else {
+                // Year Average
+                const tests = ["前期中間", "前期末", "後期中間", "学年末"];
+                let sum = 0;
+                let count = 0;
+                tests.forEach(t => {
+                    const s = parseFloat(getScore(studentName, sub.name, t));
+                    if (!isNaN(s)) {
+                        sum += s;
+                        count++;
+                    }
+                });
+                if (count > 0) scoreValue = sum / count;
+            }
+
+            if (!isNaN(scoreValue)) {
+                if (scoreValue <= 59.9) { // Using 59.9 to capture below 60
+                    count59++;
+                    if (scoreValue <= 49.9) count49++;
+                    if (scoreValue <= 39.9) count39++;
+                    lowScores.push({ name: sub.name, score: scoreValue });
+                }
+            }
+        });
+
+        // Condition Test: (<=59) >= 4 OR (<=49) >= 3 OR (<=39) >= 2
+        // Condition Year Avg: (<=59) >= 3 OR (<=49) >= 2 OR (<=39) >= 1
+        let isAtRisk = false;
+        if (type === 'test') {
+            isAtRisk = (count59 >= 4 || count49 >= 3 || count39 >= 2);
+        } else {
+            isAtRisk = (count59 >= 3 || count49 >= 2 || count39 >= 1);
+        }
+
+        if (isAtRisk) {
+            results.push({
+                name: studentName,
+                count59,
+                count49,
+                count39,
+                lowScores: lowScores
+            });
+        }
+    });
+
+    if (results.length === 0) {
+        reportArea.innerHTML = `
+            <div style="text-align: center; padding: 4rem; background: #f8fafc; border-radius: 1rem; border: 2px dashed #e2e8f0;">
+                <div style="font-size: 3rem; margin-bottom: 1rem;">✅</div>
+                <div style="font-size: 1.1rem; font-weight: 600; color: #1e293b;">該当する学生はいません</div>
+                <div style="color: #64748b; margin-top: 0.5rem;">${year}年 ${type === 'test' ? test : '通年平均'} において、抽出条件に合致する学生は見つかりませんでした。</div>
+            </div>
+        `;
+        return;
+    }
+
+    let html = `
+        <div class="card" style="border: 2px solid #fee2e2; background: #fff;">
+            <div style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <div style="font-weight: 700; font-size: 1.25rem; color: #b91c1c;">抽出結果: ${results.length} 名</div>
+                    <div style="font-size: 0.85rem; color: #64748b; margin-top: 2px;">対象: ${year}年 ${type === 'test' ? test : '科目別通年平均'}</div>
+                </div>
+                <div class="no-print">
+                    <button class="btn btn-secondary" onclick="window.print()" style="gap: 0.5rem; display: flex; align-items: center; border: 1px solid #cbd5e1;">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="18" height="18">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                        </svg>
+                        帳票として印刷 (Print)
+                    </button>
+                </div>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr style="background: #fef2f2;">
+                            <th style="width: 150px;">学生名</th>
+                            <th style="width: 250px;">アラート条件</th>
+                            <th>対象科目と${type === 'test' ? '点数' : '平均点'}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+    `;
+
+    results.forEach(res => {
+        const reasons = [];
+        if (type === 'test') {
+            if (res.count59 >= 4) reasons.push(`59点以下 × ${res.count59}`);
+            if (res.count49 >= 3) reasons.push(`49点以下 × ${res.count49}`);
+            if (res.count39 >= 2) reasons.push(`39点以下 × ${res.count39}`);
+        } else {
+            if (res.count59 >= 3) reasons.push(`平均59点以下 × ${res.count59}`);
+            if (res.count49 >= 2) reasons.push(`平均49点以下 × ${res.count49}`);
+            if (res.count39 >= 1) reasons.push(`平均39点以下 × ${res.count39}`);
+        }
+
+        const scoreBadges = res.lowScores
+            .sort((a, b) => a.score - b.score)
+            .map(s => {
+                let colorClass = 'background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca;';
+                if (s.score <= 39.9) colorClass = 'background: #450a0a; color: #fff;';
+                else if (s.score <= 49.9) colorClass = 'background: #7f1d1d; color: #fff;';
+
+                const valDisplay = type === 'test' ? s.score : s.score.toFixed(1);
+                return `<span style="display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; ${colorClass} margin-right: 4px; margin-bottom: 4px;">
+                    ${s.name}: ${valDisplay}
+                </span>`;
+            }).join('');
+
+        html += `
+            <tr>
+                <td style="font-weight: 700; color: #1e293b; font-size: 1.1rem;">${res.name}</td>
+                <td>
+                    <div style="display: flex; flex-direction: column; gap: 4px;">
+                        ${reasons.map(r => `<span style="color: #dc2626; font-weight: 600; font-size: 0.85rem;">⚠️ ${r}</span>`).join('')}
+                    </div>
+                </td>
+                <td style="padding: 1rem;">
+                    ${scoreBadges}
+                </td>
+            </tr>
+        `;
+    });
+
+    html += `
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+
+    reportArea.innerHTML = html;
+}
