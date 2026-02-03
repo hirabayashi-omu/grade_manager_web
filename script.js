@@ -2057,6 +2057,129 @@ function renderGraduationRequirements() {
         `;
         detailsBody.appendChild(tr);
     });
+
+    // Render Gantt Chart
+    renderDPGanttChart(studentName, subjects, isPassed);
+}
+
+function renderDPGanttChart(studentName, subjects, isPassed) {
+    const container = document.getElementById('dpGanttChartContainer');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const dps = ['DP-A', 'DP-B', 'DP-C', 'DP-D', 'DP-E', 'SDGs'];
+    const years = [1, 2, 3, 4, 5];
+
+    const table = document.createElement('table');
+    table.style.width = '100%';
+    table.style.borderCollapse = 'collapse';
+    table.style.fontSize = '0.85rem';
+    table.style.minWidth = '800px';
+
+    // Header
+    const thead = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+    headerRow.innerHTML = `<th style="width: 120px; padding: 0.75rem; border: 1px solid #e2e8f0; background: #f1f5f9; text-align: left; position: sticky; left: 0; z-index: 10;">項目</th>`;
+    years.forEach(y => {
+        const isPastOrCurrent = (y <= state.currentYear);
+        const bg = isPastOrCurrent ? '#e2e8f0' : '#f1f5f9';
+        headerRow.innerHTML += `<th style="padding: 0.75rem; border: 1px solid #e2e8f0; background: ${bg}; text-align: center;">${y}年</th>`;
+    });
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    // Body
+    const tbody = document.createElement('tbody');
+    dps.forEach(dp => {
+        const row = document.createElement('tr');
+        row.innerHTML = `<td style="padding: 0.75rem; border: 1px solid #e2e8f0; font-weight: 700; background: #f8fafc; color: #1e293b; position: sticky; left: 0; z-index: 5;">${dp}</td>`;
+
+        years.forEach(y => {
+            const td = document.createElement('td');
+            td.style.padding = '0.6rem';
+            td.style.border = '1px solid #e2e8f0';
+            td.style.verticalAlign = 'top';
+            td.style.minWidth = '140px';
+
+            // Background logic for past/current years
+            const isPastOrCurrent = (y <= state.currentYear);
+            td.style.background = isPastOrCurrent ? '#f1f5f9' : '#fff';
+
+            const filtered = subjects.filter(s => {
+                const type3 = (s.type3 || '').toLowerCase();
+                const dpTarget = dp.toLowerCase();
+                const belongsToDp = type3.split(',').some(part => part.trim() === dpTarget);
+                if (!belongsToDp) return false;
+
+                // Match academic year: Either fixed year or float year (year 0) assigned to this year
+                let yearMatches = (s.year === y);
+                if (s.year === 0) {
+                    const scoreObj = (state.scores[studentName] || {})[s.name];
+                    yearMatches = (scoreObj && scoreObj.obtainedYear === y);
+                }
+                if (!yearMatches) return false;
+
+                // SPECIAL FILTER: For past/current years, exclude subjects with no input
+                if (isPastOrCurrent) {
+                    const scoreObj = (state.scores[studentName] || {})[s.name];
+                    const hasInput = scoreObj && SCORE_KEYS.some(k => {
+                        const val = scoreObj[k];
+                        return val !== undefined && val !== null && val !== '';
+                    });
+                    if (!hasInput) return false;
+                }
+
+                return true;
+            });
+
+            if (filtered.length === 0) {
+                td.innerHTML = '<div style="color: #cbd5e1; text-align: center; font-size: 0.75rem; margin-top: 0.5rem;">-</div>';
+            } else {
+                const listWrapper = document.createElement('div');
+                listWrapper.style.display = 'flex';
+                listWrapper.style.flexDirection = 'column';
+                listWrapper.style.gap = '0.5rem';
+
+                filtered.forEach(sub => {
+                    const passed = isPassed(sub);
+                    const block = document.createElement('div');
+                    block.style.padding = '0.5rem 0.75rem';
+                    block.style.borderRadius = '0.4rem';
+                    block.style.fontSize = '0.75rem';
+                    block.style.color = '#fff';
+                    block.style.fontWeight = '600';
+                    block.style.lineHeight = '1.3';
+                    block.style.boxShadow = '0 1px 2px rgba(0,0,0,0.05)';
+                    block.style.transition = 'transform 0.1s ease';
+                    block.style.cursor = 'default';
+
+                    // Colors based on Status
+                    if (passed) {
+                        block.style.background = '#10b981'; // Success Green
+                        block.style.borderLeft = '4px solid #059669';
+                    } else {
+                        block.style.background = '#3b82f6'; // Primary Blue
+                        block.style.borderLeft = '4px solid #2563eb';
+                        block.style.opacity = '0.85';
+                    }
+
+                    block.textContent = `${sub.name} (${sub.credits})`;
+                    block.title = `${sub.name}\n単位: ${sub.credits}\n状況: ${passed ? '修得済み' : '開講予定'}`;
+
+                    // Hover effect
+                    block.onmouseover = () => { block.style.transform = 'translateY(-1px)'; block.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.1)'; };
+                    block.onmouseout = () => { block.style.transform = 'translateY(0)'; block.style.boxShadow = '0 1px 2px rgba(0,0,0,0.05)'; };
+
+                    listWrapper.appendChild(block);
+                });
+                td.appendChild(listWrapper);
+            }
+            row.appendChild(td);
+        });
+        tbody.appendChild(row);
+    });
+    table.appendChild(tbody);
+    container.appendChild(table);
 }
 
 // ==================== RENDERING ====================
