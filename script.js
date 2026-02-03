@@ -276,7 +276,7 @@ function loadSessionState() {
 
     if (savedTab) state.currentTab = savedTab;
     if (savedHideEmpty !== null) state.hideEmptySubjects = (savedHideEmpty === 'true');
-    if (savedYear) state.currentYear = parseInt(savedYear);
+    // REMOVED: if (savedYear) state.currentYear = parseInt(savedYear); // Force data-driven year on load instead
     if (savedBPYear) state.boxPlotYear = parseInt(savedBPYear);
     if (savedBPTest) state.boxPlotTest = savedBPTest;
     if (savedCourse !== null) state.currentCourse = savedCourse;
@@ -304,6 +304,11 @@ function loadSessionState() {
     } else {
         state.currentStudent = null;
     }
+
+    // Force automatic year detection on load to ensure we start at the latest data year
+    // This MUST happen after state.scores and state.subjects are loaded (which happens in refreshMasterData and mockData)
+    // Actually, loadSessionState is called in init() AFTER refreshMasterData and mockData.
+    setDefaultYear();
 }
 
 // ==================== INITIALIZATION ====================
@@ -339,10 +344,8 @@ function init() {
 
     populateControls();
 
-    // Only auto-detect year if we don't have a saved one
-    if (!localStorage.getItem('gm_state_year')) {
-        setDefaultYear();
-    }
+    // Set current year to the latest year that has actual grade data
+    setDefaultYear();
 
     initAtRiskDefaults();
 }
@@ -491,34 +494,63 @@ async function openPasswordChange() {
 
 function setDefaultYear() {
     // Find the latest year that has actual grade data for the current student
-    const yearsWithData = new Set();
+    const studentName = state.currentStudent;
+    if (!studentName) {
+        state.currentYear = 1;
+        return;
+    }
 
-    // Check which years have data for any student
-    for (const studentName in state.scores) {
-        const studentScores = state.scores[studentName];
-        for (const subjectName in studentScores) {
-            // Find the subject to get its year
-            const subject = state.subjects.find(s => s.name === subjectName);
-            if (subject && typeof subject.year === 'number') {
-                // Check if there's any actual score data
-                const scoreObj = studentScores[subjectName];
-                const hasData = SCORE_KEYS.some(key => {
-                    const val = scoreObj[key];
-                    return val !== undefined && val !== null && val !== '';
-                });
-                if (hasData) {
-                    yearsWithData.add(subject.year);
-                }
+    const studentScores = state.scores[studentName] || {};
+    let latestYear = 0;
+
+    // Check which years have data for the CURRENT student
+    for (const subjectName in studentScores) {
+        // Find the subject to get its year
+        const subject = state.subjects.find(s => s.name === subjectName);
+        if (subject && typeof subject.year === 'number') {
+            // Check if there's any actual score data
+            const scoreObj = studentScores[subjectName];
+            const hasData = SCORE_KEYS.some(key => {
+                const val = scoreObj[key];
+                return val !== undefined && val !== null && val !== '';
+            });
+            if (hasData) {
+                const y = (subject.year === 0) ? (scoreObj.obtainedYear || 0) : subject.year;
+                if (y > latestYear) latestYear = y;
             }
         }
     }
 
-    // Set to the highest year with data, or default to 1
-    if (yearsWithData.size > 0) {
-        state.currentYear = Math.max(...Array.from(yearsWithData));
+    // If current student has data, use it.
+    if (latestYear > 0) {
+        state.currentYear = latestYear;
     } else {
-        state.currentYear = 1;
+        // Fallback to checking ALL students (legacy behavior)
+        const yearsWithData = new Set();
+        for (const sName in state.scores) {
+            const scores = state.scores[sName];
+            for (const subName in scores) {
+                const sub = state.subjects.find(s => s.name === subName);
+                if (sub && typeof sub.year === 'number') {
+                    const scoreObj = scores[subName];
+                    const hasData = SCORE_KEYS.some(key => {
+                        const val = scoreObj[key];
+                        return val !== undefined && val !== null && val !== '';
+                    });
+                    if (hasData) {
+                        const y = (sub.year === 0) ? (scoreObj.obtainedYear || 0) : sub.year;
+                        if (y > 0) yearsWithData.add(y);
+                    }
+                }
+            }
+        }
+        if (yearsWithData.size > 0) {
+            state.currentYear = Math.max(...Array.from(yearsWithData));
+        } else {
+            state.currentYear = 1;
+        }
     }
+    console.log(`Auto-detected latest year: ${state.currentYear} for student ${studentName}`);
 
     // Update the year select dropdown
     const yearSelect = document.getElementById('yearSelect');
@@ -711,6 +743,7 @@ function populateControls() {
 function setupEventListeners() {
     document.getElementById('studentSelect')?.addEventListener('change', (e) => {
         state.currentStudent = e.target.value;
+        setDefaultYear(); // Automatically jump to the latest year with data for this student
         saveSessionState();
         render();
     });
@@ -922,6 +955,7 @@ function switchTab(tabName) {
     } else if (tabName === 'stats2') {
         renderStats2();
     } else if (tabName === 'grad_requirements') {
+        setDefaultYear();
         renderGraduationRequirements();
     } else if (tabName === 'class_stats') {
         initClassStats();
