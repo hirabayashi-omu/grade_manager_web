@@ -597,6 +597,12 @@ function refreshMasterData() {
         state.students = [];
     }
 
+    // FALLBACK: If list became empty somehow, restore defaults for safety
+    if (state.students.length === 0) {
+        state.students = DEFAULT_STUDENTS_RAW.replace(/\n/g, '').split(',').map(s => s.trim()).filter(s => s);
+        localStorage.setItem('grade_manager_students', JSON.stringify(state.students));
+    }
+
     // SAFETY CHECK: Prevent massive array freeze (Protection against user entering Student ID as No.)
     // If list is absurdly large (e.g. > 1000), it causes freezing in rendering and logic.
     if (state.students.length > 1000) {
