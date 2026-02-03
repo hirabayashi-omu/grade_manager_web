@@ -592,7 +592,13 @@ function refreshMasterData() {
         localStorage.setItem('grade_manager_students', JSON.stringify(state.students));
         localStorage.setItem('grade_manager_initialized', 'true');
     } else if (storedStudents) {
-        state.students = JSON.parse(storedStudents);
+        try {
+            state.students = JSON.parse(storedStudents);
+            if (!Array.isArray(state.students)) state.students = [];
+        } catch (e) {
+            console.error('Failed to parse students:', e);
+            state.students = [];
+        }
     } else {
         state.students = [];
     }
@@ -4547,6 +4553,10 @@ function initSeating() {
             disabled: []
         };
     }
+    // Safety check for nested properties (in case of partial load)
+    if (!state.seating.assignments) state.seating.assignments = {};
+    if (!state.seating.fixed) state.seating.fixed = [];
+    if (!state.seating.disabled) state.seating.disabled = [];
 
     // Sync UI with state
     const colInput = document.getElementById('seatingCols');
