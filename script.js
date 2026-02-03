@@ -1028,7 +1028,6 @@ function switchTab(tabName) {
     } else if (tabName === 'settings') {
         renderSettings();
     } else if (tabName === 'seating') {
-        document.title = '席決め | Grade Manager';
         initSeating();
     }
 }
