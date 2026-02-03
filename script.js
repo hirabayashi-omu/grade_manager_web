@@ -5365,6 +5365,7 @@ function initContextMenu() {
     menu.className = 'context-menu';
     menu.innerHTML = `
         <div class="context-menu-item" data-action="clear-seat" style="color: #ef4444; font-weight: bold;">席をクリア</div>
+        <div class="context-menu-item" data-action="toggle-fix">📌 位置を固定/解除</div>
         <div class="context-menu-separator" id="sep-clear"></div>
         <div class="context-menu-item" data-action="toggle-disable">無効化/有効化 (Toggle)</div>
         <div class="context-menu-separator"></div>
@@ -5397,10 +5398,17 @@ function showSeatContextMenu(e, pos) {
     if (menu) {
         // Show/Hide "Clear Seat" depending on assignment
         const hasStudent = !!state.seating.assignments[pos];
+        const isFixed = state.seating.fixed.includes(pos);
+
         const clearItem = menu.querySelector('[data-action="clear-seat"]');
+        const fixItem = menu.querySelector('[data-action="toggle-fix"]');
         const sep = document.getElementById('sep-clear');
 
         if (clearItem) clearItem.style.display = hasStudent ? 'block' : 'none';
+        if (fixItem) {
+            fixItem.style.display = hasStudent ? 'block' : 'none';
+            fixItem.textContent = isFixed ? '📌 固定解除' : '📌 位置を固定';
+        }
         if (sep) sep.style.display = hasStudent ? 'block' : 'none';
 
         menu.style.left = e.clientX + 'px';
@@ -5433,9 +5441,10 @@ function handleSeatMenuAction(action, pos) {
     if (action === 'clear-seat') {
         if (state.seating.assignments[pos]) {
             delete state.seating.assignments[pos];
-            // Also remove from fixed if it was fixed? Maybe keep it fixed just empty?
-            // Usually 'Clear' implies check-out. Let's keep fixed status but remove student.
         }
+    } else if (action === 'toggle-fix') {
+        toggleFixed(pos);
+        return; // toggleFixed already saves and renders
     } else if (action === 'toggle-disable') {
         const isDisabled = state.seating.disabled.includes(pos);
         setDisable(pos, !isDisabled);
