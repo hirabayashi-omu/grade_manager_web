@@ -661,13 +661,21 @@ function refreshMasterData() {
             if (line.includes('\t')) {
                 parts = line.split('\t');
             } else if (line.includes(',')) {
-                // Improved CSV split to handle quoted fields
-                parts = line.match(/(".*?"|[^",\r\n]+)(?=\s*,|\s*$)/g);
-                if (parts) {
-                    parts = parts.map(p => p.startsWith('"') && p.endsWith('"') ? p.slice(1, -1) : p.trim());
-                } else {
-                    parts = line.split(',');
+                // Robust CSV split to handle quoted fields and empty values
+                parts = [];
+                let cur = '';
+                let inQuote = false;
+                for (let i = 0; i < line.length; i++) {
+                    const char = line[i];
+                    if (char === '"') {
+                        if (inQuote && line[i + 1] === '"') { cur += '"'; i++; }
+                        else { inQuote = !inQuote; }
+                    } else if (char === ',' && !inQuote) {
+                        parts.push(cur.trim());
+                        cur = '';
+                    } else { cur += char; }
                 }
+                parts.push(cur.trim());
                 isCsv = true;
             } else {
                 parts = line.split(/\s+/);
@@ -1748,14 +1756,24 @@ function handleFileUpload(e) {
     reader.onload = function (evt) {
         const text = evt.target.result;
         try {
-            // Improved CSV split to handle quoted fields
             const rows = text.replace(/\r/g, '').split('\n').map(line => {
-                let parts = line.match(/(".*?"|[^",\r\n]+)(?=\s*,|\s*$)/g);
-                if (parts) {
-                    return parts.map(p => p.startsWith('"') && p.endsWith('"') ? p.slice(1, -1) : p.trim());
+                if (!line.trim()) return [];
+                const parts = [];
+                let cur = '';
+                let inQuote = false;
+                for (let i = 0; i < line.length; i++) {
+                    const char = line[i];
+                    if (char === '"') {
+                        if (inQuote && line[i + 1] === '"') { cur += '"'; i++; }
+                        else { inQuote = !inQuote; }
+                    } else if (char === ',' && !inQuote) {
+                        parts.push(cur.trim());
+                        cur = '';
+                    } else { cur += char; }
                 }
-                return line.split(',');
-            });
+                parts.push(cur.trim());
+                return parts;
+            }).filter(row => row.length > 0);
             if (rows.length < 2) throw new Error("Empty or invalid CSV");
 
             const header = rows[0];
