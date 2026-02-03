@@ -370,6 +370,7 @@ function init() {
     setDefaultYear();
 
     initAtRiskDefaults();
+    initContextMenu(); // Initialize menu once at startup
 }
 
 // ==================== AUTHENTICATION ====================
@@ -4576,7 +4577,6 @@ function initSeating() {
 
     renderSeatingRoster();
     renderSeatingGrid();
-    initContextMenu();
 }
 
 function renderSeatingRoster() {
@@ -5356,38 +5356,64 @@ function loadPresetsOnly() {
 let currentContextMenuSeat = null;
 
 function initContextMenu() {
-    // If exists, remove to re-init (in case we changed structure)
-    const existing = document.getElementById('seatContextMenu');
-    if (existing) existing.remove();
+    let menu = document.getElementById('seatContextMenu');
+    if (menu) return; // Only create once
 
-    const menu = document.createElement('div');
+    menu = document.createElement('div');
     menu.id = 'seatContextMenu';
-    menu.className = 'context-menu';
+    menu.style.cssText = `
+        position: fixed;
+        background: white;
+        border: 1px solid #cbd5e1;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 99999;
+        display: none;
+        min-width: 180px;
+        border-radius: 0.5rem;
+        padding: 0.5rem 0;
+        font-family: sans-serif;
+    `;
+
     menu.innerHTML = `
-        <div class="context-menu-item" data-action="clear-seat" style="color: #ef4444; font-weight: bold;">席をクリア</div>
-        <div class="context-menu-item" data-action="toggle-fix">📌 位置を固定/解除</div>
-        <div class="context-menu-separator" id="sep-clear"></div>
-        <div class="context-menu-item" data-action="toggle-disable">無効化/有効化 (Toggle)</div>
-        <div class="context-menu-separator"></div>
-        <div class="context-menu-item" data-action="disable-col">縦一列を無効化</div>
-        <div class="context-menu-item" data-action="disable-row">横一列を無効化</div>
-        <div class="context-menu-separator"></div>
-        <div class="context-menu-item" data-action="enable-col">縦一列を有効化</div>
-        <div class="context-menu-item" data-action="enable-row">横一列を有効化</div>
+        <div class="context-menu-item" data-action="clear-seat" style="padding: 0.6rem 1rem; cursor: pointer; color: #ef4444; font-weight: bold; font-size: 0.9rem;">席をクリア</div>
+        <div class="context-menu-item" data-action="toggle-fix" style="padding: 0.6rem 1rem; cursor: pointer; color: #475569; font-size: 0.9rem;">📌 位置を固定/解除</div>
+        <div id="sep-clear" style="height: 1px; background: #e2e8f0; margin: 0.4rem 0;"></div>
+        <div class="context-menu-item" data-action="toggle-disable" style="padding: 0.6rem 1rem; cursor: pointer; color: #475569; font-size: 0.9rem;">無効化/有効化 (Toggle)</div>
+        <div style="height: 1px; background: #e2e8f0; margin: 0.4rem 0;"></div>
+        <div class="context-menu-item" data-action="disable-col" style="padding: 0.6rem 1rem; cursor: pointer; color: #475569; font-size: 0.9rem;">縦一列を無効化</div>
+        <div class="context-menu-item" data-action="disable-row" style="padding: 0.6rem 1rem; cursor: pointer; color: #475569; font-size: 0.9rem;">横一列を無効化</div>
+        <div style="height: 1px; background: #e2e8f0; margin: 0.4rem 0;"></div>
+        <div class="context-menu-item" data-action="enable-col" style="padding: 0.6rem 1rem; cursor: pointer; color: #475569; font-size: 0.9rem;">縦一列を有効化</div>
+        <div class="context-menu-item" data-action="enable-row" style="padding: 0.6rem 1rem; cursor: pointer; color: #475569; font-size: 0.9rem;">横一列を有効化</div>
     `;
     document.body.appendChild(menu);
 
-    document.addEventListener('click', () => {
-        menu.style.display = 'none';
+    // Hover effect for items (since we are inlining)
+    menu.querySelectorAll('.context-menu-item').forEach(item => {
+        item.onmouseover = () => item.style.background = '#f1f5f9';
+        item.onmouseout = () => item.style.background = 'transparent';
     });
 
-    menu.addEventListener('click', (e) => {
-        const action = e.target.getAttribute('data-action');
-        if (action && currentContextMenuSeat) {
-            handleSeatMenuAction(action, currentContextMenuSeat);
+    // Close on any click outside
+    document.addEventListener('mousedown', (e) => {
+        if (!menu.contains(e.target)) {
             menu.style.display = 'none';
         }
     });
+
+    menu.addEventListener('click', (e) => {
+        const item = e.target.closest('.context-menu-item');
+        if (item) {
+            const action = item.getAttribute('data-action');
+            if (action && currentContextMenuSeat) {
+                handleSeatMenuAction(action, currentContextMenuSeat);
+                menu.style.display = 'none';
+            }
+        }
+    });
+
+    // Prevent default context menu on our custom menu
+    menu.oncontextmenu = (e) => e.preventDefault();
 }
 
 function showSeatContextMenu(e, pos) {
@@ -5414,8 +5440,6 @@ function showSeatContextMenu(e, pos) {
         menu.style.left = e.clientX + 'px';
         menu.style.top = e.clientY + 'px';
         menu.style.display = 'block';
-        menu.style.visibility = 'visible'; // Ensure visibility
-        menu.style.zIndex = '30000'; // Extra high z-index
     }
 }
 
