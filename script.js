@@ -4592,8 +4592,16 @@ function initSeating() {
 
 function renderSeatingRoster() {
     const list = document.getElementById('seatingRosterList');
-    if (!list) return;
+    if (!list) {
+        console.error('Element #seatingRosterList not found');
+        return;
+    }
     list.innerHTML = '';
+
+    if (!state.students || state.students.length === 0) {
+        list.innerHTML = '<div style="padding:1rem; color: #94a3b8; font-size: 0.9rem;">学生データが見つかりません。<br>成績入力タブで名簿を確認してください。</div>';
+        return;
+    }
 
     // Students currently assigned to any seat
     const assignedStudents = new Set(Object.values(state.seating.assignments));
