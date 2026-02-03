@@ -1,4 +1,4 @@
-﻿
+
 // ==================== DATA CONSTANTS ====================
 // ==================== DATA CONSTANTS ====================
 // These are factory defaults. We use localStorage for actual master data.
@@ -258,33 +258,21 @@ const SCORE_KEYS_EN = ["earlyMid", "earlyFinal", "lateMid", "lateFinal"]; // map
 let currentPasteKey = null;
 
 // ==================== STATE PERSISTENCE ====================
-// ==================== STATE PERSISTENCE ====================
 function saveSessionState() {
-    try {
-        // Ensure presets are saved FIRST (to avoid quota issues/errors from other large data blocking it)
-        const presets = state.seatingPresets || [];
-        localStorage.setItem('gm_state_seatingPresets', JSON.stringify(presets));
+    localStorage.setItem('gm_state_tab', state.currentTab);
+    localStorage.setItem('gm_state_student', state.currentStudent || '');
+    localStorage.setItem('gm_state_year', state.currentYear);
+    localStorage.setItem('gm_state_hide_empty', state.hideEmptySubjects);
+    localStorage.setItem('gm_state_boxplot_year', state.boxPlotYear || '');
+    localStorage.setItem('gm_state_boxplot_test', state.boxPlotTest || '');
+    localStorage.setItem('gm_state_course', state.currentCourse || '');
+    localStorage.setItem('gm_state_seating', JSON.stringify(state.seating));
 
-        localStorage.setItem('gm_state_tab', state.currentTab);
-        localStorage.setItem('gm_state_student', state.currentStudent || '');
-        localStorage.setItem('gm_state_year', state.currentYear);
-        localStorage.setItem('gm_state_hide_empty', state.hideEmptySubjects);
-        localStorage.setItem('gm_state_boxplot_year', state.boxPlotYear || '');
-        localStorage.setItem('gm_state_boxplot_test', state.boxPlotTest || '');
-        localStorage.setItem('gm_state_course', state.currentCourse || '');
-        localStorage.setItem('gm_state_seating', JSON.stringify(state.seating));
-
-        // Auto-save the actual lists and scores so everything is remembered on reload
-        localStorage.setItem('grade_manager_students', JSON.stringify(state.students));
-        localStorage.setItem('gm_master_subjects_json', JSON.stringify(state.subjects));
-        localStorage.setItem('grade_manager_scores', JSON.stringify(state.scores));
-
-    } catch (e) {
-        console.error('Save State Error:', e);
-        if (e.name === 'QuotaExceededError' || e.code === 22) {
-            alert('【警告】ブラウザの保存容量上限に達したため、データ（プリセット等）が保存できませんでした。\n不要なデータ（学生データなど）を減らしてください。');
-        }
-    }
+    // Auto-save the actual lists and scores so everything is remembered on reload
+    localStorage.setItem('grade_manager_students', JSON.stringify(state.students));
+    localStorage.setItem('gm_master_subjects_json', JSON.stringify(state.subjects));
+    localStorage.setItem('grade_manager_scores', JSON.stringify(state.scores));
+    localStorage.setItem('gm_state_seatingPresets', JSON.stringify(state.seatingPresets));
 }
 
 function loadSessionState() {
@@ -304,8 +292,8 @@ function loadSessionState() {
     if (savedCourse !== null) state.currentCourse = savedCourse;
     if (savedSeating) state.seating = JSON.parse(savedSeating);
 
-    // Load presets (Isolated function)
-    loadPresetsOnly();
+    const savedPresets = localStorage.getItem('gm_state_seatingPresets');
+    if (savedPresets) state.seatingPresets = JSON.parse(savedPresets);
 
     // MIGRATION: Rename courses to formal names
     const courseMap = {
@@ -906,11 +894,13 @@ function setupEventListeners() {
     document.getElementById('seatingGradeMethod')?.addEventListener('change', (e) => {
         state.seating.gradeMethod = e.target.value;
         saveSessionState();
-        updateGradeMethodInfo();
         if (state.seating.colorByGrade) renderSeatingGrid();
     });
     document.getElementById('saveSeatingBtn')?.addEventListener('click', saveSeatingLayout);
     document.getElementById('loadSeatingBtn')?.addEventListener('click', loadSeatingLayout);
+    document.getElementById('savePresetBtn')?.addEventListener('click', saveSeatingPreset);
+    document.getElementById('deletePresetBtn')?.addEventListener('click', deleteSeatingPreset);
+    document.getElementById('seatingPresetSelect')?.addEventListener('change', loadSeatingPreset);
 
     document.getElementById('changePassBtn')?.addEventListener('click', openPasswordChange);
     document.getElementById('clearAllDataBtn')?.addEventListener('click', clearAllDataHard);
@@ -992,16 +982,6 @@ function switchTab(tabName) {
 
     // Add tab-specific class to body for CSS targeting (especially for print)
     document.body.className = `tab-${tabName}`;
-
-    // Update Header Title dynamically
-    const logoEl = document.querySelector('.logo');
-    if (logoEl) {
-        if (tabName === 'seating') {
-            logoEl.innerHTML = '<i class="fas fa-chair"></i> 席決め';
-        } else {
-            logoEl.innerHTML = '<i class="fas fa-chart-line"></i> 成績レポート';
-        }
-    }
 
     document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
     document.getElementById(`${tabName}-content`).classList.remove('hidden');
@@ -4554,24 +4534,9 @@ function initSeating() {
     if (colorByGradeInput) colorByGradeInput.checked = state.seating.colorByGrade || false;
     if (gradeMethodInput) gradeMethodInput.value = state.seating.gradeMethod || 'cumulative';
 
-    updateGradeMethodInfo();
-
-    // Add Event Listeners for Presets
-    const savePresetBtn = document.getElementById('savePresetBtn');
-    const deletePresetBtn = document.getElementById('deletePresetBtn');
-    const presetSelect = document.getElementById('seatingPresetSelect');
-
-    if (savePresetBtn) savePresetBtn.onclick = saveSeatingPreset;
-    if (deletePresetBtn) deletePresetBtn.onclick = deleteSeatingPreset;
-    if (presetSelect) presetSelect.onchange = loadSeatingPreset;
-
-
     renderPresetList();
-    const autoAssignBtn = document.getElementById('autoAssignBtn'); if (autoAssignBtn) autoAssignBtn.onclick = autoAssignSeating;
-
     renderSeatingRoster();
     renderSeatingGrid();
-    initContextMenu();
 }
 
 function renderSeatingRoster() {
@@ -4601,42 +4566,23 @@ function renderSeatingRoster() {
 
 function renderSeatingGrid() {
     const grid = document.getElementById('seatingGrid');
-    const oldDesk = document.getElementById('seatingDesk');
-    if (oldDesk) oldDesk.remove();
-
+    const desk = document.getElementById('seatingDesk');
     if (!grid) return;
 
     const { cols, rows, perspective } = state.seating;
     const isTeacher = perspective === 'teacher';
 
-    // Flexible column width
-    grid.style.gridTemplateColumns = `repeat(${cols}, minmax(60px, 1fr))`;
-    grid.innerHTML = '';
-
-    // Create Layout Desk Element
-    const desk = document.createElement('div');
-    desk.className = 'teacher-desk-grid';
-    desk.innerText = '教 卓 (前方)';
-    desk.style.gridColumn = '1 / -1';
-
-    // CENTER ALIGNMENT
-    desk.style.justifySelf = 'center';
-    desk.style.width = 'auto';
-    desk.style.minWidth = '200px';
-
-    desk.style.textAlign = 'center';
-    desk.style.background = '#e2e8f0';
-    desk.style.padding = '0.5rem 3rem';
-    desk.style.borderRadius = '0.3rem';
-    desk.style.fontWeight = 'bold';
-    desk.style.color = '#475569';
-    // Visual spacing
-    desk.style.marginBottom = !isTeacher ? '15px' : '0';
-    desk.style.marginTop = isTeacher ? '15px' : '0';
-
-    if (!isTeacher) {
-        grid.appendChild(desk);
+    // Move desk
+    if (desk) {
+        if (isTeacher) {
+            desk.parentElement.appendChild(desk); // Move to bottom
+        } else {
+            desk.parentElement.insertBefore(desk, desk.parentElement.firstChild); // Move to top
+        }
     }
+
+    grid.style.gridTemplateColumns = `repeat(${cols}, 80px)`;
+    grid.innerHTML = '';
 
     for (let currentR = 0; currentR < rows; currentR++) {
         for (let currentC = 0; currentC < cols; currentC++) {
@@ -4665,16 +4611,39 @@ function renderSeatingGrid() {
                     const method = state.seating.gradeMethod || 'cumulative';
 
                     if (method === 'latest') {
-                        // Find latest test with data based on current year (same logic as Class Stats)
-                        const targetYear = state.currentYear || 5;
-                        // Use detection logic similar to Class Stats
-                        let latestScores = [];
-                        // Find latest test (naively or robustly)
-                        // Using simplified logic here or helper
-                        // For visualization, simple accumulation is often enough or reuse getStudentAverage
-                        avgGrade = getStudentAverage(student);
+                        // Latest test average: get the last score key with data
+                        const latestScores = [];
+                        const lastKey = SCORE_KEYS[SCORE_KEYS.length - 1];
+
+                        Object.values(scoreData).forEach(subjectScores => {
+                            if (typeof subjectScores === 'object') {
+                                const val = subjectScores[lastKey];
+                                if (val !== undefined && val !== null && val !== '' && !isNaN(val)) {
+                                    latestScores.push(parseFloat(val));
+                                }
+                            }
+                        });
+
+                        if (latestScores.length > 0) {
+                            avgGrade = latestScores.reduce((a, b) => a + b, 0) / latestScores.length;
+                        }
                     } else {
-                        avgGrade = getStudentAverage(student);
+                        // Cumulative average: all scores
+                        const allScores = [];
+                        Object.values(scoreData).forEach(subjectScores => {
+                            if (typeof subjectScores === 'object') {
+                                SCORE_KEYS.forEach(key => {
+                                    const val = subjectScores[key];
+                                    if (val !== undefined && val !== null && val !== '' && !isNaN(val)) {
+                                        allScores.push(parseFloat(val));
+                                    }
+                                });
+                            }
+                        });
+
+                        if (allScores.length > 0) {
+                            avgGrade = allScores.reduce((a, b) => a + b, 0) / allScores.length;
+                        }
                     }
                 }
             }
@@ -4692,27 +4661,31 @@ function renderSeatingGrid() {
                 if (avgGrade < 50) {
                     // Below 50: Solid Red
                     r = 255;
-                    g = 100;
-                    b = 100;
-                } else if (avgGrade < 75) {
-                    // 50-75: Red to Yellow
-                    const p = (avgGrade - 50) / 25;
+                    g = 0;
+                    b = 0;
+                } else if (avgGrade <= 75) {
+                    // Red to Yellow (50-75)
+                    const ratio = (avgGrade - 50) / 25;
                     r = 255;
-                    g = Math.round(100 + (155 * p));
-                    b = Math.round(100 * (1 - p)); // reduce blue/white tint
+                    g = Math.round(255 * ratio);
+                    b = 0;
                 } else {
-                    // 75-100: Yellow to Green
-                    const p = (avgGrade - 75) / 25;
-                    r = Math.round(255 * (1 - p));
+                    // Yellow to Green (75-100)
+                    const ratio = (avgGrade - 75) / 25;
+                    r = Math.round(255 * (1 - ratio));
                     g = 255;
                     b = 0;
                 }
 
-                // Light bg
-                cell.style.background = `rgba(${r}, ${g}, ${b}, 0.15)`;
-                cell.style.borderColor = `rgba(${r}, ${g}, ${b}, 0.5)`;
+                // Apply with more visible background and darker border
+                const bgColor = `rgba(${r}, ${g}, ${b}, 0.4)`;
+                const borderColor = `rgb(${Math.round(r * 0.7)}, ${Math.round(g * 0.7)}, ${Math.round(b * 0.7)})`;
 
-                // Badge
+                cell.style.background = bgColor;
+                cell.style.borderColor = borderColor;
+                cell.style.borderWidth = '2px';
+
+                // Add grade display
                 const gradeDisplay = document.createElement('div');
                 gradeDisplay.className = 'no-print';
                 gradeDisplay.style.cssText = `
@@ -4751,7 +4724,8 @@ function renderSeatingGrid() {
 
             // Right click menu for fixed/disabled
             cell.addEventListener('contextmenu', (e) => {
-                showSeatContextMenu(e, pos); // Correct function name
+                e.preventDefault();
+                showSeatingContextMenu(e, pos);
             });
 
             // Allow dragging student OUT of seat
@@ -4765,11 +4739,6 @@ function renderSeatingGrid() {
 
             grid.appendChild(cell);
         }
-    }
-
-    // Teacher View: Desk is at BOTTOM
-    if (isTeacher) {
-        grid.appendChild(desk);
     }
 }
 
@@ -5016,460 +4985,92 @@ function loadSeatingLayout() {
     };
     input.click();
 }
-
-function updateGradeMethodInfo() {
-    const infoDiv = document.getElementById('seatingGradeMethodInfo');
-    if (!infoDiv) return;
-
-    const method = state.seating.gradeMethod || 'cumulative';
-
-    if (method === 'latest') {
-        const targetYear = state.currentYear || 5;
-        let latestTest = null;
-
-        // Find latest test with data for the target year
-        for (let i = SCORE_KEYS.length - 1; i >= 0; i--) {
-            const testKey = SCORE_KEYS[i];
-
-            // Check if any student has data for this test in the target year
-            // Optimization: check first few students
-            const subjects = state.subjects.filter(sub => sub.year === targetYear && !sub.exclude);
-            if (subjects.length > 0) {
-                const hasData = state.students.some(student => {
-                    return subjects.some(sub => {
-                        const val = getScore(student, sub.name, testKey);
-                        return val !== undefined && val !== null && val !== '';
-                    });
-                });
-
-                if (hasData) {
-                    latestTest = testKey;
-                    break;
-                }
-            }
-        }
-
-        if (latestTest) {
-            infoDiv.textContent = `（${targetYear}年 ${latestTest}を使用）`;
-        } else {
-            const lastKey = SCORE_KEYS[SCORE_KEYS.length - 1];
-            infoDiv.textContent = `（${targetYear}年 ${lastKey}を使用）`;
-        }
-    } else {
-        infoDiv.textContent = '';
-    }
-}
-
-function renderPresetList() {
-    const select = document.getElementById('seatingPresetSelect');
-    if (!select) return;
-
-    // Save current selection if possible
-    const currentVal = select.value;
-
-    select.innerHTML = '<option value="">-- 選択 --</option>';
-
-    // Ensure it's an array
-    if (!Array.isArray(state.seatingPresets)) {
-        state.seatingPresets = [];
-    }
-
-    // Sort logic removed or keep simple?
-    // Just map
-    state.seatingPresets.forEach((preset, index) => {
-        const option = document.createElement('option');
-        option.value = index;
-        option.textContent = preset.name;
-        select.appendChild(option);
-    });
-
-    // Restore selection if index still exists
-    if (currentVal && state.seatingPresets[currentVal]) {
-        select.value = currentVal;
-    }
-}
-
-
-function saveSeatingPreset() {
-    const name = prompt('保存するプリセット名を入力してください:', 'レイアウト ' + (state.seatingPresets.length + 1));
-    if (!name) return;
-
-    // Save current layout configuration (only structure, not students)
-    const preset = {
-        name: name,
-        cols: state.seating.cols,
-        rows: state.seating.rows,
-        disabled: [...(state.seating.disabled || [])],
-        timestamp: new Date().toISOString()
-    };
-
-    state.seatingPresets.push(preset);
-    savePresetsOnly(); // Isolated Save
-    saveSessionState();
-    renderPresetList();
-    const autoAssignBtn = document.getElementById('autoAssignBtn'); if (autoAssignBtn) autoAssignBtn.onclick = autoAssignSeating;
-
-
-    // Select the new preset
-    const select = document.getElementById('seatingPresetSelect');
-    if (select) select.value = state.seatingPresets.length - 1;
-
-    alert('プリセット「' + name + '」を保存しました。');
-}
-
-
-function loadSeatingPreset(e) {
-    const index = e.target.value;
-    if (index === '') return;
-
-    const preset = state.seatingPresets[index];
-    if (!preset) return;
-
-    // Confirm if layout is different and assignments exist
-    if (Object.keys(state.seating.assignments).length > 0 &&
-        (state.seating.cols !== preset.cols || state.seating.rows !== preset.rows)) {
-        if (!confirm('座席のサイズが変更されます。配置済みの学生がリセットされる可能性がありますがよろしいですか？')) {
-            e.target.value = ''; // Reset selection
-            return;
-        }
-    }
-
-    state.seating.cols = preset.cols;
-    state.seating.rows = preset.rows;
-    state.seating.disabled = [...(preset.disabled || [])];
-
-    // Update UI inputs
-    document.getElementById('seatingCols').value = preset.cols;
-    document.getElementById('seatingRows').value = preset.rows;
-
-    saveSessionState();
-    renderSeatingGrid();
-}
-
-
-function deleteSeatingPreset() {
-    const select = document.getElementById('seatingPresetSelect');
-    if (!select || select.value === '') {
-        alert('削除するプリセットを選択してください。');
-        return;
-    }
-
-    const index = parseInt(select.value);
-    const preset = state.seatingPresets[index];
-
-    if (confirm('プリセット「' + preset.name + '」を削除しますか？')) {
-        state.seatingPresets.splice(index, 1);
-        saveSessionState();
-        renderPresetList();
-        const autoAssignBtn = document.getElementById('autoAssignBtn'); if (autoAssignBtn) autoAssignBtn.onclick = autoAssignSeating;
-
-    }
-}
-
-
-function getStudentAverage(student) {
-    if (!student || !state.scores[student]) return 0;
-
-    const method = state.seating.gradeMethod || 'cumulative';
-    let avg = 0;
-
-    if (method === 'latest') {
-        const targetYear = state.currentYear || 5;
-        let latestScores = [];
-
-        for (let i = SCORE_KEYS.length - 1; i >= 0; i--) {
-            const testKey = SCORE_KEYS[i];
-            const subjects = state.subjects.filter(sub => sub.year === targetYear && !sub.exclude);
-            const testScores = [];
-
-            subjects.forEach(sub => {
-                const val = getScore(student, sub.name, testKey);
-                if (val !== undefined && val !== null && val !== '' && !isNaN(parseFloat(val))) {
-                    testScores.push(parseFloat(val));
-                }
-            });
-
-            if (testScores.length > 0) {
-                latestScores = testScores;
-                break;
-            }
-        }
-
-        if (latestScores.length > 0) {
-            avg = latestScores.reduce((a, b) => a + b, 0) / latestScores.length;
-        }
-    } else {
-        // Cumulative
-        const scoreData = state.scores[student];
-        const allScores = [];
-        Object.values(scoreData).forEach(subjectScores => {
-            if (typeof subjectScores === 'object') {
-                SCORE_KEYS.forEach(key => {
-                    const val = subjectScores[key];
-                    if (val !== undefined && val !== null && val !== '' && !isNaN(parseFloat(val))) {
-                        allScores.push(parseFloat(val));
-                    }
-                });
-            }
-        });
-        if (allScores.length > 0) {
-            avg = allScores.reduce((a, b) => a + b, 0) / allScores.length;
-        }
-    }
-    return avg;
-}
-
-function autoAssignSeating() {
-    try {
-        const methodSelect = document.getElementById('seatingAssignMethod');
-        if (!methodSelect) return;
-        const method = methodSelect.value;
-        if (!method) return;
-
-        // Preserve assignments for fixed seats
-        const fixedStudents = new Set();
-        const currentAssignments = state.seating.assignments || {};
-        const newAssignments = {};
-
-        if (state.seating.fixed) {
-            state.seating.fixed.forEach(pos => {
-                if (currentAssignments[pos]) {
-                    newAssignments[pos] = currentAssignments[pos];
-                    fixedStudents.add(currentAssignments[pos]);
-                }
-            });
-        }
-
-        // Set assignments to only the fixed ones (effectively clearing non-fixed)
-        state.seating.assignments = newAssignments;
-
-        // Determine available seats (excluding disabled AND fixed)
-        // Order: Top-Left (Teacher's Right-Front) origin
-
-        const seats = [];
-        const rows = state.seating.rows;
-        const cols = state.seating.cols;
-
-        const isExcluded = (pos) => {
-            return (state.seating.disabled && state.seating.disabled.includes(pos)) || (state.seating.fixed && state.seating.fixed.includes(pos));
-        };
-
-        if (method === 'roster_v') {
-            // Vertical from Screen Left (Student Right)
-            for (let c = 0; c < cols; c++) {
-                for (let r = 0; r < rows; r++) {
-                    const pos = r + '-' + c;
-                    if (!isExcluded(pos)) {
-                        seats.push(pos);
-                    }
-                }
-            }
-        } else {
-            // Horizontal (Screen Left -> Right, Top -> Bottom)
-            for (let r = 0; r < rows; r++) {
-                for (let c = 0; c < cols; c++) {
-                    const pos = r + '-' + c;
-                    if (!isExcluded(pos)) {
-                        seats.push(pos);
-                    }
-                }
-            }
-        }
-
-        // Prepare students list (Exclude fixed students)
-        let studentsToAssign = state.students.filter(s => !fixedStudents.has(s));
-
-        if (method === 'grades_asc') {
-            // Sort by average grade Ascending (Lower grades come first)
-            studentsToAssign.sort((a, b) => {
-                const avgA = getStudentAverage(a);
-                const avgB = getStudentAverage(b);
-                return avgA - avgB;
-            });
-
-            // Special Logic: Fill rows from Front to Back, but randomize WITHIN the row
-            let studentIndex = 0;
-
-            for (let r = 0; r < rows; r++) {
-                // 1. Find valid seats in this row
-                const seatsInRow = [];
-                for (let c = 0; c < cols; c++) {
-                    const pos = r + '-' + c;
-                    if (!isExcluded(pos)) {
-                        seatsInRow.push(pos);
-                    }
-                }
-
-                if (seatsInRow.length === 0) continue;
-
-                // 2. Take the next N students (where N = seats in row)
-                // Need to handle if we run out of students
-                const count = seatsInRow.length;
-                const chunk = studentsToAssign.slice(studentIndex, studentIndex + count);
-                studentIndex += count;
-
-                // 3. Shuffle these students
-                for (let i = chunk.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [chunk[i], chunk[j]] = [chunk[j], chunk[i]];
-                }
-
-                // 4. Assign shuffled students to seats in this row
-                seatsInRow.forEach((pos, idx) => {
-                    if (idx < chunk.length) {
-                        state.seating.assignments[pos] = chunk[idx];
-                    }
-                });
-
-                if (studentIndex >= studentsToAssign.length) break;
-            }
-
-            // Skip standard assignment loop
-        } else {
-            // Standard Assignment for other methods
-            // Sort students
-            if (method === 'random') {
-                for (let i = studentsToAssign.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [studentsToAssign[i], studentsToAssign[j]] = [studentsToAssign[j], studentsToAssign[i]];
-                }
-            }
-
-            // Assign
-            for (let i = 0; i < seats.length && i < studentsToAssign.length; i++) {
-                state.seating.assignments[seats[i]] = studentsToAssign[i];
-            }
-        }
-
-        saveSessionState();
-        renderSeatingRoster();
-        renderSeatingGrid();
-    } catch (e) {
-        alert('自動配置エラー: ' + e.message);
-        console.error(e);
-    }
-}
-
-function savePresetsOnly() {
-    try {
-        if (!state.seatingPresets) state.seatingPresets = [];
-        localStorage.setItem('gm_state_seatingPresets_v2', JSON.stringify(state.seatingPresets));
-    } catch (e) {
-        alert('プリセット保存エラー: ' + e.message);
-    }
-}
-
-function loadPresetsOnly() {
-    try {
-        const raw = localStorage.getItem('gm_state_seatingPresets_v2');
-        if (raw) {
-            state.seatingPresets = JSON.parse(raw);
-        }
-    } catch (e) {
-        console.error('Preset load error', e);
-    }
-}
-
-// Context Menu Logic
-let currentContextMenuSeat = null;
-
-function initContextMenu() {
-    // If exists, remove to re-init (in case we changed structure)
-    const existing = document.getElementById('seatContextMenu');
-    if (existing) existing.remove();
-
-    const menu = document.createElement('div');
-    menu.id = 'seatContextMenu';
-    menu.className = 'context-menu';
-    menu.innerHTML = `
-        <div class="context-menu-item" data-action="clear-seat" style="color: #ef4444; font-weight: bold;">席をクリア</div>
-        <div class="context-menu-separator" id="sep-clear"></div>
-        <div class="context-menu-item" data-action="toggle-disable">無効化/有効化 (Toggle)</div>
-        <div class="context-menu-separator"></div>
-        <div class="context-menu-item" data-action="disable-col">縦一列を無効化</div>
-        <div class="context-menu-item" data-action="disable-row">横一列を無効化</div>
-        <div class="context-menu-separator"></div>
-        <div class="context-menu-item" data-action="enable-col">縦一列を有効化</div>
-        <div class="context-menu-item" data-action="enable-row">横一列を有効化</div>
-    `;
-    document.body.appendChild(menu);
-
-    document.addEventListener('click', () => {
-        menu.style.display = 'none';
-    });
-
-    menu.addEventListener('click', (e) => {
-        const action = e.target.getAttribute('data-action');
-        if (action && currentContextMenuSeat) {
-            handleSeatMenuAction(action, currentContextMenuSeat);
-            menu.style.display = 'none';
-        }
-    });
-}
-
-function showSeatContextMenu(e, pos) {
-    e.preventDefault();
-    currentContextMenuSeat = pos;
-    const menu = document.getElementById('seatContextMenu');
-    if (menu) {
-        // Show/Hide "Clear Seat" depending on assignment
-        const hasStudent = !!state.seating.assignments[pos];
-        const clearItem = menu.querySelector('[data-action="clear-seat"]');
-        const sep = document.getElementById('sep-clear');
-
-        if (clearItem) clearItem.style.display = hasStudent ? 'block' : 'none';
-        if (sep) sep.style.display = hasStudent ? 'block' : 'none';
-
-        menu.style.left = e.pageX + 'px';
-        menu.style.top = e.pageY + 'px';
-        menu.style.display = 'block';
-    }
-}
-
-function handleSeatMenuAction(action, pos) {
-    const parts = pos.split('-');
-    const r = parseInt(parts[0]);
-    const c = parseInt(parts[1]);
-    const rows = state.seating.rows;
-    const cols = state.seating.cols;
-
-    const setDisable = (p, disable) => {
-        if (disable) {
-            if (!state.seating.disabled.includes(p)) state.seating.disabled.push(p);
-            // Remove from fixed
-            state.seating.fixed = state.seating.fixed.filter(x => x !== p);
-            // Remove assignment
-            if (state.seating.assignments[p]) delete state.seating.assignments[p];
-        } else {
-            state.seating.disabled = state.seating.disabled.filter(x => x !== p);
-        }
-    };
-
-    if (action === 'clear-seat') {
-        if (state.seating.assignments[pos]) {
-            delete state.seating.assignments[pos];
-            // Also remove from fixed if it was fixed? Maybe keep it fixed just empty?
-            // Usually 'Clear' implies check-out. Let's keep fixed status but remove student.
-        }
-    } else if (action === 'toggle-disable') {
-        const isDisabled = state.seating.disabled.includes(pos);
-        setDisable(pos, !isDisabled);
-    } else if (action === 'disable-col') {
-        for (let i = 0; i < rows; i++) setDisable(i + '-' + c, true);
-    } else if (action === 'disable-row') {
-        for (let j = 0; j < cols; j++) setDisable(r + '-' + j, true);
-    } else if (action === 'enable-col') {
-        for (let i = 0; i < rows; i++) setDisable(i + '-' + c, false);
-    } else if (action === 'enable-row') {
-        for (let j = 0; j < cols; j++) setDisable(r + '-' + j, false);
-    }
-
-    // Reset preset selection if layout (disabled/enabled) changed
-    if (action !== 'clear-seat') {
-        const presetSelect = document.getElementById('seatingPresetSelect');
-        if (presetSelect) presetSelect.value = '';
-    }
-
-    saveSessionState();
-    renderSeatingGrid();
-}
+ 
+ f u n c t i o n   r e n d e r P r e s e t L i s t ( )   {  
+         c o n s t   s e l e c t   =   d o c u m e n t . g e t E l e m e n t B y I d ( ' s e a t i n g P r e s e t S e l e c t ' ) ;  
+         i f   ( ! s e l e c t )   r e t u r n ;  
+  
+         / /   S a v e   c u r r e n t   s e l e c t i o n  
+         c o n s t   c u r r e n t V a l u e   =   s e l e c t . v a l u e ;  
+  
+         / /   C l e a r   a n d   r e b u i l d  
+         s e l e c t . i n n e r H T M L   =   ' < o p t i o n   v a l u e = " " > - -   U�x���0- - < / o p t i o n > ' ;  
+  
+         s t a t e . s e a t i n g P r e s e t s . f o r E a c h ( ( p r e s e t ,   i n d e x )   = >   {  
+                 c o n s t   o p t i o n   =   d o c u m e n t . c r e a t e E l e m e n t ( ' o p t i o n ' ) ;  
+                 o p t i o n . v a l u e   =   i n d e x ;  
+                 o p t i o n . t e x t C o n t e n t   =   p r e s e t . n a m e ;  
+                 s e l e c t . a p p e n d C h i l d ( o p t i o n ) ;  
+         } ) ;  
+  
+         / /   R e s t o r e   s e l e c t i o n   i f   s t i l l   v a l i d  
+         i f   ( c u r r e n t V a l u e   & &   s t a t e . s e a t i n g P r e s e t s [ c u r r e n t V a l u e ] )   {  
+                 s e l e c t . v a l u e   =   c u r r e n t V a l u e ;  
+         }  
+ }  
+  
+ f u n c t i o n   s a v e S e a t i n g P r e s e t ( )   {  
+         c o n s t   n a m e   =   p r o m p t ( ' ]~�R�g~{�]~�0�07�*�R��e�	�^ �:~f�:~
+N�%:~��: ' ,   ` ]~l�g~d�g~b�g~f�]~�0$ { s t a t e . s e a t i n g P r e s e t s . l e n g t h   +   1 } ` ) ;  
+         i f   ( ! n a m e )   r e t u r n ;  
+  
+         c o n s t   p r e s e t   =   {  
+                 n a m e :   n a m e ,  
+                 c o l s :   s t a t e . s e a t i n g . c o l s ,  
+                 r o w s :   s t a t e . s e a t i n g . r o w s ,  
+                 d i s a b l e d :   [ . . . s t a t e . s e a t i n g . d i s a b l e d ] ,  
+                 t i m e s t a m p :   n e w   D a t e ( ) . t o I S O S t r i n g ( )  
+         } ;  
+  
+         s t a t e . s e a t i n g P r e s e t s . p u s h ( p r e s e t ) ;  
+         s a v e S e s s i o n S t a t e ( ) ;  
+         r e n d e r P r e s e t L i s t ( ) ;  
+  
+         / /   S e l e c t   t h e   n e w l y   c r e a t e d   p r e s e t  
+         c o n s t   s e l e c t   =   d o c u m e n t . g e t E l e m e n t B y I d ( ' s e a t i n g P r e s e t S e l e c t ' ) ;  
+         i f   ( s e l e c t )   s e l e c t . v a l u e   =   s t a t e . s e a t i n g P r e s e t s . l e n g t h   -   1 ;  
+  
+         a l e r t ( ` ]~�R�g~{�]~�0�02~�0{ n a m e } 2~*�R��Ofm�%P �:~~�:~�R�%2~!�) ;  
+ }  
+  
+ f u n c t i o n   l o a d S e a t i n g P r e s e t ( e )   {  
+         c o n s t   i n d e x   =   e ? . t a r g e t ? . v a l u e   | |   d o c u m e n t . g e t E l e m e n t B y I d ( ' s e a t i n g P r e s e t S e l e c t ' ) ? . v a l u e ;  
+         i f   ( i n d e x   = = =   ' '   | |   i n d e x   = = =   u n d e f i n e d )   r e t u r n ;  
+  
+         c o n s t   p r e s e t   =   s t a t e . s e a t i n g P r e s e t s [ p a r s e I n t ( i n d e x ) ] ;  
+         i f   ( ! p r e s e t )   r e t u r n ;  
+  
+         / /   A p p l y   p r e s e t   ( o n l y   l a y o u t ,   n o t   a s s i g n m e n t s )  
+         s t a t e . s e a t i n g . c o l s   =   p r e s e t . c o l s ;  
+         s t a t e . s e a t i n g . r o w s   =   p r e s e t . r o w s ;  
+         s t a t e . s e a t i n g . d i s a b l e d   =   [ . . . p r e s e t . d i s a b l e d ] ;  
+  
+         / /   U p d a t e   U I  
+         d o c u m e n t . g e t E l e m e n t B y I d ( ' s e a t i n g C o l s ' ) . v a l u e   =   p r e s e t . c o l s ;  
+         d o c u m e n t . g e t E l e m e n t B y I d ( ' s e a t i n g R o w s ' ) . v a l u e   =   p r e s e t . r o w s ;  
+  
+         s a v e S e s s i o n S t a t e ( ) ;  
+         r e n d e r S e a t i n g G r i d ( ) ;  
+ }  
+  
+ f u n c t i o n   d e l e t e S e a t i n g P r e s e t ( )   {  
+         c o n s t   s e l e c t   =   d o c u m e n t . g e t E l e m e n t B y I d ( ' s e a t i n g P r e s e t S e l e c t ' ) ;  
+         i f   ( ! s e l e c t )   r e t u r n ;  
+  
+         c o n s t   i n d e x   =   p a r s e I n t ( s e l e c t . v a l u e ) ;  
+         i f   ( i s N a N ( i n d e x )   | |   ! s t a t e . s e a t i n g P r e s e t s [ i n d e x ] )   {  
+                 a l e r t ( ' �O�R:~6TK�]~�R�g~{�]~�0�0g~^"��i �:~f�:~
+N�%:~��2~�0) ;  
+                 r e t u r n ;  
+         }  
+  
+         c o n s t   p r e s e t   =   s t a t e . s e a t i n g P r e s e t s [ i n d e x ] ;  
+         i f   ( ! c o n f i r m ( ` ]~�R�g~{�]~�0�02~�0{ p r e s e t . n a m e } 2~*�R��O�R:~�R*":~6T� �0Tk) )   r e t u r n ;  
+  
+         s t a t e . s e a t i n g P r e s e t s . s p l i c e ( i n d e x ,   1 ) ;  
+         s a v e S e s s i o n S t a t e ( ) ;  
+         r e n d e r P r e s e t L i s t ( ) ;  
+  
+         a l e r t ( ' ]~�R�g~{�]~�0�0g~���p�d�:~�R*":~�R�%2~�0) ;  
+ }  
+ 

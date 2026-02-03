@@ -532,7 +532,168 @@ th {
     display: none !important;
 }
 
-/* ==================== PRINT STYLES ==================== */
+/* ==================== SEATING STYLES ==================== */
+.seating-grid-container {
+    perspective: 1000px;
+}
+
+#seatingGrid {
+    transition: var(--transition);
+}
+
+.seat-item {
+    width: 80px;
+    height: 80px;
+    background: #eef2ff;
+    border: 2px solid #cbd5e1;
+    border-radius: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    cursor: grab;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    user-select: none;
+    font-size: 0.75rem;
+    padding: 0.5rem;
+    text-align: center;
+    color: #475569;
+}
+
+.seat-item:hover {
+    transform: scale(1.05);
+    border-color: var(--primary);
+    box-shadow: var(--shadow);
+    z-index: 10;
+}
+
+.seat-item.empty {
+    background: #f1f5f9;
+    border-style: dashed;
+    color: #94a3b8;
+}
+
+.seat-item.disabled {
+    opacity: 0.3;
+    pointer-events: none;
+    background: #e2e8f0;
+}
+
+.seat-item.fixed {
+    background: #fff7ed;
+    border-color: #fb923c;
+}
+
+.seat-item.fixed::before {
+    content: '📌';
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    font-size: 0.7rem;
+}
+
+.seat-item .seat-label {
+    font-size: 0.65rem;
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    color: #94a3b8;
+}
+
+.seat-item .student-name {
+    font-weight: 600;
+    line-height: 1.2;
+    margin-top: 5px;
+}
+
+.roster-item {
+    padding: 0.5rem 0.75rem;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.4rem;
+    font-size: 0.85rem;
+    cursor: grab;
+    transition: all 0.2s;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.roster-item:hover {
+    border-color: var(--primary);
+    background: #f5f3ff;
+}
+
+.roster-item.assigned {
+    opacity: 0.5;
+    background: #f1f5f9;
+}
+
+.divider-v {
+    width: 1px;
+    height: 24px;
+    background: #e2e8f0;
+    margin: 0 0.5rem;
+}
+
+.drag-over {
+    background: #e0e7ff !important;
+    border-color: var(--primary) !important;
+    border-style: solid !important;
+}
+
+@media print {
+    @page {
+        size: landscape;
+        margin: 5mm;
+    }
+
+    body.tab-seating {
+        overflow: visible !important;
+    }
+
+    .seating-roster-sidebar {
+        display: none !important;
+    }
+
+    .seating-grid-container {
+        padding: 0 !important;
+        border: none !important;
+    }
+
+    #seatingGrid {
+        gap: 5px !important;
+        width: 100% !important;
+        justify-content: start !important;
+    }
+
+    .seat-item {
+        width: 48px !important;
+        height: 48px !important;
+        border: 1pt solid #000 !important;
+        background: #fff !important;
+        color: #000 !important;
+        font-size: 0.6rem !important;
+        margin: 1px !important;
+        /* Ensure some spacing logic */
+    }
+
+    .seat-item.empty {
+        background: #eee !important;
+    }
+
+    .seat-item.fixed {
+        background: #fff !important;
+        border-color: #000 !important;
+    }
+
+    /* Reset all color coding in print */
+    .seat-item {
+        background: #fff !important;
+        border-color: #000 !important;
+    }
+}
 
 @page {
     size: A4 portrait;
@@ -729,5 +890,135 @@ th {
     * {
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
+    }
+}
+
+/* Context Menu */
+.context-menu {
+    position: absolute;
+    background: white;
+    border: 1px solid #ccc;
+    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);
+    z-index: 1000;
+    display: none;
+    min-width: 160px;
+    border-radius: 4px;
+    padding: 5px 0;
+}
+
+.context-menu-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: #333;
+}
+
+.context-menu-item:hover {
+    background-color: #f0f0f0;
+}
+
+.context-menu-separator {
+    height: 1px;
+    background: #e0e0e0;
+    margin: 4px 0;
+}
+
+
+/* Print Styles */
+@media print {
+    @page {
+        size: landscape;
+        margin: 5mm;
+    }
+
+    html,
+    body {
+        height: auto !important;
+        overflow: visible !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: white;
+    }
+
+    header,
+    .modal,
+    .context-menu {
+        display: none !important;
+    }
+
+    main {
+        padding: 0;
+        height: auto;
+        overflow: visible !important;
+        width: 100% !important;
+    }
+
+    /* Seating Tab Specifics */
+    #seating-content .seating-wrapper {
+        display: block !important;
+        width: 100% !important;
+    }
+
+    /* Hide the roster sidebar and controls when printing seating chart */
+    #seating-content .seating-roster-sidebar,
+    #seating-content .seating-controls {
+        display: none !important;
+    }
+
+    #seating-content .seating-main-area {
+        width: 100% !important;
+        height: auto !important;
+        overflow: visible !important;
+        border: none !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    #seatingGrid {
+        display: grid !important;
+        width: 100% !important;
+        max-width: none !important;
+        /* Remove aggressive zoom, let browser handle scale or mild zoom */
+        margin-top: 10px !important;
+        page-break-inside: avoid;
+    }
+
+    .teacher-desk {
+        display: none !important;
+    }
+
+    .teacher-desk-grid {
+        grid-column: 1 / -1 !important;
+        justify-self: center !important;
+        width: auto !important;
+        min-width: 200px !important;
+        margin: 10px 0 !important;
+        page-break-inside: avoid;
+        border: 2px solid #333 !important;
+        background-color: #f0f0f0 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+        /* Padding to match screen somewhat */
+        padding: 0.5rem 2rem !important;
+    }
+
+    /* Make sure seats look okay when printed */
+    .seat-item {
+        border: 1px solid #333 !important;
+        box-shadow: none !important;
+        break-inside: avoid;
+    }
+
+    .seat-label {
+        color: #000 !important;
+    }
+
+    .student-name {
+        font-weight: bold;
+        color: #000 !important;
+        font-size: 0.8rem;
+        /* detailed control */
     }
 }

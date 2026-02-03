@@ -227,6 +227,13 @@
                 </svg>
                 要注意学生 (Risk)
             </div>
+            <div class="nav-item" data-tab="seating" title="座席表の作成・ランダム席決めを行います">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                    stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                </svg>
+                席決め (Seats)
+            </div>
             <div class="nav-item" data-tab="settings" title="学生名や科目定義を直接編集します">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
                     stroke-width="2">
@@ -673,6 +680,109 @@
                     <div id="atRiskReportArea">
                         <div style="text-align: center; padding: 3rem; color: #94a3b8;">
                             条件を選択して「抽出実行」をクリックしてください。
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Seating Assignment View -->
+            <div id="seating-content" class="tab-content hidden fade-in">
+                <div class="card">
+                    <div class="card-header"
+                        style="justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                        <h2 class="card-title">席決め (Seating Assignment)</h2>
+                        <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;" class="no-print">
+                            <div class="control-group">
+                                <label>列:</label>
+                                <input type="number" id="seatingCols" value="7" min="1" max="20" style="width: 60px;">
+                            </div>
+                            <div class="control-group">
+                                <label>行:</label>
+                                <input type="number" id="seatingRows" value="7" min="1" max="20" style="width: 60px;">
+                            </div>
+                            <div class="control-group">
+                                <label>視点:</label>
+                                <select id="seatingPerspective" style="width: 100px;">
+                                    <option value="teacher">教員</option>
+                                    <option value="student">学生</option>
+                                </select>
+                            </div>
+                            <button class="btn btn-secondary" id="updateSeatingGridBtn">グリッド更新</button>
+                            <div class="divider-v"></div>
+                            <div class="control-group">
+                                <label>配置:</label>
+                                <select id="seatingAssignMethod" style="width: 130px;">
+                                    <option value="random">ランダム</option>
+                                    <option value="roster_v">名簿順 (縦)</option>
+                                    <option value="roster_h">名簿順 (横)</option>
+                                    <option value="grades_asc">成績順 (前=低)</option>
+                                </select>
+                                <button class="btn btn-primary" id="autoAssignBtn">実行</button>
+                            </div>
+                            <button class="btn btn-secondary" id="clearSeatingBtn">クリア</button>
+                            <div class="divider-v"></div>
+                            <div class="control-group">
+                                <label>プリセット:</label>
+                                <select id="seatingPresetSelect" style="width: 150px;">
+                                    <option value="">-- 選択 --</option>
+                                </select>
+                            </div>
+                            <button class="btn btn-secondary" id="savePresetBtn">プリセット保存</button>
+                            <button class="btn btn-secondary" id="deletePresetBtn">削除</button>
+                            <div class="divider-v"></div>
+                            <button class="btn btn-secondary" id="saveSeatingBtn">保存</button>
+                            <button class="btn btn-secondary" id="loadSeatingBtn">読込</button>
+                            <button class="btn btn-secondary" id="printSeatingBtn">印刷 (PDF)</button>
+                            <div class="divider-v"></div>
+                            <div class="control-group">
+                                <label>
+                                    <input type="checkbox" id="seatingColorByGrade"
+                                        style="width: auto; margin-right: 0.25rem;">
+                                    成績で色分け
+                                </label>
+                            </div>
+                            <div class="control-group">
+                                <label>計算方法:</label>
+                                <select id="seatingGradeMethod" style="width: 140px;">
+                                    <option value="cumulative">単純平均（累積）</option>
+                                    <option value="latest">最新テストの平均</option>
+                                </select>
+                            </div>
+                            <div id="seatingGradeMethodInfo"
+                                style="font-size: 0.75rem; color: #64748b; margin-left: 0.5rem;"></div>
+                        </div>
+                    </div>
+
+                    <div class="seating-wrapper"
+                        style="display: grid; grid-template-columns: 280px 1fr; gap: 1.5rem; margin-top: 1rem;">
+                        <!-- Roster Sidebar -->
+                        <div class="seating-roster-sidebar"
+                            style="background: #f8fafc; border-radius: 0.5rem; border: 1px solid #e2e8f0; padding: 1rem; height: 600px; display: flex; flex-direction: column;">
+                            <h3 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 0.75rem; color: #475569;">名簿
+                                (学生リスト)</h3>
+                            <div id="seatingRosterList"
+                                style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 0.25rem;">
+                                <!-- Populated by JS -->
+                            </div>
+                            <div style="margin-top: 1rem; font-size: 0.8rem; color: #64748b;">
+                                ※ 学生をドラッグして席に配置できます。<br>
+                                ※ 右クリックで固定・解除が可能です。
+                            </div>
+                        </div>
+
+                        <!-- Seating Grid -->
+                        <div style="display: flex; flex-direction: column; gap: 1rem;">
+                            <div id="seatingDesk"
+                                style="text-align: center; background: #e2e8f0; padding: 0.5rem; border-radius: 0.3rem; font-weight: bold; color: #475569;">
+                                教 卓 (前方)
+                            </div>
+                            <div id="seatingGridContainer" class="seating-grid-container"
+                                style="background: #fff; border: 1px solid #e2e8f0; border-radius: 0.5rem; padding: 1rem; overflow: auto; min-height: 500px;">
+                                <!-- Grid Canvas or Div-based Grid -->
+                                <div id="seatingGrid" style="display: grid; gap: 10px; justify-content: center;">
+                                    <!-- Populated by JS -->
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
