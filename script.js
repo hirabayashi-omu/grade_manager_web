@@ -4592,16 +4592,33 @@ function initSeating() {
 
 function renderSeatingRoster() {
     const list = document.getElementById('seatingRosterList');
-    if (!list) {
-        console.error('Element #seatingRosterList not found');
-        return;
+    if (!list) return;
+
+    // Reliability Fix: If students list is empty, try to reload from storage or defaults
+    if (!state.students || state.students.length === 0) {
+        const stored = localStorage.getItem('grade_manager_students');
+        if (stored) {
+            try {
+                const parsed = JSON.parse(stored);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    state.students = parsed;
+                }
+            } catch (e) {
+                console.error('Json parse error in roster render', e);
+            }
+        }
+
+        // If still empty, load defaults (prevents empty sidebar)
+        if (!state.students || state.students.length === 0) {
+            state.students = DEFAULT_STUDENTS_RAW.replace(/\n/g, '').split(',').map(s => s.trim()).filter(s => s);
+        }
     }
+
     list.innerHTML = '';
 
-    if (!state.students || state.students.length === 0) {
-        list.innerHTML = '<div style="padding:1rem; color: #94a3b8; font-size: 0.9rem;">学生データが見つかりません。<br>成績入力タブで名簿を確認してください。</div>';
-        return;
-    }
+    // Safety check for assignments
+    if (!state.seating) state.seating = { assignments: {} };
+    if (!state.seating.assignments) state.seating.assignments = {};
 
     // Students currently assigned to any seat
     const assignedStudents = new Set(Object.values(state.seating.assignments));
