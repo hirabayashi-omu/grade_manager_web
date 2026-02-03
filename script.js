@@ -314,6 +314,7 @@ function init() {
     setupEventListeners();
     refreshMasterData();
     mockData();
+    syncSpecialActivitiesForAll();
 
     // OPTIMIZATION: Clean up orphaned scores if they accumulate too much
     // (Prevents memory/storage bloat if many students were added/removed or due to the massive array bug)
@@ -1812,6 +1813,7 @@ function handleFileUpload(e) {
             });
 
             alert(`成績データを読み込みました: ${count} 件\n(Imported ${count} records)`);
+            syncSpecialActivitiesForAll();
             render();
             // Clear input
             e.target.value = '';
@@ -1842,10 +1844,28 @@ function renderGraduationRequirements() {
 
     // Logic to identify passed subjects
     const isPassed = (sub) => {
-        const score = getScore(studentName, sub.name, '学年末');
-        if (score === '認' || score === '履' || score === '修' || score === '合') return true;
-        const n = parseFloat(score);
-        return !isNaN(n) && n >= 60;
+        const scoreObj = (state.scores[studentName] || {})[sub.name];
+        if (!scoreObj) return false;
+
+        // Special Activities: Passed if "履" exists in any column OR any data in "学年末"
+        if (sub.name.includes('特別活動')) {
+            const finalVal = scoreObj['学年末'];
+            const hasFinalData = (finalVal !== undefined && finalVal !== null && finalVal !== '' && finalVal !== '-');
+            const hasAttended = SCORE_KEYS.some(k => scoreObj[k] === '履');
+            if (hasFinalData || hasAttended) return true;
+        }
+
+        // Regular Subjects: Passed if numeric score >= 60 in '学年末'
+        const finalScore = scoreObj['学年末'];
+        const n = parseFloat(finalScore);
+        if (!isNaN(n) && n >= 60) return true;
+
+        // All Subjects: Passed if a passing status string is found in any column
+        const passingStatuses = ['合', '合格', '認', '認定', 'A', 'B', 'C', '履', '修'];
+        return SCORE_KEYS.some(k => {
+            const val = scoreObj[k];
+            return val !== undefined && val !== null && typeof val === 'string' && passingStatuses.includes(val.trim());
+        });
     };
 
     // Filters and counts
@@ -2058,129 +2078,13 @@ function renderGraduationRequirements() {
         detailsBody.appendChild(tr);
     });
 
-    // Render Gantt Chart
+    // Render Gantt Charts
+    renderMandatoryGanttChart(studentName, subjects, isPassed);
     renderDPGanttChart(studentName, subjects, isPassed);
 }
 
-function renderDPGanttChart(studentName, subjects, isPassed) {
-    const container = document.getElementById('dpGanttChartContainer');
-    if (!container) return;
-    container.innerHTML = '';
 
-    const dps = ['DP-A', 'DP-B', 'DP-C', 'DP-D', 'DP-E', 'SDGs'];
-    const years = [1, 2, 3, 4, 5];
 
-    const table = document.createElement('table');
-    table.style.width = '100%';
-    table.style.borderCollapse = 'collapse';
-    table.style.fontSize = '0.85rem';
-    table.style.minWidth = '800px';
-
-    // Header
-    const thead = document.createElement('thead');
-    const headerRow = document.createElement('tr');
-    headerRow.innerHTML = `<th style="width: 120px; padding: 0.75rem; border: 1px solid #e2e8f0; background: #f1f5f9; text-align: left; position: sticky; left: 0; z-index: 10;">項目</th>`;
-    years.forEach(y => {
-        const isPastOrCurrent = (y <= state.currentYear);
-        const bg = isPastOrCurrent ? '#e2e8f0' : '#f1f5f9';
-        headerRow.innerHTML += `<th style="padding: 0.75rem; border: 1px solid #e2e8f0; background: ${bg}; text-align: center;">${y}年</th>`;
-    });
-    thead.appendChild(headerRow);
-    table.appendChild(thead);
-
-    // Body
-    const tbody = document.createElement('tbody');
-    dps.forEach(dp => {
-        const row = document.createElement('tr');
-        row.innerHTML = `<td style="padding: 0.75rem; border: 1px solid #e2e8f0; font-weight: 700; background: #f8fafc; color: #1e293b; position: sticky; left: 0; z-index: 5;">${dp}</td>`;
-
-        years.forEach(y => {
-            const td = document.createElement('td');
-            td.style.padding = '0.6rem';
-            td.style.border = '1px solid #e2e8f0';
-            td.style.verticalAlign = 'top';
-            td.style.minWidth = '140px';
-
-            // Background logic for past/current years
-            const isPastOrCurrent = (y <= state.currentYear);
-            td.style.background = isPastOrCurrent ? '#f1f5f9' : '#fff';
-
-            const filtered = subjects.filter(s => {
-                const type3 = (s.type3 || '').toLowerCase();
-                const dpTarget = dp.toLowerCase();
-                const belongsToDp = type3.split(',').some(part => part.trim() === dpTarget);
-                if (!belongsToDp) return false;
-
-                // Match academic year: Either fixed year or float year (year 0) assigned to this year
-                let yearMatches = (s.year === y);
-                if (s.year === 0) {
-                    const scoreObj = (state.scores[studentName] || {})[s.name];
-                    yearMatches = (scoreObj && scoreObj.obtainedYear === y);
-                }
-                if (!yearMatches) return false;
-
-                // SPECIAL FILTER: For past/current years, exclude subjects with no input
-                if (isPastOrCurrent) {
-                    const scoreObj = (state.scores[studentName] || {})[s.name];
-                    const hasInput = scoreObj && SCORE_KEYS.some(k => {
-                        const val = scoreObj[k];
-                        return val !== undefined && val !== null && val !== '';
-                    });
-                    if (!hasInput) return false;
-                }
-
-                return true;
-            });
-
-            if (filtered.length === 0) {
-                td.innerHTML = '<div style="color: #cbd5e1; text-align: center; font-size: 0.75rem; margin-top: 0.5rem;">-</div>';
-            } else {
-                const listWrapper = document.createElement('div');
-                listWrapper.style.display = 'flex';
-                listWrapper.style.flexDirection = 'column';
-                listWrapper.style.gap = '0.5rem';
-
-                filtered.forEach(sub => {
-                    const passed = isPassed(sub);
-                    const block = document.createElement('div');
-                    block.style.padding = '0.5rem 0.75rem';
-                    block.style.borderRadius = '0.4rem';
-                    block.style.fontSize = '0.75rem';
-                    block.style.color = '#fff';
-                    block.style.fontWeight = '600';
-                    block.style.lineHeight = '1.3';
-                    block.style.boxShadow = '0 1px 2px rgba(0,0,0,0.05)';
-                    block.style.transition = 'transform 0.1s ease';
-                    block.style.cursor = 'default';
-
-                    // Colors based on Status
-                    if (passed) {
-                        block.style.background = '#10b981'; // Success Green
-                        block.style.borderLeft = '4px solid #059669';
-                    } else {
-                        block.style.background = '#3b82f6'; // Primary Blue
-                        block.style.borderLeft = '4px solid #2563eb';
-                        block.style.opacity = '0.85';
-                    }
-
-                    block.textContent = `${sub.name} (${sub.credits})`;
-                    block.title = `${sub.name}\n単位: ${sub.credits}\n状況: ${passed ? '修得済み' : '開講予定'}`;
-
-                    // Hover effect
-                    block.onmouseover = () => { block.style.transform = 'translateY(-1px)'; block.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.1)'; };
-                    block.onmouseout = () => { block.style.transform = 'translateY(0)'; block.style.boxShadow = '0 1px 2px rgba(0,0,0,0.05)'; };
-
-                    listWrapper.appendChild(block);
-                });
-                td.appendChild(listWrapper);
-            }
-            row.appendChild(td);
-        });
-        tbody.appendChild(row);
-    });
-    table.appendChild(tbody);
-    container.appendChild(table);
-}
 
 // ==================== RENDERING ====================
 function render() {
@@ -3008,6 +2912,45 @@ function validateInput(input, value, subjectName) {
     }
 }
 
+/**
+ * Global Sync: For all students and all years (1-5),
+ * if there's any non-special subject with a "Year End" score,
+ * automatically set the corresponding "Special Activity" to "履".
+ */
+function syncSpecialActivitiesForAll() {
+    const years = [1, 2, 3, 4, 5];
+    state.students.forEach(student => {
+        const studentScores = state.scores[student];
+        if (!studentScores) return;
+
+        years.forEach(year => {
+            // Check if any standard subject in this year has a Year End score
+            const hasYearEndData = state.subjects.some(sub => {
+                if (sub.name.includes('特別活動')) return false;
+
+                // Year match logic (standard or floater)
+                let matchesYear = (sub.year === year);
+                if (sub.year === 0) {
+                    matchesYear = (studentScores[sub.name] && studentScores[sub.name].obtainedYear === year);
+                }
+                if (!matchesYear) return false;
+
+                const scoreObj = studentScores[sub.name];
+                return scoreObj && scoreObj['学年末'] && scoreObj['学年末'] !== '' && scoreObj['学年末'] !== '-';
+            });
+
+            if (hasYearEndData) {
+                const spActName = `特・特別活動${year}`;
+                if (state.subjects.some(s => s.name === spActName)) {
+                    if (!studentScores[spActName]) studentScores[spActName] = {};
+                    studentScores[spActName]['学年末'] = '履';
+                }
+            }
+        });
+    });
+    saveSessionState();
+}
+
 function updateScore(student, subject, key, value) {
     if (!state.scores[student]) state.scores[student] = {};
     if (!state.scores[student][subject]) state.scores[student][subject] = {};
@@ -3032,6 +2975,21 @@ function updateScore(student, subject, key, value) {
         state.scores[student][subject][key] = parseFloat(value);
     } else {
         state.scores[student][subject][key] = value;
+    }
+
+    // Auto-mark Special Activities "履" when any Year End score for that year is entered
+    if (key === '学年末' && value !== '' && value !== '-' && !subject.includes('特別活動')) {
+        let sy = 0;
+        if (subDef) {
+            sy = (subDef.year !== 0) ? subDef.year : (state.scores[student][subject].obtainedYear || state.currentYear);
+        }
+        if (sy > 0) {
+            const spActName = `特・特別活動${sy}`;
+            if (state.subjects.some(s => s.name === spActName)) {
+                if (!state.scores[student][spActName]) state.scores[student][spActName] = {};
+                state.scores[student][spActName]['学年末'] = '履';
+            }
+        }
     }
 
     // Global auto-save on every keystroke/change
@@ -3287,29 +3245,32 @@ function renderStats() {
         let currentYearSpecial = 0;
 
         subjects.forEach(sub => {
-            const score = getScore(state.currentStudent, sub.name, '学年末');
-            // Support both numeric pass (>=60) and string pass
+            const scoreObj = (state.scores[state.currentStudent] || {})[sub.name];
+            if (!scoreObj) return;
+
             let passed = false;
-            if (typeof score === 'number') {
-                passed = score >= 60;
-            } else if (typeof score === 'string' && score.trim() !== '') {
-                // Check if it is a known Pass string or NOT a known Fail string
-                // Known Fails: 否, 不可, D, F, Fail
-                // Known Passes: 合, 合格, 認, 認定, A, B, C
-                const s = score.trim();
-                if (['合', '合格', '認', '認定', 'A', 'B', 'C', '履'].includes(s)) passed = true;
-                else if (!['否', '不可', 'D', 'F', 'Fail'].includes(s)) passed = true; // Assume pass if not fail? Safest is explicit.
+            if (sub.name.includes('特別活動')) {
+                const finalVal = scoreObj['学年末'];
+                const hasFinalData = (finalVal !== undefined && finalVal !== null && finalVal !== '' && finalVal !== '-');
+                const hasAttended = SCORE_KEYS.some(k => scoreObj[k] === '履');
+                passed = hasFinalData || hasAttended;
+            } else {
+                const f = scoreObj['学年末'];
+                const n = parseFloat(f);
+                if (!isNaN(n) && n >= 60) {
+                    passed = true;
+                } else {
+                    const passingStatuses = ['合', '合格', '認', '認定', 'A', 'B', 'C', '履', '修'];
+                    passed = SCORE_KEYS.some(k => {
+                        const val = scoreObj[k];
+                        return val !== undefined && val !== null && typeof val === 'string' && passingStatuses.includes(val.trim());
+                    });
+                }
 
-                // Explicit check for Special Study default value "認"
-                if (s === '認') passed = true;
-            }
-
-            // Special handling for Special Studies: strict pass if record exists?
-            // Since UI forces "認", we should treat existence of record as pass for stats to match UI.
-            if (sub.name.startsWith('特・')) {
-                const scoreEntry = state.scores[state.currentStudent] && state.scores[state.currentStudent][sub.name];
-                // If entry exists (meaning it was in CSV for this student), count it.
-                if (scoreEntry) passed = true;
+                // Keep the existence-based pass for other "特・" subjects for compatibility
+                if (!passed && sub.name.startsWith('特・')) {
+                    passed = true;
+                }
             }
 
             if (passed) {
@@ -4336,4 +4297,135 @@ function renderAtRiskReport() {
     `;
 
     reportArea.innerHTML = html;
+}
+
+function renderMandatoryGanttChart(studentName, subjects, isPassed) {
+    const categories = [
+        { name: '一般必修', filter: s => s.type2 === '一般' && ['必', '必修', '必修得'].includes(s.type1) },
+        { name: '専門必修', filter: s => s.type2 !== '一般' && s.type2 !== 'その他' && ['必', '必修', '必修得'].includes(s.type1) },
+        { name: '特別・その他必修', filter: s => (s.type2 === 'その他' || s.name.startsWith('特・') || s.name.includes('特別活動')) && ['必', '必修', '必修得'].includes(s.type1) }
+    ];
+    renderGenericGanttChart('mandatoryGanttChartContainer', studentName, categories, subjects, isPassed, true);
+}
+
+function renderDPGanttChart(studentName, subjects, isPassed) {
+    const dps = ['DP-A', 'DP-B', 'DP-C', 'DP-D', 'DP-E', 'SDGs'];
+    const categories = dps.map(dp => ({
+        name: dp,
+        filter: s => {
+            const type3 = (s.type3 || '').toLowerCase();
+            const dpTarget = dp.toLowerCase();
+            return type3.split(',').some(part => part.trim() === dpTarget);
+        }
+    }));
+    renderGenericGanttChart('dpGanttChartContainer', studentName, categories, subjects, isPassed, false);
+}
+
+function renderGenericGanttChart(containerId, studentName, categories, subjects, isPassed, alwaysShowAll = false) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    container.innerHTML = '';
+
+    const years = [1, 2, 3, 4, 5];
+    const table = document.createElement('table');
+    table.style.width = '100%';
+    table.style.borderCollapse = 'collapse';
+    table.style.fontSize = '0.85rem';
+    table.style.minWidth = '800px';
+
+    // Header
+    const thead = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+    headerRow.innerHTML = `<th style="width: 120px; padding: 0.75rem; border: 1px solid #e2e8f0; background: #f1f5f9; text-align: left; position: sticky; left: 0; z-index: 10;">項目</th>`;
+    years.forEach(y => {
+        const isPastOrCurrent = (y <= state.currentYear);
+        const bg = isPastOrCurrent ? '#e2e8f0' : '#f1f5f9';
+        headerRow.innerHTML += `<th style="padding: 0.75rem; border: 1px solid #e2e8f0; background: ${bg}; text-align: center;">${y}年</th>`;
+    });
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    // Body
+    const tbody = document.createElement('tbody');
+    categories.forEach(cat => {
+        const row = document.createElement('tr');
+        row.innerHTML = `<td style="padding: 0.75rem; border: 1px solid #e2e8f0; font-weight: 700; background: #f8fafc; color: #1e293b; position: sticky; left: 0; z-index: 5;">${cat.name}</td>`;
+
+        years.forEach(y => {
+            const td = document.createElement('td');
+            td.style.padding = '0.6rem';
+            td.style.border = '1px solid #e2e8f0';
+            td.style.verticalAlign = 'top';
+            td.style.minWidth = '140px';
+
+            const isPastOrCurrent = (y <= state.currentYear);
+            td.style.background = isPastOrCurrent ? '#f1f5f9' : '#fff';
+
+            const filtered = subjects.filter(s => {
+                if (!cat.filter(s)) return false;
+                let yearMatches = (s.year === y);
+                if (s.year === 0) {
+                    const scoreObj = (state.scores[studentName] || {})[s.name];
+                    yearMatches = (scoreObj && scoreObj.obtainedYear === y);
+                }
+                if (!yearMatches) return false;
+
+                // SPECIAL FILTER: For past/current years, exclude subjects with no input
+                // BUT skip this filter if alwaysShowAll is true (e.g. for Mandatory chart)
+                if (isPastOrCurrent && !alwaysShowAll) {
+                    const scoreObj = (state.scores[studentName] || {})[s.name];
+                    const hasInput = scoreObj && SCORE_KEYS.some(k => {
+                        const val = scoreObj[k];
+                        return val !== undefined && val !== null && val !== '';
+                    });
+                    if (!hasInput) return false;
+                }
+                return true;
+            });
+
+            if (filtered.length === 0) {
+                td.innerHTML = '<div style="color: #cbd5e1; text-align: center; font-size: 0.75rem; margin-top: 0.5rem;">-</div>';
+            } else {
+                const listWrapper = document.createElement('div');
+                listWrapper.style.display = 'flex';
+                listWrapper.style.flexDirection = 'column';
+                listWrapper.style.gap = '0.5rem';
+
+                filtered.forEach(sub => {
+                    const passed = isPassed(sub);
+                    const block = document.createElement('div');
+                    block.style.padding = '0.5rem 0.75rem';
+                    block.style.borderRadius = '0.4rem';
+                    block.style.fontSize = '0.75rem';
+                    block.style.color = '#fff';
+                    block.style.fontWeight = '600';
+                    block.style.lineHeight = '1.3';
+                    block.style.boxShadow = '0 1px 2px rgba(0,0,0,0.05)';
+                    block.style.transition = 'transform 0.1s ease';
+                    block.style.cursor = 'default';
+
+                    if (passed) {
+                        block.style.background = '#10b981';
+                        block.style.borderLeft = '4px solid #059669';
+                    } else {
+                        block.style.background = '#3b82f6';
+                        block.style.borderLeft = '4px solid #2563eb';
+                        block.style.opacity = '0.85';
+                    }
+
+                    block.textContent = `${sub.name} (${sub.credits})`;
+                    block.title = `${sub.name}\n単位: ${sub.credits}\n状況: ${passed ? '修得済み' : '開講予定'}`;
+                    block.onmouseover = () => { block.style.transform = 'translateY(-1px)'; block.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.1)'; };
+                    block.onmouseout = () => { block.style.transform = 'translateY(0)'; block.style.boxShadow = '0 1px 2px rgba(0,0,0,0.05)'; };
+
+                    listWrapper.appendChild(block);
+                });
+                td.appendChild(listWrapper);
+            }
+            row.appendChild(td);
+        });
+        tbody.appendChild(row);
+    });
+    table.appendChild(tbody);
+    container.appendChild(table);
 }

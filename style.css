@@ -690,6 +690,42 @@ th {
         margin-bottom: 4mm !important;
     }
 
+    /* Gantt Chart Print Fixes */
+    #dpGanttChartContainer,
+    #mandatoryGanttChartContainer {
+        overflow: visible !important;
+        width: 100% !important;
+        padding: 0 !important;
+    }
+
+    #dpGanttChartContainer table,
+    #mandatoryGanttChartContainer table {
+        min-width: 0 !important;
+        width: 100% !important;
+        table-layout: fixed !important;
+        border: 0.5pt solid #e2e8f0;
+    }
+
+    #dpGanttChartContainer th,
+    #dpGanttChartContainer td,
+    #mandatoryGanttChartContainer th,
+    #mandatoryGanttChartContainer td {
+        position: static !important;
+        /* Disable sticky for print */
+        font-size: 6.5pt !important;
+        /* Smaller text to fit 5 years + DP title */
+        padding: 2px !important;
+        word-break: break-all;
+    }
+
+    #dpGanttChartContainer th:first-child,
+    #dpGanttChartContainer td:first-child,
+    #mandatoryGanttChartContainer th:first-child,
+    #mandatoryGanttChartContainer td:first-child {
+        width: 45pt !important;
+        /* Narrower DP/Category label column */
+    }
+
     * {
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
