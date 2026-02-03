@@ -576,8 +576,11 @@ th {
 
 .seat-item.disabled {
     opacity: 0.3;
-    pointer-events: none;
     background: #e2e8f0;
+    cursor: default;
+    transform: none !important;
+    box-shadow: none !important;
+    border-color: #cbd5e1 !important;
 }
 
 .seat-item.fixed {
