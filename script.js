@@ -4833,55 +4833,7 @@ function assignStudentToSeat(studentName, targetPos, sourcePos) {
     renderSeatingGrid();
 }
 
-function showSeatingContextMenu(e, pos) {
-    const isFixed = state.seating.fixed.includes(pos);
-    const isDisabled = state.seating.disabled.includes(pos);
-    const hasStudent = !!state.seating.assignments[pos];
 
-    const menu = document.createElement('div');
-    menu.style.cssText = `
-        position: fixed;
-        left: ${e.clientX}px;
-        top: ${e.clientY}px;
-        background: white;
-        border: 1px solid #e2e8f0;
-        box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
-        border-radius: 0.5rem;
-        z-index: 10000;
-        padding: 0.5rem 0;
-        min-width: 150px;
-    `;
-
-    const options = [
-        { label: isFixed ? '📌 固定解除' : '📌 位置を固定', action: () => toggleFixed(pos), active: hasStudent },
-        { label: isDisabled ? '✅ 有効化' : '🚫 無効化 (壁など)', action: () => toggleDisabled(pos), active: !hasStudent },
-        { label: '🗑️ 割当解除', action: () => unassignSeat(pos), active: hasStudent }
-    ];
-
-    options.forEach(opt => {
-        if (!opt.active) return;
-        const item = document.createElement('div');
-        item.textContent = opt.label;
-        item.style.cssText = 'padding: 0.5rem 1rem; cursor: pointer; font-size: 0.9rem; color: #475569;';
-        item.onmouseover = () => item.style.background = '#f1f5f9';
-        item.onmouseout = () => item.style.background = 'transparent';
-        item.onclick = () => {
-            opt.action();
-            if (menu.parentElement) document.body.removeChild(menu);
-        };
-        menu.appendChild(item);
-    });
-
-    const closeMenu = (ev) => {
-        if (menu.parentElement && !menu.contains(ev.target)) {
-            document.body.removeChild(menu);
-            window.removeEventListener('mousedown', closeMenu);
-        }
-    };
-
-    window.addEventListener('mousedown', closeMenu);
-    document.body.appendChild(menu);
-}
 
 function toggleFixed(pos) {
     const idx = state.seating.fixed.indexOf(pos);
@@ -5439,6 +5391,7 @@ function initContextMenu() {
 
 function showSeatContextMenu(e, pos) {
     e.preventDefault();
+    e.stopPropagation();
     currentContextMenuSeat = pos;
     const menu = document.getElementById('seatContextMenu');
     if (menu) {
@@ -5450,9 +5403,11 @@ function showSeatContextMenu(e, pos) {
         if (clearItem) clearItem.style.display = hasStudent ? 'block' : 'none';
         if (sep) sep.style.display = hasStudent ? 'block' : 'none';
 
-        menu.style.left = e.pageX + 'px';
-        menu.style.top = e.pageY + 'px';
+        menu.style.left = e.clientX + 'px';
+        menu.style.top = e.clientY + 'px';
         menu.style.display = 'block';
+        menu.style.visibility = 'visible'; // Ensure visibility
+        menu.style.zIndex = '30000'; // Extra high z-index
     }
 }
 

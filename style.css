@@ -581,6 +581,8 @@ th {
     transform: none !important;
     box-shadow: none !important;
     border-color: #cbd5e1 !important;
+    pointer-events: auto !important;
+    user-select: auto !important;
 }
 
 .seat-item.fixed {
@@ -898,11 +900,11 @@ th {
 
 /* Context Menu */
 .context-menu {
-    position: absolute;
+    position: fixed;
     background: white;
     border: 1px solid #ccc;
     box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);
-    z-index: 1000;
+    z-index: 20000;
     display: none;
     min-width: 160px;
     border-radius: 4px;
