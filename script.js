@@ -1005,16 +1005,6 @@ function switchTab(tabName) {
     // Add tab-specific class to body for CSS targeting (especially for print)
     document.body.className = `tab-${tabName}`;
 
-    // Update Header Title dynamically
-    const logoEl = document.querySelector('.logo');
-    if (logoEl) {
-        if (tabName === 'seating') {
-            logoEl.innerHTML = '<i class="fas fa-chair"></i> 席決め';
-        } else {
-            logoEl.innerHTML = '<i class="fas fa-chart-line"></i> 成績レポート';
-        }
-    }
-
     document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
     document.getElementById(`${tabName}-content`).classList.remove('hidden');
 
