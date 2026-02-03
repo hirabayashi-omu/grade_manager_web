@@ -5501,5 +5501,6 @@ function handleSeatMenuAction(action, pos) {
     }
 
     saveSessionState();
+    renderSeatingRoster();
     renderSeatingGrid();
 }
