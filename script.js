@@ -2167,49 +2167,6 @@ function clearAllDataHard() {
     }
 }
 
-function handleJsonImport(file) {
-    const reader = new FileReader();
-    reader.onload = function (evt) {
-        try {
-            const jsonData = JSON.parse(evt.target.result);
-
-            // Validate JSON structure
-            if (!jsonData.scores) {
-                throw new Error('Invalid JSON format: missing scores data');
-            }
-
-            // Import scores
-            state.scores = jsonData.scores;
-
-            // Import custom subjects if available
-            if (jsonData.customSubjects && Array.isArray(jsonData.customSubjects)) {
-                jsonData.customSubjects.forEach(customSub => {
-                    // Only add if not already in the list
-                    if (!state.subjects.find(s => normalizeStr(s.name) === normalizeStr(customSub.name))) {
-                        state.subjects.push(customSub);
-                    }
-                });
-            }
-
-            // Save to localStorage
-            saveData();
-
-            // Set default year based on imported data
-            setDefaultYear();
-
-            // Re-render
-            render();
-
-            const importDate = jsonData.exportDate ? new Date(jsonData.exportDate).toLocaleString() : '不明';
-            alert(`JSONファイルを読み込みました\nエクスポート日時: ${importDate}\n\nJSON file imported\nExport date: ${importDate}`);
-
-        } catch (err) {
-            alert(`JSONファイルの読み込みに失敗しました\nエラー: ${err.message}\n\nFailed to import JSON file\nError: ${err.message}`);
-        }
-    };
-    reader.readAsText(file);
-}
-
 function parseCSV(text) {
     const rows = [];
     let row = [];
@@ -2262,9 +2219,8 @@ function handleFileUpload(e) {
     const fileName = file.name.toLowerCase();
 
     if (fileName.endsWith('.json')) {
-        // Handle JSON file
-        handleJsonImport(file);
-        e.target.value = ''; // Clear input
+        // Handle JSON file - pass the event to handleJsonImport
+        handleJsonImport(e);
         return;
     }
 

@@ -1249,6 +1249,12 @@
                             <li><strong>パスワード保護:</strong> 起動時にSHA-256ハッシュによるパスワード認証が必要です。設定で変更や保護の解除も可能です。</li>
                             <li style="color: #b91c1c; font-weight: bold;">使用上の注意:
                                 共用PCでは必ず「Logout」して終了してください（パスワード入力画面に戻ります）。</li>
+                            <li style="color: #b91c1c; font-weight: bold;">データバックアップ:
+                                重要なデータは定期的に「JSON/Score」でエクスポートしてバックアップを取ることを強く推奨します。ブラウザのデータ削除やキャッシュクリアでデータが失われる可能性があります。
+                            </li>
+                            <li style="color: #b91c1c; font-weight: bold;">機密情報の取り扱い:
+                                生成ファイルやキャッシュに機密３情報を含む可能性がありますので、学校の管理下にある端末でご使用ください。
+                            </li>
                         </ul>
                     </div>
                 </div>
@@ -1264,26 +1270,74 @@
                                     <th style="padding: 10px; border: 1px solid #cbd5e1;">形式</th>
                                     <th style="padding: 10px; border: 1px solid #cbd5e1;">用途</th>
                                     <th style="padding: 10px; border: 1px solid #cbd5e1;">内容</th>
+                                    <th style="padding: 10px; border: 1px solid #cbd5e1;">操作場所</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr>
                                     <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">PDF</td>
-                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">配布・印刷用</td>
-                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">個人成績レポート、推移グラフ、クラス順位表、要抽出結果など
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">配布・印刷用（出力のみ）</td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">
+                                        個人成績レポート、推移グラフ、クラス順位表、要注意者抽出結果など
                                     </td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">ヘッダー「PDF」ボタン</td>
                                 </tr>
                                 <tr>
                                     <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">JSON</td>
-                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">バックアップ</td>
-                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">学生・科目定義・全スコアを含む完全なデータのアーカイブ
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">バックアップ・復元</td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">
+                                        <strong>出力:</strong> 全スコアデータと特別学修科目定義を含む完全バックアップ<br>
+                                        <strong>読込:</strong> エクスポートしたJSONファイルから成績データを復元
+                                    </td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">ヘッダー「JSON/Score」「JSON/Load」ボタン
                                     </td>
                                 </tr>
                                 <tr>
-                                    <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">CSV</td>
-                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">データ移行・加工</td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">CSV<br>(学生)
+                                    </td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">学生リスト管理</td>
                                     <td style="padding: 10px; border: 1px solid #e2e8f0;">
-                                        学生リスト、科目設定リスト、クラス統計一覧表（Excel等で閲覧可能）</td>
+                                        <strong>出力:</strong> 学生名とメタデータ（学年、組、出席番号など）を含むリスト<br>
+                                        <strong>読込:</strong> 学生名とメタデータの一括登録・更新
+                                    </td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">設定タブ「学生リスト」セクション</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">CSV<br>(科目)
+                                    </td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">科目定義管理</td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">
+                                        <strong>出力:</strong> 全学年の科目定義（科目名、単位数、学年、種別など）<br>
+                                        <strong>読込:</strong> 科目定義の一括登録・更新
+                                    </td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">設定タブ「全学年科目定義」セクション</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">CSV<br>(名簿)
+                                    </td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">学生名簿取り込み</td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">
+                                        <strong>読込:</strong> 学籍番号、氏名、学年、組、性別、コースなどの詳細情報を含む名簿データ（プレビュー機能付き）
+                                    </td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">「名簿管理・取り込み」タブ</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">
+                                        CSV<br>(教職員)</td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">教職員名簿管理</td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">
+                                        <strong>読込:</strong> 教職員の氏名、メールアドレス、部署、役職などの情報（Teams連携・メール送信機能対応）
+                                    </td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">「教職員名簿」タブ</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">
+                                        JSON<br>(座席)</td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">座席配置保存</td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">
+                                        座席レイアウト（行列数、無効席）と学生配置情報のプリセット保存・読込（複数保存可能）
+                                    </td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">「席決め」タブ</td>
                                 </tr>
                             </tbody>
                         </table>
