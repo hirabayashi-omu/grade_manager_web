@@ -871,11 +871,35 @@ function setupEventListeners() {
     });
     document.getElementById('csvFileInput')?.addEventListener('change', handleFileUpload);
 
-    // New Roster Import
+    // New Roster Import (Settings Tab)
     document.getElementById('rosterImportBtn')?.addEventListener('click', () => {
         document.getElementById('rosterFileInput')?.click();
     });
+    // This is shared input for both
     document.getElementById('rosterFileInput')?.addEventListener('change', handleRosterSelect);
+
+    // Roster Board Controls (New Listeners)
+    document.getElementById('triggerRosterLoadBtn')?.addEventListener('click', () => {
+        document.getElementById('rosterFileInput')?.click();
+    });
+    document.getElementById('applyRosterImportBtn')?.addEventListener('click', confirmImportFromBoard);
+    document.getElementById('teamsChatSelectedBtn')?.addEventListener('click', openTeamsChatForSelected);
+    document.getElementById('sendMailSelectedBtn')?.addEventListener('click', openMailForSelected);
+
+    document.getElementById('rosterSortSelect')?.addEventListener('change', (e) => {
+        importState.sortMethod = e.target.value;
+        renderRosterBoardTable();
+    });
+
+    document.getElementById('rosterSelectAll')?.addEventListener('click', (e) => {
+        const checked = e.target.checked;
+        const visible = getFilteredAndSortedCandidates();
+        visible.forEach(c => {
+            if (checked) importState.selected.add(c.name);
+            else importState.selected.delete(c.name);
+        });
+        renderRosterBoardTable();
+    });
 
     // Paste Modal
     document.getElementById('closeModalBtn')?.addEventListener('click', closePasteModal);
@@ -5712,27 +5736,10 @@ function initRosterBoard() {
 }
 
 // Event Listeners for Roster Board
-document.getElementById('triggerRosterLoadBtn')?.addEventListener('click', () => {
-    document.getElementById('rosterFileInput')?.click();
-});
-document.getElementById('applyRosterImportBtn')?.addEventListener('click', confirmImportFromBoard);
-document.getElementById('teamsChatSelectedBtn')?.addEventListener('click', openTeamsChatForSelected);
-document.getElementById('sendMailSelectedBtn')?.addEventListener('click', openMailForSelected);
+// Event Listeners for Roster Board moved to setupEventListeners()
+// to ensure DOM readiness.
 
-document.getElementById('rosterSortSelect')?.addEventListener('change', (e) => {
-    importState.sortMethod = e.target.value;
-    renderRosterBoardTable();
-});
-
-document.getElementById('rosterSelectAll')?.addEventListener('click', (e) => {
-    const checked = e.target.checked;
-    const visible = getFilteredAndSortedCandidates();
-    visible.forEach(c => {
-        if (checked) importState.selected.add(c.name);
-        else importState.selected.delete(c.name);
-    });
-    renderRosterBoardTable();
-});
+// rosterSelectAll listener moved to setupEventListeners
 
 
 // Logic called after CSV parsing
