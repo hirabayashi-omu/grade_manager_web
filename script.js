@@ -248,7 +248,10 @@ let state = {
         gradeThreshold: 60,
         gradeMethod: 'cumulative'
     },
-    seatingPresets: []
+    seatingPresets: [],
+    seatingPresets: [],
+    studentMetadata: {}, // Store tag info (extra columns from roster)
+    nameDisplayMode: 'name' // 'name' or 'initial'
 };
 
 const SCORE_KEYS = ["前期中間", "前期末", "後期中間", "学年末"];
@@ -256,6 +259,15 @@ const SCORE_KEYS_EN = ["earlyMid", "earlyFinal", "lateMid", "lateFinal"]; // map
 
 // Current pasting target
 let currentPasteKey = null;
+
+// Import State
+let importState = {
+    candidates: [], // { name, sortKey, metadata }
+    filters: {},    // { key: selectedValue }
+    selected: new Set(),
+    sortKey: 'original', // 'year', 'class', 'no', 'name', ...
+    sortOrder: 'asc' // 'asc' or 'desc'
+};
 
 // ==================== STATE PERSISTENCE ====================
 // ==================== STATE PERSISTENCE ====================
@@ -272,10 +284,13 @@ function saveSessionState() {
         localStorage.setItem('gm_state_boxplot_year', state.boxPlotYear || '');
         localStorage.setItem('gm_state_boxplot_test', state.boxPlotTest || '');
         localStorage.setItem('gm_state_course', state.currentCourse || '');
+        localStorage.setItem('gm_state_course', state.currentCourse || '');
+        localStorage.setItem('gm_state_name_display', state.nameDisplayMode || 'name');
         localStorage.setItem('gm_state_seating', JSON.stringify(state.seating));
 
         // Auto-save the actual lists and scores so everything is remembered on reload
         localStorage.setItem('grade_manager_students', JSON.stringify(state.students));
+        localStorage.setItem('gm_student_metadata', JSON.stringify(state.studentMetadata));
         localStorage.setItem('gm_master_subjects_json', JSON.stringify(state.subjects));
         localStorage.setItem('grade_manager_scores', JSON.stringify(state.scores));
 
@@ -295,17 +310,22 @@ function loadSessionState() {
     const savedBPYear = localStorage.getItem('gm_state_boxplot_year');
     const savedBPTest = localStorage.getItem('gm_state_boxplot_test');
     const savedCourse = localStorage.getItem('gm_state_course');
+    const savedNameDisplay = localStorage.getItem('gm_state_name_display');
     const savedSeating = localStorage.getItem('gm_state_seating');
 
     if (savedTab) state.currentTab = savedTab;
     if (savedHideEmpty !== null) state.hideEmptySubjects = (savedHideEmpty === 'true');
     if (savedBPYear) state.boxPlotYear = parseInt(savedBPYear);
     if (savedBPTest) state.boxPlotTest = savedBPTest;
+    if (savedBPTest) state.boxPlotTest = savedBPTest;
     if (savedCourse !== null) state.currentCourse = savedCourse;
+    if (savedNameDisplay) state.nameDisplayMode = savedNameDisplay;
     if (savedSeating) state.seating = JSON.parse(savedSeating);
 
     // Load presets (Isolated function)
     loadPresetsOnly();
+
+    // Student Metadata is now loaded in refreshMasterData() to ensure availability
 
     // MIGRATION: Rename courses to formal names
     const courseMap = {
@@ -366,8 +386,13 @@ function init() {
 
     populateControls();
 
-    // Set current year to the latest year that has actual grade data
-    setDefaultYear();
+    // Set default year if not loaded or invalid, otherwise respect saved year
+    if (!state.currentYear) {
+        setDefaultYear();
+    }
+
+    // Roster Board Sort Listeners
+    setupRosterHeaderSort();
 
     initAtRiskDefaults();
     initContextMenu(); // Initialize menu once at startup
@@ -639,6 +664,19 @@ function refreshMasterData() {
         state.currentStudent = state.students[0] || null;
     }
 
+    // A-2. Student Metadata (Ensure this is loaded with students)
+    const storedMetadata = localStorage.getItem('gm_student_metadata');
+    if (storedMetadata) {
+        try {
+            state.studentMetadata = JSON.parse(storedMetadata);
+        } catch (e) {
+            console.error('Failed to parse student metadata:', e);
+            state.studentMetadata = {};
+        }
+    } else {
+        state.studentMetadata = {};
+    }
+
     // B. Subjects
     state.subjects = [];
 
@@ -756,10 +794,22 @@ function populateControls() {
         state.students.forEach(s => {
             const opt = document.createElement('option');
             opt.value = s;
-            opt.textContent = s;
+            opt.textContent = getDisplayName(s);
+            if (s === state.currentStudent) opt.selected = true;
             studentSelect.appendChild(opt);
         });
-        studentSelect.value = state.currentStudent;
+        // If empty
+        if (state.students.length === 0) {
+            const opt = document.createElement('option');
+            opt.textContent = '(学生なし)';
+            studentSelect.appendChild(opt);
+        }
+    }
+
+    // Initialize Name Display Dropdown if exists (in Settings)
+    const displaySelect = document.getElementById('settingNameDisplay');
+    if (displaySelect) {
+        displaySelect.value = state.nameDisplayMode || 'name';
     }
 
     // 2. Year Select
@@ -820,6 +870,12 @@ function setupEventListeners() {
         document.getElementById('csvFileInput')?.click();
     });
     document.getElementById('csvFileInput')?.addEventListener('change', handleFileUpload);
+
+    // New Roster Import
+    document.getElementById('rosterImportBtn')?.addEventListener('click', () => {
+        document.getElementById('rosterFileInput')?.click();
+    });
+    document.getElementById('rosterFileInput')?.addEventListener('change', handleRosterSelect);
 
     // Paste Modal
     document.getElementById('closeModalBtn')?.addEventListener('click', closePasteModal);
@@ -1038,6 +1094,9 @@ function switchTab(tabName) {
         renderSettings();
     } else if (tabName === 'seating') {
         initSeating();
+    } else if (tabName === 'roster_board') {
+        // Initialize or refresh Roster Board if needed
+        renderRosterBoardTable();
     }
 }
 
@@ -1103,8 +1162,12 @@ function renderSettings() {
                 <span style="font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; ${isCurrent ? 'color: #1d4ed8;' : ''}">${s} ${isCurrent ? '<span style="font-size:0.7em; color:#3b82f6; border:1px solid #3b82f6; padding:1px 4px; border-radius:4px; margin-left:4px;">選択中</span>' : ''}</span>
             </div>
             <div style="display: flex; gap: 0.2rem;">
-                <button onclick="editStudentSetting(${idx})" style="border:none; background:none; color:#94a3b8; cursor:pointer; padding: 0.2rem; display: flex;" title="編集">
+                <button onclick="editStudentMetadata('${s}')" style="border:none; background:none; color:#94a3b8; cursor:pointer; padding: 0.2rem; display: flex;" title="詳細情報を編集">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                </button>
+                <!-- Rename Button (Separate from Metadata) -->
+                <button onclick="editStudentSetting(${idx})" style="border:none; background:none; color:#94a3b8; cursor:pointer; padding: 0.2rem; display: flex;" title="氏名変更">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                 </button>
                 <button onclick="removeStudentSetting(${idx})" style="border:none; background:none; color:#94a3b8; cursor:pointer; padding: 0.2rem; display: flex;" title="削除">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
@@ -1737,6 +1800,50 @@ function handleJsonImport(file) {
     reader.readAsText(file);
 }
 
+function parseCSV(text) {
+    const rows = [];
+    let row = [];
+    let cur = '';
+    let inQuote = false;
+    // Normalize newlines
+    const chars = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+    for (let i = 0; i < chars.length; i++) {
+        const c = chars[i];
+        if (inQuote) {
+            if (c === '"') {
+                if (i + 1 < chars.length && chars[i + 1] === '"') {
+                    cur += '"';
+                    i++;
+                } else {
+                    inQuote = false;
+                }
+            } else {
+                cur += c;
+            }
+        } else {
+            if (c === '"') {
+                inQuote = true;
+            } else if (c === ',') {
+                row.push(cur);
+                cur = '';
+            } else if (c === '\n') {
+                row.push(cur);
+                rows.push(row);
+                row = [];
+                cur = '';
+            } else {
+                cur += c;
+            }
+        }
+    }
+    if (cur || row.length > 0) {
+        row.push(cur);
+        rows.push(row);
+    }
+    return rows;
+}
+
 function handleFileUpload(e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -1756,52 +1863,28 @@ function handleFileUpload(e) {
     reader.onload = function (evt) {
         const text = evt.target.result;
         try {
-            const rows = text.replace(/\r/g, '').split('\n').map(line => {
-                if (!line.trim()) return [];
-                const parts = [];
-                let cur = '';
-                let inQuote = false;
-                for (let i = 0; i < line.length; i++) {
-                    const char = line[i];
-                    if (char === '"') {
-                        if (inQuote && line[i + 1] === '"') { cur += '"'; i++; }
-                        else { inQuote = !inQuote; }
-                    } else if (char === ',' && !inQuote) {
-                        parts.push(cur.trim());
-                        cur = '';
-                    } else { cur += char; }
-                }
-                parts.push(cur.trim());
-                return parts;
-            }).filter(row => row.length > 0);
+            // New logic: Only try to parse Score CSV or Subject Definitions here. 
+            // Roster CSV should ideally go through "Roster Import" button, but we can support fallback or redirect.
+
+            const rows = parseCSV(text).filter(row => row.length > 0);
             if (rows.length < 2) throw new Error("Empty or invalid CSV");
 
             const header = rows[0];
+            const h0 = header[0]?.trim().replace(/^"|"$/g, '');
 
-            // CASE 1: Students List (students.csv)
-            // Header: 名前
-            if (header[0].trim() === '名前') {
-                const newStudents = [];
-                rows.slice(1).forEach(row => {
-                    if (row.length > 0 && row[0].trim() !== '') {
-                        newStudents.push(row[0].trim());
-                    }
-                });
+            // Check if it looks like a Roster
+            const isRoster = (h0 === '名前') || (header.some(h => h.includes('出席') && h.includes('番号')) && header.includes('氏名'));
 
-                if (newStudents.length > 0) {
-                    state.students = newStudents;
-                    // Reset current student if not in new list
-                    if (!state.students.includes(state.currentStudent)) {
-                        state.currentStudent = state.students[0];
-                    }
-                    saveSessionState(); // ENSURE THIS IS PERSISTED
-                    populateControls(); // Refresh dropdown
-                    render();
-                    alert(`学生リストを読み込みました: ${newStudents.length} 名`);
+            if (isRoster) {
+                // If user used the generic "Load" button for a roster, redirect to the new flow
+                if (confirm("名簿ファイルが検出されました。\n「名簿読込」機能として処理しますか？\n(キャンセルすると通常のファイルとして処理を続行します)")) {
+                    processRosterCSV(rows, header);
+                    e.target.value = '';
+                    return;
                 }
-                e.target.value = ''; // Clear input
-                return;
             }
+
+            // ... Continue with Score/Subject Parsing (Subject Defs, Score List) ...
 
             // CASE 2: Subject Definitions List
             // Header: 授業科目, 単位, 学年, 種別1, 種別2, [種別3], [種別4], [除外]
@@ -1942,6 +2025,109 @@ function handleFileUpload(e) {
         }
     };
     reader.readAsText(file);
+}
+
+
+// --- New Dedicated Roster Import Logic ---
+
+function handleRosterSelect(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function (evt) {
+        const text = evt.target.result;
+        try {
+            const rows = parseCSV(text).filter(row => row.length > 0);
+            if (rows.length < 2) throw new Error("Empty or invalid CSV");
+            const header = rows[0];
+            processRosterCSV(rows, header);
+        } catch (err) {
+            alert('名簿読み込みエラー: ' + err.message);
+        } finally {
+            e.target.value = ''; // Reset
+        }
+    };
+    reader.readAsText(file);
+}
+
+function processRosterCSV(rows, header) {
+    // Shared Logic
+    const h0 = header[0].trim().replace(/^"|"$/g, '');
+    const isNewRoster = header.some(h => h.includes('出席') && h.includes('番号')) && header.includes('氏名');
+
+    const newStudents = [];
+
+    if (isNewRoster) {
+        // New Format Logic
+        const colName = header.findIndex(h => h.trim() === '氏名');
+        // Fix: Year might be quoted or contain whitespace
+        const colYear = header.findIndex(h => h.trim().replace(/"/g, '') === '年' || h.trim() === '年');
+        const colClass = header.findIndex(h => h.trim().replace(/"/g, '') === '組' || h.trim() === '組');
+        const colNo = header.findIndex(h => h.includes('出席') && h.includes('番号'));
+        const colId = header.findIndex(h => h.includes('学籍') && h.includes('番号')); // Optional
+
+        if (colName === -1) throw new Error("CSVに「氏名」列が見つかりません。");
+
+        rows.slice(1).forEach(row => {
+            const name = row[colName]?.trim();
+            if (name) {
+                const y = row[colYear]?.trim();
+                const c = row[colClass]?.trim();
+
+                // Debug fallback if extraction failed but columns seem likely position-based
+                // User hint: Year is 2nd column (index 1)
+                const finalY = y || (colYear === -1 && row[1] ? row[1] : '9');
+                // Assume Class might be 3rd column (index 2) if Year is index 1, or maybe index 2? 
+                // Let's rely on name search primarily. If Class search failed too, guess index 2.
+                const finalC = c || (colClass === -1 && row[2] ? row[2] : 'Z');
+                const n = row[colNo]?.trim();
+                const sid = colId !== -1 ? row[colId]?.trim() : '';
+
+                // Metadata
+                const meta = {};
+                header.forEach((h, idx) => {
+                    const cleanH = h.replace(/\n/g, '').replace(/"/g, '').trim();
+                    if (cleanH) meta[cleanH] = row[idx];
+                });
+
+                // Force include Year/Class in metadata if missing (using fallback values)
+                if (!meta['年'] && !meta['year']) meta['年'] = finalY;
+                if (!meta['組'] && !meta['class']) meta['組'] = finalC;
+
+                newStudents.push({
+                    name: name,
+                    sortKey: `${finalY || '9'}-${finalC || 'Z'}-${(n || '999').padStart(3, '0')}`,
+                    metadata: meta,
+                    year: finalY,
+                    class: finalC,
+                    no: n,
+                    studentId: sid
+                });
+            }
+        });
+    } else {
+        // Fallback for simple list
+        rows.slice(1).forEach(row => {
+            if (row.length > 0 && row[0].trim() !== '') {
+                const name = row[0].trim();
+                newStudents.push({
+                    name: name,
+                    sortKey: name,
+                    metadata: {},
+                    year: '',
+                    class: ''
+                });
+            }
+        });
+    }
+
+    if (newStudents.length === 0) throw new Error("有効な学生データが見つかりませんでした。");
+
+    // Default Sort
+    newStudents.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+
+    openRosterBoard(newStudents);
 }
 
 // --- Graduation Requirements Logic ---
@@ -2240,12 +2426,10 @@ function updatePrintHeader() {
     }
 
     if (nameEl) {
-        if (state.currentTab === 'class_stats') {
-            nameEl.parentElement.style.display = 'none'; // Don't show student name on class-wide report
-        } else {
-            nameEl.parentElement.style.display = 'block';
-            nameEl.textContent = state.currentStudent || '-';
-        }
+        // Always show name, but respect privacy setting
+        nameEl.parentElement.style.display = 'block';
+        const display = getDisplayName(state.currentStudent);
+        nameEl.textContent = display || '-';
     }
 
     if (dateEl) {
@@ -2770,7 +2954,7 @@ function renderGradesTable() {
                 if (hasSummaryBaseData) {
                     // Show ONLY if Summary Base Data exists (Year End of normal subjects is done)
                 } else {
-                    return; // Hide if Summary logic not met (even if it has data?) 
+                    return; // Hide if Summary logic not met (even if it has data?)
                     // User said: "学年末が終わっていない学年すなわち、成績集計 (Summary)の学年末が空欄の学年も表示されます" -> implies they want it HIDDEN if year not done.
                 }
             } else {
@@ -3379,7 +3563,7 @@ function renderStats() {
                 if (!isNaN(n) && n >= 60) {
                     passed = true;
                 } else {
-                    const passingStatuses = ['合', '合格', '認', '認定', 'A', 'B', 'C', '履', '修'];
+                    const passingStatuses = ['合', '認', '修', '履', 'S', 'A', 'B', 'C'];
                     passed = SCORE_KEYS.some(k => {
                         const val = scoreObj[k];
                         return val !== undefined && val !== null && typeof val === 'string' && passingStatuses.includes(val.trim());
@@ -3485,7 +3669,7 @@ function calculateRank(year, key, targetStudent) {
 }
 
 function calculateCredits(student, year) {
-    // Keep definition as it might be used elsewhere or remove if unused, 
+    // Keep definition as it might be used elsewhere or remove if unused,
     // but better to keep for safety if referenced by old code.
     // Logic is now duplicated inside renderStats for loop.
     return {};
@@ -3642,7 +3826,8 @@ function renderBoxPlot() {
             plugins: [{
                 id: 'plotAreaBorder',
                 beforeDraw(chart) {
-                    const { ctx, chartArea: { top, bottom, left, right } } = chart;
+                    const { ctx, chartArea: { top, bottom, left, right } = {} } = chart;
+                    if (top === undefined) return; // Ensure chartArea is defined
                     ctx.save();
                     ctx.strokeStyle = '#000000'; // Black border
                     ctx.lineWidth = 1.5;
@@ -3719,7 +3904,8 @@ function renderBoxPlot() {
             plugins: [{
                 id: 'plotAreaBorder',
                 beforeDraw(chart) {
-                    const { ctx, chartArea: { top, bottom, left, right } } = chart;
+                    const { ctx, chartArea: { top, bottom, left, right } = {} } = chart;
+                    if (top === undefined) return; // Ensure chartArea is defined
                     ctx.save();
                     ctx.strokeStyle = '#64748b';
                     ctx.lineWidth = 1;
@@ -3939,7 +4125,8 @@ function renderTrendChart() {
         plugins: [{
             id: 'plotAreaBorder',
             beforeDraw(chart) {
-                const { ctx, chartArea: { top, bottom, left, right } } = chart;
+                const { ctx, chartArea: { top, bottom, left, right } = {} } = chart;
+                if (top === undefined) return; // Ensure chartArea is defined
                 ctx.save();
                 ctx.strokeStyle = '#000000'; // Clear black border
                 ctx.lineWidth = 1.5;
@@ -4185,6 +4372,9 @@ function generateClassStats() {
     html += `<div style="margin-top: 1rem; text-align: right; color: #64748b; font-size: 0.85rem;">対象科目数: ${targetSubjects.length}</div>`;
 
     container.innerHTML = html;
+
+    // Ensure header name is updated (for print)
+    updatePrintHeader();
 }
 
 // Helpers
@@ -4395,7 +4585,7 @@ function renderAtRiskReport() {
 
         html += `
             <tr>
-                <td style="font-weight: 700; color: #1e293b; font-size: 1.1rem;">${res.name}</td>
+                <td style="font-weight: 700; color: #1e293b; font-size: 1.1rem;">${getDisplayName(res.name)}</td>
                 <td>
                     <div style="display: flex; flex-direction: column; gap: 4px;">
                         ${reasons.map(r => `<span style="color: #dc2626; font-weight: 600; font-size: 0.85rem;">⚠️ ${r}</span>`).join('')}
@@ -4716,9 +4906,6 @@ function renderSeatingGrid() {
                         // Find latest test with data based on current year (same logic as Class Stats)
                         const targetYear = state.currentYear || 5;
                         // Use detection logic similar to Class Stats
-                        let latestScores = [];
-                        // Find latest test (naively or robustly)
-                        // Using simplified logic here or helper
                         // For visualization, simple accumulation is often enough or reuse getStudentAverage
                         avgGrade = getStudentAverage(student);
                     } else {
@@ -5493,11 +5680,11 @@ function handleSeatMenuAction(action, pos) {
     } else if (action === 'disable-col') {
         for (let i = 0; i < rows; i++) setDisable(i + '-' + c, true);
     } else if (action === 'disable-row') {
-        for (let j = 0; j < cols; j++) setDisable(r + '-' + j, true);
+        for (let i = 0; i < cols; i++) setDisable(r + '-' + i, true);
     } else if (action === 'enable-col') {
         for (let i = 0; i < rows; i++) setDisable(i + '-' + c, false);
     } else if (action === 'enable-row') {
-        for (let j = 0; j < cols; j++) setDisable(r + '-' + j, false);
+        for (let i = 0; i < cols; i++) setDisable(r + '-' + i, false);
     }
 
     // Reset preset selection if layout (disabled/enabled) changed
@@ -5509,4 +5696,698 @@ function handleSeatMenuAction(action, pos) {
     saveSessionState();
     renderSeatingRoster();
     renderSeatingGrid();
+}
+
+// ==================== ROSTER BOARD LOGIC ====================
+// Replaces old Import Preview Modal
+
+function initRosterBoard() {
+    // Check if we have pending import state or active students
+    if (importState.candidates.length === 0 && state.students.length > 0) {
+        // If empty candidates but we have students, populate candidates FROM current students?
+        // No, Roster Board is specifically for IMPORTING NEW or UPDATING.
+        // But maybe we should show current status? 
+        // For now, let's keep it clean: "No file loaded".
+    }
+}
+
+// Event Listeners for Roster Board
+document.getElementById('triggerRosterLoadBtn')?.addEventListener('click', () => {
+    document.getElementById('rosterFileInput')?.click();
+});
+document.getElementById('applyRosterImportBtn')?.addEventListener('click', confirmImportFromBoard);
+document.getElementById('teamsChatSelectedBtn')?.addEventListener('click', openTeamsChatForSelected);
+document.getElementById('sendMailSelectedBtn')?.addEventListener('click', openMailForSelected);
+
+document.getElementById('rosterSortSelect')?.addEventListener('change', (e) => {
+    importState.sortMethod = e.target.value;
+    renderRosterBoardTable();
+});
+
+document.getElementById('rosterSelectAll')?.addEventListener('click', (e) => {
+    const checked = e.target.checked;
+    const visible = getFilteredAndSortedCandidates();
+    visible.forEach(c => {
+        if (checked) importState.selected.add(c.name);
+        else importState.selected.delete(c.name);
+    });
+    renderRosterBoardTable();
+});
+
+
+// Logic called after CSV parsing
+function openRosterBoard(candidates) {
+    importState.candidates = candidates;
+    importState.selected = new Set(); // Start with NONE selected to avoid accidental full import
+    importState.filters = {};
+    importState.sortKey = 'original';
+    importState.sortOrder = 'asc';
+
+    // Reset UI
+    // document.getElementById('rosterSortSelect').value = 'original'; // remove if select removed
+
+    // Switch Tab
+    switchTab('roster_board');
+
+    // Render Sidebar Filters
+    renderRosterBoardFilters();
+
+    // Render Status
+    document.getElementById('rosterBoardStatus').textContent = `読み込み完了 (${candidates.length}名)`;
+    document.getElementById('rosterBoardStatus').style.color = '#10b981';
+
+    // Render Table
+    renderRosterBoardTable();
+    setupRosterHeaderSort(); // Attach listeners
+}
+
+function renderRosterBoardFilters() {
+    const filterContainer = document.getElementById('rosterFilterContainer');
+    filterContainer.innerHTML = '';
+
+    const candidates = importState.candidates;
+
+    // Extract unique values
+    const years = [...new Set(candidates.map(c => c.metadata['年'] || c.year).filter(Boolean))].sort();
+    const classes = [...new Set(candidates.map(c => c.metadata['組'] || c.class).filter(Boolean))].sort();
+    const courses = [...new Set(candidates.map(c => c.metadata['コース'] || c.metadata['応用専門分野・領域']).filter(Boolean))].sort();
+
+    const genders = [...new Set(candidates.map(c => c.metadata['性別']).filter(Boolean))].sort();
+
+    // Helper
+    const createSelect = (label, key, options, staticOptions = null) => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'control-group';
+        wrapper.style.display = 'flex';
+        wrapper.style.flexDirection = 'column';
+        wrapper.style.gap = '0.3rem';
+
+        wrapper.innerHTML = `<label style="font-size:0.85rem; font-weight:600; color:#64748b;">${label}</label>`;
+        const sel = document.createElement('select');
+        sel.style.cssText = "width:100%; padding: 0.4rem; border: 1px solid #cbd5e1; border-radius: 0.4rem; font-size: 0.85rem; background: #fff;";
+
+        if (staticOptions) {
+            sel.innerHTML = '<option value="">すべて</option>' + staticOptions.map(o => `<option value="${o.val}">${o.label}</option>`).join('');
+        } else {
+            sel.innerHTML = '<option value="">すべて</option>' + options.map(o => `<option value="${o}">${o}</option>`).join('');
+        }
+
+        sel.onchange = (e) => {
+            importState.filters[key] = e.target.value;
+            renderRosterBoardTable();
+            document.getElementById('rosterSelectAll').checked = false;
+        };
+        wrapper.appendChild(sel);
+        filterContainer.appendChild(wrapper);
+    };
+
+    if (years.length > 0) createSelect('学年', 'year', years);
+    if (classes.length > 0) createSelect('組', 'class', classes);
+    if (genders.length > 0) createSelect('性別', 'gender', genders);
+    if (courses.length > 0) createSelect('コース/分野', 'course', courses);
+
+    // Status Filter (Static)
+    createSelect('登録状況', 'status', [], [
+        { val: 'new', label: '新規 (New)' },
+        { val: 'update', label: '更新 (Update)' }
+    ]);
+
+    if (filterContainer.children.length === 0) {
+        filterContainer.innerHTML = '<div style="color:#94a3b8; font-size:0.85rem;">絞り込み可能な項目がありません</div>';
+    }
+}
+
+function getFilteredAndSortedCandidates() {
+    // 1. Filter
+    let list = importState.candidates.filter(c => {
+        if (importState.filters.year && (c.metadata['年'] || String(c.year)) != importState.filters.year) return false;
+        if (importState.filters.class && (c.metadata['組'] || c.class) != importState.filters.class) return false;
+        if (importState.filters.gender && c.metadata['性別'] != importState.filters.gender) return false;
+        if (importState.filters.course && (c.metadata['コース'] || c.metadata['応用専門分野・領域']) != importState.filters.course) return false;
+        if (importState.filters.status) {
+            const isNew = !new Set(state.students).has(c.name);
+            if (importState.filters.status === 'new' && !isNew) return false;
+            if (importState.filters.status === 'update' && isNew) return false;
+        }
+        return true;
+    });
+
+    // 2. Sort
+    const key = importState.sortKey;
+    const order = importState.sortOrder === 'asc' ? 1 : -1;
+    const existingSet = new Set(state.students);
+
+    const compare = (a, b, k) => {
+        let valA = '', valB = '';
+        if (k === 'year') { valA = a.year || ''; valB = b.year || ''; }
+        else if (k === 'class') { valA = a.class || ''; valB = b.class || ''; }
+        else if (k === 'no') { valA = String(a.no || 999).padStart(3, '0'); valB = String(b.no || 999).padStart(3, '0'); }
+        else if (k === 'name') { valA = a.name; valB = b.name; }
+        else if (k === 'gender') { valA = a.metadata['性別'] || ''; valB = b.metadata['性別'] || ''; }
+        else if (k === 'selection') { valA = a.metadata['選択'] || ''; valB = b.metadata['選択'] || ''; }
+        else if (k === 'course') { valA = a.metadata['応用専門分野・領域'] || ''; valB = b.metadata['応用専門分野・領域'] || ''; }
+        else if (k === 'status') {
+            // New (= true) vs Update (= false)
+            const isNewA = !existingSet.has(a.name);
+            const isNewB = !existingSet.has(b.name);
+            // Sort: New first? True > False
+            if (isNewA === isNewB) return 0;
+            return isNewA ? -1 : 1;
+        }
+        else {
+            // Original / key
+            return a.sortKey.localeCompare(b.sortKey);
+        }
+
+        // Use numeric sort for numbers if needed, else string localeCompare
+        if (k === 'no' || k === 'year') {
+            return valA.localeCompare(valB, undefined, { numeric: true });
+        }
+        return valA.localeCompare(valB, 'ja');
+    };
+
+    if (key !== 'original') {
+        list.sort((a, b) => compare(a, b, key) * order);
+    } else {
+        list.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+    }
+
+    return list;
+}
+
+function setupRosterHeaderSort() {
+    const headers = document.querySelectorAll('.sortable-th');
+    headers.forEach(th => {
+        // Use addEventListener instead of onclick to avoid overwrites
+        th.addEventListener('click', () => {
+            const sortKey = th.dataset.sort;
+            if (importState.sortKey === sortKey) {
+                // Toggle order
+                importState.sortOrder = importState.sortOrder === 'asc' ? 'desc' : 'asc';
+            } else {
+                importState.sortKey = sortKey;
+                importState.sortOrder = 'asc';
+            }
+            console.log(`Sorting by ${sortKey} (${importState.sortOrder})`);
+            renderRosterBoardTable();
+        });
+
+        // Add visual cue logic
+        th.addEventListener('mouseover', () => th.style.backgroundColor = '#e2e8f0');
+        th.addEventListener('mouseout', () => th.style.backgroundColor = '');
+    });
+}
+
+
+function renderRosterBoardTable() {
+    const tbody = document.getElementById('rosterBoardBody');
+    if (!tbody) return;
+
+    // If no candidates (pending import), show Current Students instead
+    if (!importState.candidates || importState.candidates.length === 0) {
+        if (state.students && state.students.length > 0) {
+            // Load current students into candidates for view/edit
+            // This allows the Roster Board to act as a viewer for current data
+            importState.candidates = state.students.map(name => {
+                const meta = state.studentMetadata[name] || {};
+                // Reconstruct a candidate object
+                return {
+                    name: name,
+                    sortKey: meta['sortKey'] || name,
+                    metadata: meta,
+                    year: meta['年'] || meta['year'] || '',
+                    class: meta['組'] || meta['class'] || '',
+                    no: meta['出席番号'] || meta['no'] || '',
+                    studentId: meta['学籍番号'] || meta['studentId'] || ''
+                };
+            });
+            importState.selected = new Set(); // Default none selected
+
+            // Update Status
+            const statusDiv = document.getElementById('rosterBoardStatus');
+            if (statusDiv) {
+                statusDiv.textContent = `現在登録済みのデータ (${state.students.length}名)`;
+                statusDiv.style.color = '#475569';
+            }
+
+            // If filters are empty, render filters based on this data
+            if (Object.keys(importState.filters).length === 0) {
+                renderRosterBoardFilters();
+            }
+        }
+    }
+
+    const visible = getFilteredAndSortedCandidates();
+    document.querySelectorAll('.sortable-th .sort-icon').forEach(icon => icon.textContent = '');
+    const activeHeader = document.querySelector(`.sortable-th[data-sort="${importState.sortKey}"] .sort-icon`);
+    if (activeHeader) {
+        activeHeader.textContent = importState.sortOrder === 'asc' ? ' ▲' : ' ▼';
+    }
+
+    tbody.innerHTML = '';
+
+    // const visible = getFilteredAndSortedCandidates(); // Already defined
+    const existingStudentsSet = new Set(state.students);
+
+    // Update Select All Checkbox State
+    const selectAllCb = document.getElementById('rosterSelectAll');
+    if (selectAllCb) {
+        // Reuse 'visible' which respects filters
+        const allSelected = visible.length > 0 && visible.every(c => importState.selected.has(c.name));
+        selectAllCb.checked = allSelected;
+    }
+
+    if (visible.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 2rem; color: #94a3b8;">
+            条件に一致する学生がいません
+        </td></tr>`;
+        return;
+    }
+
+    visible.forEach(c => {
+        const tr = document.createElement('tr');
+        const isChecked = importState.selected.has(c.name);
+        const isNew = !existingStudentsSet.has(c.name);
+
+        tr.style.background = isChecked ? '#fff' : '#f8fafc';
+        if (isChecked) {
+            tr.style.background = isNew ? '#ecfdf5' : '#fff'; // Green tint if new, White if update
+        }
+
+        const statusBadge = isNew
+            ? '<span class="status-pass" style="background:#dcfce7; color:#166534; padding:2px 8px; border-radius:4px; font-size:0.75rem;">新規</span>'
+            : '<span style="background:#f1f5f9; color:#64748b; padding:2px 8px; border-radius:4px; font-size:0.75rem;">更新</span>';
+
+        tr.innerHTML = `
+            <td style="text-align: center;">
+                <input type="checkbox" class="roster-checkbox" data-name="${c.name}" ${isChecked ? 'checked' : ''}>
+            </td>
+            <td>${c.metadata['年'] || c.year || '-'}</td>
+            <td>${c.metadata['組'] || c.class || '-'}</td>
+            <td>${c.metadata['出席\n番号'] || c.metadata['出席番号'] || c.no || '-'}</td>
+            <td><div style="font-weight:500;">${c.name}</div></td>
+            <td style="color:#cbd5e1; font-size:0.8rem; font-family:monospace;">${c.metadata['暗号化氏名1'] || c.metadata['暗号化氏名'] || ''}</td>
+            <td>${c.metadata['性別'] || '-'}</td>
+            <td>${c.metadata['選択'] || c.metadata['選択科目'] || '-'}</td>
+            <td>${c.metadata['応用専門分野・領域'] || c.metadata['コース'] || '-'}</td>
+            <td style="text-align:center;">${statusBadge}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    // Count Update (Optional: could add a status bar text somewhere)
+    // document.getElementById('rosterCountInfo').textContent = ...
+
+    // Listeners and Row Interactions
+    const rows = tbody.querySelectorAll('tr');
+    rows.forEach((tr, index) => {
+        const checkbox = tr.querySelector('.roster-checkbox');
+        const studentName = checkbox.dataset.name;
+
+        // 1. Click Handler (Selection)
+        tr.addEventListener('click', (e) => {
+            // If clicked directly on the checkbox, let the change event handle it (but update lastClicked)
+            if (e.target.type === 'checkbox') {
+                importState.lastClickedIndex = index;
+                return;
+            }
+
+            // Prevent text selection double-click behavior usually
+            // e.preventDefault(); // Might block input focus if any? No inputs in row other than checkbox.
+
+            if (e.shiftKey && importState.lastClickedIndex !== undefined) {
+                // Range Selection
+                const start = Math.min(importState.lastClickedIndex, index);
+                const end = Math.max(importState.lastClickedIndex, index);
+                const rangeNames = visible.slice(start, end + 1).map(c => c.name);
+
+                // If Ctrl is NOT pressed, clear others first? 
+                // Standard behavior: Shift+Click extends selection. 
+                // Usually keeps existing 'anchor' selection.
+                // Simplified: Add range to current selection.
+                // Or: If Ctrl not pressed, range becomes the ONLY selection? 
+                // Let's go with: Shift always adds range, but if Ctrl not pressed, we might want to clear others?
+                // Windows Explorer: Shift+Click selects range between anchor and current. Clears others unless Ctrl held? No.
+                // Let's stick to "Add Range" logic for simplicity, or "Select Range exclusively" if no Ctrl.
+
+                if (!e.ctrlKey) {
+                    importState.selected.clear();
+                }
+
+                rangeNames.forEach(n => importState.selected.add(n));
+
+            } else if (e.ctrlKey || e.metaKey) {
+                // Toggle
+                if (importState.selected.has(studentName)) {
+                    importState.selected.delete(studentName);
+                } else {
+                    importState.selected.add(studentName);
+                }
+            } else {
+                // Single Select (Clear others)
+                importState.selected.clear();
+                importState.selected.add(studentName);
+            }
+
+            importState.lastClickedIndex = index;
+            renderRosterBoardTable();
+        });
+
+        // 2. Right Click (Context Menu)
+        tr.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+
+            // If row is not part of selection, select it (exclusive)
+            if (!importState.selected.has(studentName)) {
+                importState.selected.clear();
+                importState.selected.add(studentName);
+                renderRosterBoardTable();
+            }
+
+            showRosterContextMenu(e.clientX, e.clientY);
+        });
+
+        // Checkbox Change (keep existing logic for simple checkbox clicks)
+        checkbox.addEventListener('change', (e) => {
+            if (e.target.checked) importState.selected.add(e.target.dataset.name);
+            else importState.selected.delete(e.target.dataset.name);
+            // Don't re-render entire table here to avoid losing focus/scroll? 
+            // Checkbox state is already visually updated by browser.
+            // But we need to update row background.
+            // renderRosterBoardTable(); -> This rebuilds DOM, might lose checkbox focus if keyboard used.
+            // Better to just update parent row style.
+            const row = e.target.closest('tr');
+            if (e.target.checked) row.style.backgroundColor = '#fff'; // Simplification, lost 'New' tint logic? 
+            // Re-render is safer for consistency.
+            renderRosterBoardTable();
+        });
+    });
+}
+
+// Roster Context Menu
+function showRosterContextMenu(x, y) {
+    let menu = document.getElementById('rosterContextMenu');
+    if (!menu) {
+        menu = document.createElement('div');
+        menu.id = 'rosterContextMenu';
+        menu.style.cssText = `
+            position: fixed;
+            background: white;
+            border: 1px solid #cbd5e1;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 99999;
+            min-width: 160px;
+            border-radius: 0.5rem;
+            padding: 0.5rem 0;
+            font-family: sans-serif;
+            font-size: 0.9rem;
+        `;
+        menu.innerHTML = `
+            <div class="ctx-item" data-action="teams">
+                <span class="ctx-icon">💬</span> Teamsチャット
+            </div>
+            <div class="ctx-item" data-action="mail">
+                <span class="ctx-icon">✉️</span> メール送信
+            </div>
+        `;
+        document.body.appendChild(menu);
+
+        // Styling
+        const style = document.createElement('style');
+        style.textContent = `
+            #rosterContextMenu .ctx-item { padding: 0.6rem 1rem; cursor: pointer; color: #475569; display: flex; align-items: center; gap: 0.5rem; }
+            #rosterContextMenu .ctx-item:hover { background: #f1f5f9; color: #1e293b; }
+            #rosterContextMenu .ctx-icon { width: 16px; text-align: center; }
+        `;
+        document.head.appendChild(style);
+
+        // Logic
+        menu.addEventListener('click', (e) => {
+            const item = e.target.closest('.ctx-item');
+            if (!item) return;
+            const action = item.dataset.action;
+            if (action === 'teams') openTeamsChatForSelected();
+            if (action === 'mail') openMailForSelected();
+            menu.style.display = 'none';
+        });
+
+        // Close
+        document.addEventListener('mousedown', (e) => {
+            if (!menu.contains(e.target)) menu.style.display = 'none';
+        });
+    }
+
+    menu.style.display = 'block';
+    // Boundary check
+    const rect = menu.getBoundingClientRect();
+    if (x + rect.width > window.innerWidth) x -= rect.width;
+    if (y + rect.height > window.innerHeight) y -= rect.height;
+
+    menu.style.left = x + 'px';
+    menu.style.top = y + 'px';
+}
+
+
+function confirmImportFromBoard() {
+    const selectedNames = Array.from(importState.selected);
+
+    if (selectedNames.length === 0) {
+        alert('学生が選択されていません。');
+        return;
+    }
+
+    if (!confirm(`${selectedNames.length} 名の学生を成績管理に取り込みますか？\n(既存の学生情報は更新・上書きされます)`)) return;
+
+    // Filter candidates
+    const finalCandidates = importState.candidates.filter(c => importState.selected.has(c.name));
+
+    // Sort again just to be sure (or use current sort?)
+    // Usually user wants the order they see on screen.
+    const sortedFinal = getFilteredAndSortedCandidates().filter(c => importState.selected.has(c.name));
+
+    // If user has filtered, we might miss selected but invisible ones in `sortedFinal`.
+    // Strategy: Use screen sort for visible, and append invisible ones at end? 
+    // Or just use importState.candidates original sort for consistency?
+    // Let's use Screen Sort logic for consistency with what user sees.
+
+    // But getFilteredAndSortedCandidates ONLY returns filtered.
+    // If I selected someone then changed filter, they are still in `selected` set but not in `sortedFinal`.
+    // We should probably just use the `importState.candidates` sorted by `importState.sortMethod`.
+
+    let allCandidates = [...importState.candidates];
+    // Sort allCandidates by current sort method
+    // Reuse logic (duplicated for brevity or refactor helper)
+    const method = importState.sortMethod;
+    if (method === 'name') {
+        allCandidates.sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+    } else if (method === 'studentId') {
+        allCandidates.sort((a, b) => (a.studentId || '').localeCompare(b.studentId || '', undefined, { numeric: true }));
+    } else if (method === 'year') {
+        allCandidates.sort((a, b) => (a.year || '').localeCompare(b.year || '', undefined, { numeric: true }) || a.sortKey.localeCompare(b.sortKey));
+    } else if (method === 'class') {
+        allCandidates.sort((a, b) => (a.class || '').localeCompare(b.class || '') || a.sortKey.localeCompare(b.sortKey));
+    } else {
+        allCandidates.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+    }
+
+    const newStudents = [];
+    const newMetadata = {};
+
+    allCandidates.forEach(c => {
+        if (importState.selected.has(c.name)) {
+            newStudents.push(c.name);
+            newMetadata[c.name] = c.metadata;
+        }
+    });
+
+    state.students = newStudents;
+    state.studentMetadata = newMetadata;
+
+    if (!state.students.includes(state.currentStudent)) {
+        state.currentStudent = state.students[0];
+    }
+
+    saveSessionState();
+    populateControls();
+
+    alert(`取り込みが完了しました。\n(${state.students.length} 名登録)`);
+
+    // Maybe switch to Settings or Roster? Stay on Roster Board.
+    renderRosterBoardTable();
+}
+
+function openTeamsChatForSelected() {
+    const selectedNames = Array.from(importState.selected);
+    if (selectedNames.length === 0) {
+        alert('学生が選択されていません。');
+        return;
+    }
+
+    const emails = getEmailsForSelected(true); // Helper with alert
+    if (!emails) return;
+
+    const usersParam = emails.join(',');
+    // Teams Deep Link
+    // format: https://teams.microsoft.com/l/chat/0/0?users=alice@example.com,bob@example.com
+    const url = `https://teams.microsoft.com/l/chat/0/0?users=${encodeURIComponent(usersParam)}`;
+
+    window.open(url, '_blank');
+}
+
+function openMailForSelected() {
+    const selectedNames = Array.from(importState.selected);
+    if (selectedNames.length === 0) {
+        alert('学生が選択されていません。');
+        return;
+    }
+
+    const emails = getEmailsForSelected(true); // Helper with alert
+    if (!emails) return; // Alert handled in helper
+
+    // Mailto
+    // Outlook often prefers semicolon, others comma. RFC says comma.
+    // Let's try comma. If user wants semicolon, they can replace?
+    // Some envs (Windows Default Mail) handle comma fine.
+    const to = emails.join(',');
+    window.location.href = `mailto:${to}`;
+}
+
+function getEmailsForSelected(showAlerts = false) {
+    const students = importState.candidates.filter(c => importState.selected.has(c.name));
+    const emails = [];
+    const missing = [];
+
+    students.forEach(s => {
+        const meta = s.metadata;
+        const email = meta['Email'] || meta['email'] || meta['メール'] || meta['メールアドレス'] || meta['e-mail'];
+        if (email) {
+            emails.push(email);
+        } else {
+            missing.push(s.name);
+        }
+    });
+
+    if (emails.length === 0) {
+        if (showAlerts) alert('選択された学生のメールアドレス情報が見つかりません。\n(CSVに「Email」などの列を追加してください)');
+        return null;
+    }
+
+    if (missing.length > 0 && showAlerts) {
+        if (!confirm(`${missing.length} 名のメールアドレスが見つかりませんでした。\n(見つかった ${emails.length} 名のみで作成しますか？)`)) {
+            return null;
+        }
+    }
+    return emails;
+}
+
+
+// ==================== METADATA EDITOR ====================
+
+function editStudentMetadata(studentName) {
+    const modal = document.getElementById('metadataEditorModal');
+    const container = document.getElementById('metaEditFieldsContainer');
+    const nameInput = document.getElementById('metaEditName');
+    const originalNameInput = document.getElementById('metaEditOriginalName');
+
+    // Get current metadata
+    const meta = state.studentMetadata[studentName] || {};
+
+    nameInput.value = studentName;
+    originalNameInput.value = studentName;
+    container.innerHTML = '';
+
+    // Default keys to always show (customize as needed)
+    // Merge existing keys with common keys
+    const commonKeys = ['年', '組', '出席番号', '性別', '選択', '応用専門分野・領域', '暗号化氏名1'];
+    const allKeys = new Set([...commonKeys, ...Object.keys(meta)]);
+
+    allKeys.forEach(key => {
+        const val = meta[key] || '';
+        const wrapper = document.createElement('div');
+        wrapper.className = 'control-group';
+        wrapper.innerHTML = `
+            <label style="font-size: 0.8rem; color: #64748b;">${key}</label>
+            <input type="text" class="meta-field-input" data-key="${key}" value="${val}" style="width: 100%; padding: 0.4rem; border: 1px solid #cbd5e1; border-radius: 0.3rem;">
+        `;
+        container.appendChild(wrapper);
+    });
+
+    modal.classList.add('open');
+}
+
+function addCustomMetadataField() {
+    const key = prompt("新しい項目名を入力してください (例: 部活):");
+    if (!key) return;
+
+    const container = document.getElementById('metaEditFieldsContainer');
+    const wrapper = document.createElement('div');
+    wrapper.className = 'control-group';
+    wrapper.innerHTML = `
+        <label style="font-size: 0.8rem; color: #64748b;">${key}</label>
+        <input type="text" class="meta-field-input" data-key="${key}" value="" style="width: 100%; padding: 0.4rem; border: 1px solid #cbd5e1; border-radius: 0.3rem;">
+    `;
+    container.appendChild(wrapper);
+}
+
+function saveStudentMetadata() {
+    const studentName = document.getElementById('metaEditOriginalName').value;
+    const inputs = document.querySelectorAll('.meta-field-input');
+
+    const newMeta = {};
+    inputs.forEach(input => {
+        const key = input.dataset.key;
+        const val = input.value.trim();
+        if (key && val) { // Only save non-empty? Or save empty to clear? Let's save empty if needed to overwrite.
+            newMeta[key] = val;
+        }
+    });
+
+    state.studentMetadata[studentName] = newMeta;
+    saveSessionState();
+
+    // If current student, update UI might be needed if side effects exist (e.g. if we used metadata for display)
+    if (state.currentStudent === studentName) {
+        // re-render if needed
+    }
+
+    closeMetadataEditorModal();
+    // Refresh Settings List (optional, but good visual feedback not really shown there)
+    // alert('保存しました');
+}
+
+function closeMetadataEditorModal() {
+    document.getElementById('metadataEditorModal').classList.remove('open');
+}
+
+// ==================== PRIVACY / DISPLAY NAME ====================
+function getDisplayName(originalName) {
+    if (state.nameDisplayMode === 'name') return originalName;
+
+    // Try to find encrypted name in metadata
+    const meta = state.studentMetadata[originalName] || {};
+    const encrypted = meta['暗号化氏名1'] || meta['暗号化氏名'] || meta['EncryptedName'];
+
+    if (encrypted) return encrypted;
+
+    // Fallback if no encrypted name: Initial-like or ID
+    // If we have 'attendance no', use that? E.g. "No.15"
+    const no = meta['出席番号'] || meta['no'];
+    if (no) return `Student ${no}`;
+
+    // Last resort
+    return originalName.substring(0, 1) + '...';
+}
+
+function updateNameDisplayMode(mode) {
+    state.nameDisplayMode = mode;
+    saveSessionState();
+
+    // Refresh UI
+    populateControls(); // Updates sidebar
+
+    // Re-render current tab if it uses names
+    if (state.currentTab === 'settings') renderSettings();
+    else if (state.currentTab === 'grades') renderGradesTable();
+    else if (state.currentTab === 'stats' || state.currentTab === 'stats2') switchTab(state.currentTab);
+    else if (state.currentTab === 'class_stats') initClassStats(); // re-init
 }
