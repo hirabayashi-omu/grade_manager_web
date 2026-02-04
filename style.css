@@ -542,8 +542,9 @@ th {
 }
 
 .seat-item {
-    width: 80px;
-    height: 80px;
+    aspect-ratio: 1 / 1;
+    min-width: 0;
+    flex-shrink: 0;
     background: #eef2ff;
     border: 2px solid #cbd5e1;
     border-radius: 0.75rem;
@@ -674,14 +675,11 @@ th {
     }
 
     .seat-item {
-        width: 48px !important;
-        height: 48px !important;
+        /* Remove fixed width/height to allow dynamic JS sizing */
         border: 1pt solid #000 !important;
         background: #fff !important;
         color: #000 !important;
-        font-size: 0.6rem !important;
         margin: 1px !important;
-        /* Ensure some spacing logic */
     }
 
     .seat-item.empty {
@@ -1014,16 +1012,21 @@ th {
         border: 1px solid #333 !important;
         box-shadow: none !important;
         break-inside: avoid;
+        aspect-ratio: 1 / 1;
+        /* Keep it square */
     }
 
     .seat-label {
-        color: #000 !important;
+        display: none !important;
     }
 
     .student-name {
         font-weight: bold;
         color: #000 !important;
-        font-size: 0.8rem;
-        /* detailed control */
+    }
+
+    .attendance-no {
+        color: #000 !important;
+        font-weight: bold !important;
     }
 }

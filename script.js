@@ -979,6 +979,27 @@ function setupEventListeners() {
         renderFacultyTable();
     });
 
+    // Clear Filters Buttons
+    document.getElementById('clearRosterFiltersBtn')?.addEventListener('click', () => {
+        importState.filters = {};
+        importState.searchText = '';
+        document.getElementById('rosterSearchInput').value = '';
+        document.querySelectorAll('#rosterFilterContainer select').forEach(select => {
+            select.value = '';
+        });
+        renderRosterBoardTable();
+    });
+
+    document.getElementById('clearFacultyFiltersBtn')?.addEventListener('click', () => {
+        facultyImportState.filters = {};
+        facultyImportState.searchText = '';
+        document.getElementById('facultySearchInput').value = '';
+        document.querySelectorAll('#facultyFilterContainer select').forEach(select => {
+            select.value = '';
+        });
+        renderFacultyTable();
+    });
+
     // Paste Modal
     document.getElementById('closeModalBtn')?.addEventListener('click', closePasteModal);
     document.getElementById('cancelPasteBtn')?.addEventListener('click', closePasteModal);
@@ -5170,8 +5191,43 @@ function renderSeatingGrid() {
     const { cols, rows, perspective } = state.seating;
     const isTeacher = perspective === 'teacher';
 
-    // Flexible column width
-    grid.style.gridTemplateColumns = `repeat(${cols}, minmax(60px, 1fr))`;
+    // Calculate dynamic sizing based on grid size
+    const totalCells = cols * rows;
+    let cellSize, fontSize, labelFontSize;
+
+    // Adjust sizes based on number of columns (most important for width)
+    if (cols <= 5) {
+        cellSize = '80px';
+        fontSize = '0.95rem';
+        labelFontSize = '0.75rem';
+    } else if (cols <= 7) {
+        cellSize = '70px';
+        fontSize = '0.85rem';
+        labelFontSize = '0.7rem';
+    } else if (cols <= 10) {
+        cellSize = '60px';
+        fontSize = '0.75rem';
+        labelFontSize = '0.65rem';
+    } else if (cols <= 15) {
+        cellSize = '50px';
+        fontSize = '0.65rem';
+        labelFontSize = '0.6rem';
+    } else {
+        cellSize = '40px';
+        fontSize = '0.55rem';
+        labelFontSize = '0.55rem';
+    }
+
+    // Set grid template with calculated size and dynamic gap
+    const gap = cols > 10 ? '4px' : '8px';
+    grid.style.gridTemplateColumns = `repeat(${cols}, ${cellSize})`;
+    grid.style.gap = gap;
+
+    // Store sizes as data attributes for CSS access
+    grid.dataset.cellSize = cellSize;
+    grid.dataset.fontSize = fontSize;
+    grid.dataset.labelFontSize = labelFontSize;
+
     grid.innerHTML = '';
 
     // Create Layout Desk Element
@@ -5187,10 +5243,11 @@ function renderSeatingGrid() {
 
     desk.style.textAlign = 'center';
     desk.style.background = '#e2e8f0';
-    desk.style.padding = '0.5rem 3rem';
+    desk.style.padding = '0.4rem 1.5rem';
     desk.style.borderRadius = '0.3rem';
     desk.style.fontWeight = 'bold';
     desk.style.color = '#475569';
+    desk.style.fontSize = labelFontSize;
     // Visual spacing
     desk.style.marginBottom = !isTeacher ? '15px' : '0';
     desk.style.marginTop = isTeacher ? '15px' : '0';
@@ -5237,9 +5294,18 @@ function renderSeatingGrid() {
                 }
             }
 
+            // Look for attendance number in metadata
+            let attendanceNo = '';
+            if (student && state.studentMetadata && state.studentMetadata[student]) {
+                const meta = state.studentMetadata[student];
+                // Try common keys for attendance number
+                attendanceNo = meta['出席番号'] || meta['番号'] || meta['No.'] || meta['No'] || '';
+            }
+
             cell.innerHTML = `
-                <div class="seat-label">${label}</div>
-                <div class="student-name">${student || ''}</div>
+                <div class="seat-label" style="font-size: ${labelFontSize};">${label}</div>
+                ${attendanceNo ? `<div class="attendance-no" style="position: absolute; top: 2px; right: 4px; font-size: ${labelFontSize}; color: #64748b; font-weight: bold;">${attendanceNo}</div>` : ''}
+                <div class="student-name" style="font-size: ${fontSize};">${student || ''}</div>
             `;
 
             // Apply color coding with gradient
@@ -6321,7 +6387,7 @@ function renderRosterBoardTable() {
     }
 
     if (visible.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 2rem; color: #94a3b8;">
+        tbody.innerHTML = `<tr><td colspan="11" style="text-align: center; padding: 2rem; color: #94a3b8;">
             条件に一致する学生がいません
         </td></tr>`;
         return;
@@ -6352,6 +6418,7 @@ function renderRosterBoardTable() {
             <td>${c.metadata['出席\n番号'] || c.metadata['出席番号'] || c.no || '-'}</td>
             <td><div style="font-weight:500;">${displayName}</div></td>
             <td style="color:#cbd5e1; font-size:0.8rem; font-family:monospace;">${c.metadata['暗号化氏名1'] || c.metadata['暗号化氏名'] || ''}</td>
+            <td style="font-family:monospace; font-size:0.85rem;">${c.metadata['OMUID'] || c.metadata['omuid'] || '-'}</td>
             <td>${c.metadata['性別'] || '-'}</td>
             <td>${c.metadata['選択'] || c.metadata['選択科目'] || '-'}</td>
             <td>${c.metadata['応用専門分野・領域'] || c.metadata['コース'] || '-'}</td>
@@ -6885,7 +6952,10 @@ function renderFacultyTable() {
         const tr = document.createElement('tr');
         const isSelected = facultyImportState.selected.has(c.id);
         const rowStyle = isSelected ? 'background-color: #f0f9ff;' : '';
-        tr.style.cssText = rowStyle;
+        tr.style.cssText = rowStyle + ' cursor: pointer;';
+        tr.dataset.facultyId = c.id;
+        tr.dataset.facultyEmail = c.email || '';
+        tr.dataset.facultyName = c.name || '';
 
         tr.innerHTML = `
             <td style="text-align:center;"><input type="checkbox" class="fac-row-check" data-id="${c.id}" ${isSelected ? 'checked' : ''}></td>
@@ -6896,6 +6966,21 @@ function renderFacultyTable() {
             <td style="font-family: monospace; font-size: 0.8rem;">${c.email}</td>
             <td style="color:#64748b;">${c.omuid}</td>
         `;
+
+        // Add right-click context menu
+        tr.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            showFacultyContextMenu(e, c);
+        });
+
+        // Hover effect
+        tr.addEventListener('mouseenter', () => {
+            if (!isSelected) tr.style.backgroundColor = '#f8fafc';
+        });
+        tr.addEventListener('mouseleave', () => {
+            if (!isSelected) tr.style.backgroundColor = '';
+        });
+
         tbody.appendChild(tr);
     });
 
@@ -6909,6 +6994,93 @@ function renderFacultyTable() {
             e.target.closest('tr').style.backgroundColor = e.target.checked ? '#f0f9ff' : '';
         };
     });
+}
+
+function showFacultyContextMenu(event, faculty) {
+    // Remove existing context menu if any
+    const existingMenu = document.getElementById('facultyContextMenu');
+    if (existingMenu) existingMenu.remove();
+
+    if (!faculty.email) {
+        alert('この教職員にはメールアドレスが登録されていません。');
+        return;
+    }
+
+    // Create context menu
+    const menu = document.createElement('div');
+    menu.id = 'facultyContextMenu';
+    menu.style.cssText = `
+        position: fixed;
+        left: ${event.clientX}px;
+        top: ${event.clientY}px;
+        background: white;
+        border: 1px solid #cbd5e1;
+        border-radius: 0.5rem;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        z-index: 10000;
+        min-width: 200px;
+        padding: 0.5rem 0;
+    `;
+
+    const menuItems = [
+        {
+            icon: '💬',
+            label: 'Teams チャット',
+            action: () => {
+                const url = `https://teams.microsoft.com/l/chat/0/0?users=${faculty.email}`;
+                window.open(url, '_blank');
+            }
+        },
+        {
+            icon: '📧',
+            label: 'メール送信',
+            action: () => {
+                window.location.href = `mailto:${faculty.email}`;
+            }
+        }
+    ];
+
+    menuItems.forEach(item => {
+        const menuItem = document.createElement('div');
+        menuItem.style.cssText = `
+            padding: 0.75rem 1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 0.9rem;
+            color: #334155;
+            transition: background-color 0.15s;
+        `;
+        menuItem.innerHTML = `
+            <span style="font-size: 1.2rem;">${item.icon}</span>
+            <span>${item.label}</span>
+        `;
+
+        menuItem.addEventListener('mouseenter', () => {
+            menuItem.style.backgroundColor = '#f1f5f9';
+        });
+        menuItem.addEventListener('mouseleave', () => {
+            menuItem.style.backgroundColor = '';
+        });
+        menuItem.addEventListener('click', () => {
+            item.action();
+            menu.remove();
+        });
+
+        menu.appendChild(menuItem);
+    });
+
+    document.body.appendChild(menu);
+
+    // Close menu when clicking outside
+    const closeMenu = (e) => {
+        if (!menu.contains(e.target)) {
+            menu.remove();
+            document.removeEventListener('click', closeMenu);
+        }
+    };
+    setTimeout(() => document.addEventListener('click', closeMenu), 0);
 }
 
 function openFacultyTeamsChat() {

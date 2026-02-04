@@ -861,6 +861,10 @@
                                     style="display: flex; flex-direction: column; gap: 1rem;">
                                     <!-- Populated by JS -->
                                 </div>
+                                <button id="clearFacultyFiltersBtn" class="btn btn-secondary"
+                                    style="width: 100%; margin-top: 1rem; justify-content: center; font-size: 0.85rem;">
+                                    🔄 絞り込みクリア
+                                </button>
                             </div>
 
                             <div style="margin-top: auto; padding-top: 1rem; border-top: 1px solid #e2e8f0;">
@@ -977,6 +981,10 @@
                                     style="display: flex; flex-direction: column; gap: 0.5rem;">
                                     <div style="color: #94a3b8; font-size: 0.85rem;">ファイルを読み込むと条件が表示されます</div>
                                 </div>
+                                <button id="clearRosterFiltersBtn" class="btn btn-secondary"
+                                    style="width: 100%; margin-top: 1rem; justify-content: center; font-size: 0.85rem;">
+                                    🔄 絞り込みクリア
+                                </button>
                             </div>
 
                             <div style="margin-top: auto;">
@@ -1018,6 +1026,9 @@
                                                 class="sort-icon"></span></th>
                                         <th style="text-align: left; padding: 0.5rem; color:#94a3b8; font-size:0.8rem;">
                                             暗号化氏名1</th>
+                                        <th class="sortable-th" data-sort="omuid"
+                                            style="text-align: left; padding: 0.5rem; cursor: pointer;">OMUID <span
+                                                class="sort-icon"></span></th>
                                         <th class="sortable-th" data-sort="gender"
                                             style="text-align: left; padding: 0.5rem; cursor: pointer;">性別 <span
                                                 class="sort-icon"></span></th>
@@ -1034,7 +1045,7 @@
                                 </thead>
                                 <tbody id="rosterBoardBody">
                                     <tr>
-                                        <td colspan="8" style="text-align: center; padding: 3rem; color: #94a3b8;">
+                                        <td colspan="11" style="text-align: center; padding: 3rem; color: #94a3b8;">
                                             「新しい名簿ファイルを読み込む」ボタンからCSVを選択してください
                                         </td>
                                     </tr>
