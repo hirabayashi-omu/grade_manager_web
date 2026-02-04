@@ -251,7 +251,7 @@ let state = {
     seatingPresets: [],
     seatingPresets: [],
     studentMetadata: {}, // Store tag info (extra columns from roster)
-    nameDisplayMode: 'name' // 'name' or 'initial'
+    nameDisplayMode: localStorage.getItem('gm_state_name_display') || 'name' // 'name' or 'initial'
 };
 
 const SCORE_KEYS = ["前期中間", "前期末", "後期中間", "学年末"];
@@ -264,9 +264,20 @@ let currentPasteKey = null;
 let importState = {
     candidates: [], // { name, sortKey, metadata }
     filters: {},    // { key: selectedValue }
+    searchText: '', // Search Query
     selected: new Set(),
     sortKey: 'original', // 'year', 'class', 'no', 'name', ...
     sortOrder: 'asc' // 'asc' or 'desc'
+};
+
+// Faculty Roster State
+let facultyImportState = {
+    candidates: [],
+    filters: {},
+    searchText: '',
+    selected: new Set(),
+    sortKey: 'original',
+    sortOrder: 'asc'
 };
 
 // ==================== STATE PERSISTENCE ====================
@@ -293,6 +304,10 @@ function saveSessionState() {
         localStorage.setItem('gm_student_metadata', JSON.stringify(state.studentMetadata));
         localStorage.setItem('gm_master_subjects_json', JSON.stringify(state.subjects));
         localStorage.setItem('grade_manager_scores', JSON.stringify(state.scores));
+
+        // Roster Persistence
+        localStorage.setItem('gm_roster_candidates', JSON.stringify(importState.candidates));
+        localStorage.setItem('gm_faculty_candidates', JSON.stringify(facultyImportState.candidates));
 
     } catch (e) {
         console.error('Save State Error:', e);
@@ -347,6 +362,29 @@ function loadSessionState() {
         state.currentStudent = null;
     }
 
+    // Restore Roster Candidates
+    try {
+        const savedRoster = localStorage.getItem('gm_roster_candidates');
+        if (savedRoster) {
+            importState.candidates = JSON.parse(savedRoster) || [];
+            console.log(`Loaded ${importState.candidates.length} student roster candidates.`);
+        }
+    } catch (e) {
+        console.error('Failed to restore student roster:', e);
+        importState.candidates = [];
+    }
+
+    try {
+        const savedFaculty = localStorage.getItem('gm_faculty_candidates');
+        if (savedFaculty) {
+            facultyImportState.candidates = JSON.parse(savedFaculty) || [];
+            console.log(`Loaded ${facultyImportState.candidates.length} faculty roster candidates.`);
+        }
+    } catch (e) {
+        console.error('Failed to restore faculty roster:', e);
+        facultyImportState.candidates = [];
+    }
+
     // Force automatic year detection on load to ensure we start at the latest data year
     // This MUST happen after state.scores and state.subjects are loaded (which happens in refreshMasterData and mockData)
     // Actually, loadSessionState is called in init() AFTER refreshMasterData and mockData.
@@ -354,17 +392,24 @@ function loadSessionState() {
 }
 
 // ==================== INITIALIZATION ====================
+// ==================== INITIALIZATION ====================
+// ==================== INITIALIZATION ====================
 function init() {
-    // Auth check must happen first to block UI
-    initAuth();
-
     setupEventListeners();
+
+    // 1. Load Master Data & Scores
     refreshMasterData();
     mockData();
+
+    // 2. Restore Session State (Roster, Tab, Filters, etc.)
+    // MUST be done before syncSpecialActivitiesForAll because that function triggers a save,
+    // and we need the roster data loaded so it doesn't get overwritten with empty arrays.
+    loadSessionState();
+
+    // 3. Logic that might trigger a save
     syncSpecialActivitiesForAll();
 
     // OPTIMIZATION: Clean up orphaned scores if they accumulate too much
-    // (Prevents memory/storage bloat if many students were added/removed or due to the massive array bug)
     const scoreCount = Object.keys(state.scores).length;
     if (scoreCount > 1000 && scoreCount > state.students.length * 2) {
         const validNames = new Set(state.students);
@@ -381,9 +426,6 @@ function init() {
         }
     }
 
-    // Restore persistent state
-    loadSessionState();
-
     populateControls();
 
     // Set default year if not loaded or invalid, otherwise respect saved year
@@ -395,7 +437,10 @@ function init() {
     setupRosterHeaderSort();
 
     initAtRiskDefaults();
-    initContextMenu(); // Initialize menu once at startup
+    initContextMenu();
+
+    // 4. Initialize Auth & UI (Last, so data is ready for rendering)
+    initAuth();
 }
 
 // ==================== AUTHENTICATION ====================
@@ -865,6 +910,12 @@ function setupEventListeners() {
     document.getElementById('printBtn')?.addEventListener('click', () => window.print());
     document.getElementById('exportJsonBtn')?.addEventListener('click', exportJson);
 
+    // Import JSON
+    document.getElementById('importJsonBtn')?.addEventListener('click', () => {
+        document.getElementById('jsonFileInput')?.click();
+    });
+    document.getElementById('jsonFileInput')?.addEventListener('change', handleJsonImport);
+
     // Import CSV
     document.getElementById('importBtn')?.addEventListener('click', () => {
         document.getElementById('csvFileInput')?.click();
@@ -891,6 +942,17 @@ function setupEventListeners() {
         renderRosterBoardTable();
     });
 
+    // Search Inputs
+    document.getElementById('rosterSearchInput')?.addEventListener('input', (e) => {
+        importState.searchText = e.target.value;
+        renderRosterBoardTable();
+    });
+
+    document.getElementById('facultySearchInput')?.addEventListener('input', (e) => {
+        facultyImportState.searchText = e.target.value;
+        renderFacultyTable();
+    });
+
     document.getElementById('rosterSelectAll')?.addEventListener('click', (e) => {
         const checked = e.target.checked;
         const visible = getFilteredAndSortedCandidates();
@@ -899,6 +961,22 @@ function setupEventListeners() {
             else importState.selected.delete(c.name);
         });
         renderRosterBoardTable();
+    });
+
+    // Faculty Roster Controls
+    document.getElementById('triggerFacultyLoadBtn')?.addEventListener('click', () => {
+        document.getElementById('facultyFileInput')?.click();
+    });
+    document.getElementById('facultyFileInput')?.addEventListener('change', handleFacultyRosterSelect);
+    document.getElementById('facultyTeamsChatBtn')?.addEventListener('click', openFacultyTeamsChat);
+    document.getElementById('facultySendMailBtn')?.addEventListener('click', openFacultyMail);
+    document.getElementById('facultySelectAll')?.addEventListener('click', (e) => {
+        const checked = e.target.checked;
+        facultyImportState.candidates.forEach(c => {
+            if (checked) facultyImportState.selected.add(c.id);
+            else facultyImportState.selected.delete(c.id);
+        });
+        renderFacultyTable();
     });
 
     // Paste Modal
@@ -929,9 +1007,13 @@ function setupEventListeners() {
     document.getElementById('generateClassStatsBtn')?.addEventListener('click', () => {
         generateClassStats();
     });
+    document.getElementById('classStatsYear')?.addEventListener('change', () => {
+        generateClassStats();
+    });
     document.getElementById('classStatsTest')?.addEventListener('change', () => {
         generateClassStats();
     });
+    document.getElementById('exportClassStatsCsvBtn')?.addEventListener('click', exportClassStatsCsv);
 
     // Mobile tabs
     document.querySelectorAll('.mobile-tab').forEach(tab => {
@@ -1038,7 +1120,16 @@ function setupEventListeners() {
     });
 
     document.getElementById('exportStudentsCsvBtn')?.addEventListener('click', exportStudentsCsv);
+    document.getElementById('importStudentsCsvBtn')?.addEventListener('click', () => {
+        document.getElementById('studentsCsvFileInput')?.click();
+    });
+    document.getElementById('studentsCsvFileInput')?.addEventListener('change', handleStudentsCsvImport);
+
     document.getElementById('exportSubjectsCsvBtn')?.addEventListener('click', exportSubjectsCsv);
+    document.getElementById('importSubjectsCsvBtn')?.addEventListener('click', () => {
+        document.getElementById('subjectsCsvFileInput')?.click();
+    });
+    document.getElementById('subjectsCsvFileInput')?.addEventListener('change', handleSubjectsCsvImport);
 
     document.getElementById('subjectSearchInput')?.addEventListener('input', render);
 
@@ -1119,8 +1210,11 @@ function switchTab(tabName) {
     } else if (tabName === 'seating') {
         initSeating();
     } else if (tabName === 'roster_board') {
-        // Initialize or refresh Roster Board if needed
+        renderRosterBoardFilters();
         renderRosterBoardTable();
+    } else if (tabName === 'faculty_roster') {
+        renderFacultyFilters();
+        renderFacultyTable();
     }
 }
 
@@ -1166,6 +1260,60 @@ function exportJson() {
     URL.revokeObjectURL(url);
 
     alert('JSONファイルをダウンロードしました (JSON file downloaded)');
+}
+
+function handleJsonImport(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        try {
+            const importData = JSON.parse(event.target.result);
+
+            // Validate data structure
+            if (!importData.scores) {
+                throw new Error('無効なJSONファイル形式です。成績データが見つかりません。');
+            }
+
+            // Confirm before overwriting
+            if (!confirm('現在の成績データを上書きしますか？\n\n※この操作は元に戻せません。')) {
+                e.target.value = ''; // Reset file input
+                return;
+            }
+
+            // Import scores
+            state.scores = importData.scores;
+            localStorage.setItem('grade_manager_scores', JSON.stringify(state.scores));
+
+            // Import custom subjects if available
+            if (importData.customSubjects && Array.isArray(importData.customSubjects)) {
+                // Merge custom subjects (avoid duplicates)
+                const existingNames = new Set(state.subjects.map(s => s.name));
+                importData.customSubjects.forEach(sub => {
+                    if (!existingNames.has(sub.name)) {
+                        state.subjects.push(sub);
+                        existingNames.add(sub.name);
+                    }
+                });
+                localStorage.setItem('grade_manager_subjects', JSON.stringify(state.subjects));
+                localStorage.setItem('gm_master_subjects_json', JSON.stringify(state.subjects));
+            }
+
+            saveSessionState();
+            render();
+
+            alert('成績データを読み込みました！\n\n画面を更新して反映します。');
+
+        } catch (err) {
+            console.error('JSON import error:', err);
+            alert('JSONファイルの読み込みに失敗しました:\n' + err.message);
+        } finally {
+            e.target.value = ''; // Reset file input
+        }
+    };
+
+    reader.readAsText(file);
 }
 
 function renderSettings() {
@@ -1652,10 +1800,34 @@ function exportStudentsCsv() {
         return;
     }
 
-    // Prepare CSV content (Standard format: one name per line with header)
-    const BOM = '\uFEFF'; // Add BOM for Excel compatibility
-    const header = '学生名';
-    const csvContent = BOM + [header, ...state.students].join('\n');
+    // Collect all metadata keys
+    const metadataKeys = new Set();
+    state.students.forEach(student => {
+        const meta = state.studentMetadata[student] || {};
+        Object.keys(meta).forEach(key => metadataKeys.add(key));
+    });
+
+    const BOM = '\uFEFF';
+
+    // Create header with metadata columns
+    const baseHeaders = ['学生名'];
+    const metaHeaders = Array.from(metadataKeys).sort();
+    const headers = [...baseHeaders, ...metaHeaders];
+
+    // Create rows with metadata
+    const rows = state.students.map(student => {
+        const meta = state.studentMetadata[student] || {};
+        const row = [student];
+
+        // Add metadata values in the same order as headers
+        metaHeaders.forEach(key => {
+            row.push(meta[key] || '');
+        });
+
+        return row.join(',');
+    });
+
+    const csvContent = BOM + [headers.join(','), ...rows].join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -1668,6 +1840,115 @@ function exportStudentsCsv() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+}
+
+function handleStudentsCsvImport(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        try {
+            const text = event.target.result;
+            const lines = text.split(/\r?\n/).filter(line => line.trim());
+
+            if (lines.length < 2) {
+                throw new Error('CSVファイルが空か、データが不足しています。');
+            }
+
+            // Parse header
+            const header = lines[0].replace(/^\uFEFF/, '').split(',').map(h => h.trim());
+
+            if (header[0] !== '学生名') {
+                throw new Error('CSVファイルの形式が正しくありません。\n最初の列は「学生名」である必要があります。');
+            }
+
+            // Extract metadata column names
+            const metadataColumns = header.slice(1);
+
+            // Parse students and metadata
+            const importedStudents = [];
+            const importedMetadata = {};
+
+            for (let i = 1; i < lines.length; i++) {
+                const cols = lines[i].split(',').map(c => c.trim());
+                if (cols.length < 1 || !cols[0]) continue; // Skip invalid rows
+
+                const studentName = cols[0];
+                importedStudents.push(studentName);
+
+                // Parse metadata
+                const metadata = {};
+                metadataColumns.forEach((colName, idx) => {
+                    const value = cols[idx + 1];
+                    if (value) {
+                        metadata[colName] = value;
+                    }
+                });
+
+                if (Object.keys(metadata).length > 0) {
+                    importedMetadata[studentName] = metadata;
+                }
+            }
+
+            if (importedStudents.length === 0) {
+                throw new Error('有効な学生データが見つかりませんでした。');
+            }
+
+            // Check for duplicates
+            const existingNames = new Set(state.students);
+            const duplicates = importedStudents.filter(s => existingNames.has(s));
+
+            let confirmMsg = `${importedStudents.length}名の学生データを読み込みます。\n`;
+            if (metadataColumns.length > 0) {
+                confirmMsg += `メタデータ列: ${metadataColumns.join(', ')}\n`;
+            }
+            confirmMsg += '\n';
+
+            if (duplicates.length > 0) {
+                confirmMsg += `※ ${duplicates.length}名の重複する学生が見つかりました。\n`;
+                confirmMsg += '重複する学生のメタデータは上書きされます。\n\n';
+            }
+
+            confirmMsg += '続行しますか？';
+
+            if (!confirm(confirmMsg)) {
+                e.target.value = '';
+                return;
+            }
+
+            // Merge students (add new, keep existing)
+            const studentSet = new Set(state.students);
+            importedStudents.forEach(s => studentSet.add(s));
+            state.students = Array.from(studentSet);
+
+            // Merge metadata (overwrite duplicates)
+            Object.keys(importedMetadata).forEach(name => {
+                if (!state.studentMetadata[name]) {
+                    state.studentMetadata[name] = {};
+                }
+                Object.assign(state.studentMetadata[name], importedMetadata[name]);
+            });
+
+            // Save to localStorage
+            localStorage.setItem('grade_manager_students', JSON.stringify(state.students));
+            localStorage.setItem('gm_student_metadata', JSON.stringify(state.studentMetadata));
+
+            saveSessionState();
+            renderSettings();
+            populateControls();
+
+            alert(`学生データを読み込みました！\n\n読込: ${importedStudents.length}名\n重複: ${duplicates.length}名\n合計: ${state.students.length}名`);
+
+        } catch (err) {
+            console.error('CSV import error:', err);
+            alert('CSVファイルの読み込みに失敗しました:\n' + err.message);
+        } finally {
+            e.target.value = '';
+        }
+    };
+
+    reader.readAsText(file, 'UTF-8');
 }
 
 function exportSubjectsCsv() {
@@ -1700,6 +1981,111 @@ function exportSubjectsCsv() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+}
+
+function handleSubjectsCsvImport(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        try {
+            const text = event.target.result;
+            const lines = text.split(/\r?\n/).filter(line => line.trim());
+
+            if (lines.length < 2) {
+                throw new Error('CSVファイルが空か、データが不足しています。');
+            }
+
+            // Parse header
+            const header = lines[0].replace(/^\uFEFF/, '').split(',').map(h => h.trim());
+
+            // Validate header format
+            const expectedHeaders = ['授業科目', '単位', '学年', '種別1', '種別2', '種別3', '種別4'];
+            const hasValidHeader = expectedHeaders.every((h, i) => header[i] === h);
+
+            if (!hasValidHeader) {
+                throw new Error('CSVファイルの形式が正しくありません。\n期待されるヘッダー: ' + expectedHeaders.join(', '));
+            }
+
+            // Parse subjects
+            const importedSubjects = [];
+            for (let i = 1; i < lines.length; i++) {
+                const cols = lines[i].split(',').map(c => c.trim());
+                if (cols.length < 3) continue; // Skip invalid rows
+
+                const subject = {
+                    name: cols[0],
+                    credits: parseFloat(cols[1]) || 0,
+                    year: parseInt(cols[2]) || 1,
+                    type1: cols[3] || '',
+                    type2: cols[4] || '',
+                    type3: cols[5] || '',
+                    type4: cols[6] || '',
+                    exclude: false
+                };
+
+                if (subject.name) {
+                    importedSubjects.push(subject);
+                }
+            }
+
+            if (importedSubjects.length === 0) {
+                throw new Error('有効な科目データが見つかりませんでした。');
+            }
+
+            // Check for duplicates
+            const existingNames = new Set(state.subjects.map(s => s.name));
+            const duplicates = importedSubjects.filter(s => existingNames.has(s.name));
+
+            let confirmMsg = `${importedSubjects.length}件の科目データを読み込みます。\n\n`;
+
+            if (duplicates.length > 0) {
+                confirmMsg += `※ ${duplicates.length}件の重複する科目が見つかりました。\n`;
+                confirmMsg += '重複する科目は上書きされます。\n\n';
+            }
+
+            confirmMsg += '続行しますか？';
+
+            if (!confirm(confirmMsg)) {
+                e.target.value = '';
+                return;
+            }
+
+            // Merge subjects (replace duplicates)
+            const nameToSubject = new Map();
+
+            // Add existing subjects
+            state.subjects.forEach(s => {
+                nameToSubject.set(s.name, s);
+            });
+
+            // Overwrite with imported subjects
+            importedSubjects.forEach(s => {
+                nameToSubject.set(s.name, s);
+            });
+
+            // Update state
+            state.subjects = Array.from(nameToSubject.values());
+
+            // Save to localStorage
+            localStorage.setItem('grade_manager_subjects', JSON.stringify(state.subjects));
+            localStorage.setItem('gm_master_subjects_json', JSON.stringify(state.subjects));
+
+            saveSessionState();
+            renderSettings();
+
+            alert(`科目データを読み込みました！\n\n読込: ${importedSubjects.length}件\n上書き: ${duplicates.length}件\n合計: ${state.subjects.length}件`);
+
+        } catch (err) {
+            console.error('CSV import error:', err);
+            alert('CSVファイルの読み込みに失敗しました:\n' + err.message);
+        } finally {
+            e.target.value = '';
+        }
+    };
+
+    reader.readAsText(file, 'UTF-8');
 }
 
 
@@ -2533,371 +2919,267 @@ const isYearFinished = (studentName, year) => {
     return hasYearEnd;
 };
 
+/**
+ * Correctly calculates cumulative statistics for a student up to a specific year and test point.
+ * This ensures consistency between Personal Stats and Class Statistics reports.
+ */
+function getStudentStats(studentName, targetYear, targetTest) {
+    // 1. Stats 1 (Snapshot of current year/test)
+    const subjects1 = getTargetSubjects(s => s.year === targetYear && !s.name.startsWith('特・'));
+    let s1Sum = 0, s1Count = 0;
+    subjects1.forEach(sub => {
+        const sc = getScore(studentName, sub.name, targetTest);
+        if (typeof sc === 'number') { s1Sum += sc; s1Count++; }
+    });
+    const stats1 = { avg: s1Count > 0 ? (s1Sum / s1Count) : 0, count: s1Count };
+
+    // 2. Stats 2 (Cumulative from Year 1 up to targetYear/targetTest)
+    const subjects2 = getTargetSubjects(s => s.year <= targetYear);
+    let s2Sum = 0, s2Count = 0, s2WgtN = 0, s2WgtD = 0, s2GpN = 0, s2GpD = 0, s2Cred = 0;
+
+    subjects2.forEach(sub => {
+        const isPastYear = sub.year < targetYear;
+        // Logic: For past years, use the Final Score (学年末). 
+        // For the target year, use the requested test point (testKey).
+        const testKey = isPastYear ? '学年末' : targetTest;
+        const val = getScore(studentName, sub.name, testKey);
+
+        const isNumeric = !sub.name.startsWith('特・');
+
+        if (typeof val === 'number') {
+            if (isNumeric) {
+                s2Sum += val; s2Count++;
+                const cr = sub.credits || 0;
+                s2WgtN += val * cr; s2WgtD += cr;
+                let gp = 0;
+                if (val >= 90) gp = 4; else if (val >= 80) gp = 3; else if (val >= 70) gp = 2; else if (val >= 60) gp = 1;
+                s2GpN += gp * cr; s2GpD += cr;
+            }
+            if (val >= 60) s2Cred += (sub.credits || 0);
+        } else {
+            // Evaluated subjects (特・ etc) or Pass/Fail
+            if (['合', '認', '修', '履', 'S', 'A', 'B', 'C'].includes(val)) s2Cred += (sub.credits || 0);
+        }
+    });
+
+    return {
+        stats1,
+        stats2: {
+            credits: s2Cred,
+            avg_sim: s2Count > 0 ? (s2Sum / s2Count) : 0,
+            avg_wgt: s2WgtD > 0 ? (s2WgtN / s2WgtD) : 0,
+            gpa: s2GpD > 0 ? (s2GpN / s2GpD) : 0,
+            count: s2Count
+        }
+    };
+}
+
+/**
+ * Helper to check if a student has any recorded scores in a specific academic year.
+ */
+function hasDataForYear(studentName, year) {
+    const yearSubjects = state.subjects.filter(s => s.year === year && !s.exclude);
+    return yearSubjects.some(sub => {
+        for (const key of SCORE_KEYS) {
+            const v = getScore(studentName, sub.name, key);
+            if (v !== undefined && v !== null && v !== '') return true;
+        }
+        return false;
+    });
+}
+
+function getScore(studentName, subjectName, testKey) {
+    if (!studentName || !subjectName) return null;
+    const studentScores = state.scores[studentName] || {};
+    const scoreObj = studentScores[subjectName] || {};
+    const val = scoreObj[testKey];
+    if (val === undefined || val === null || val === '') return null;
+    const num = parseFloat(val);
+    return isNaN(num) ? val : num;
+}
+
 function renderStats2() {
     const tbody = document.getElementById('stats2Body');
+    if (!tbody) return;
     tbody.innerHTML = '';
     const currentStudent = state.currentStudent;
+    if (!currentStudent) return;
 
-    const simpleAvgData = [];
-    const weightedAvgData = [];
-    const gpaData = [];
+    const totalStudents = state.students.length;
+    const testKeys = ["学年末", "後期中間", "前期末", "前期中間"];
+    const rowData = [];
 
-    const rankSimpleData = [];
-    const rankWeightedData = [];
-    const rankGpaData = [];
+    // Rule: Iterate 1 to 5. Determine if a row/plot exists for each.
+    for (let y = 1; y <= 5; y++) {
+        // Condition: Does this specific year y have ANY data for the student?
+        if (!hasDataForYear(currentStudent, y)) continue;
 
-    const labels = ["1年", "2年", "3年", "4年", "5年"];
-
-    // --- Helpers ---
-
-    // Helper: Filter subjects based on UI settings (Course, etc.)
-    // --- GPA Calculation Part ---
-
-
-    // 2. Get Stats for "Term A"
-    const getTermA = (studentName, year) => {
-        let sum = 0;
-        let count = 0;
-        let wSum = 0;
-        let creds = 0;
-        let gpWSum = 0;
-        let gpCreds = 0;
-
-        const subjects = getTargetSubjects(s => {
-            if (s.year === year) return true;
-            if (s.year === 0) {
-                const scoreObj = (state.scores[studentName] || {})[s.name];
-                return scoreObj && scoreObj.obtainedYear === year;
-            }
-            return false;
-        });
-
-        subjects.forEach(sub => {
-            // ... rest of function logic ...
-            const keys = ["学年末", "後期中間", "前期末", "前期中間"];
-            let subValSum = 0;
-            let subValCount = 0;
-
-            keys.forEach(k => {
-                const v = getScore(studentName, sub.name, k);
-                if (v !== undefined && v !== null && v !== '' && !isNaN(parseFloat(v))) {
-                    subValSum += parseFloat(v);
-                    subValCount++;
-                }
+        // Determine the latest test point for the "current" year snapshot
+        let targetTest = '学年末';
+        // For each year, we try to find the best representative data point.
+        // Priority: 学年末 -> 後期中間 -> 前期末 -> 前期中間
+        for (const tk of testKeys) {
+            const hasTestScores = state.subjects.filter(s => s.year === y).some(s => {
+                const sc = getScore(currentStudent, s.name, tk);
+                return sc !== undefined && sc !== null && sc !== '';
             });
-
-            if (subValCount > 0) {
-                const subAvg = subValSum / subValCount;
-                sum += subAvg;
-                count++;
-                const c = sub.credits || 0;
-                wSum += subAvg * c;
-                creds += c;
-                let gp = 0;
-                if (subAvg >= 90) gp = 4.0;
-                else if (subAvg >= 80) gp = 3.0;
-                else if (subAvg >= 70) gp = 2.0;
-                else if (subAvg >= 60) gp = 1.0;
-                else gp = 0.0;
-                gpWSum += gp * c;
-                gpCreds += c;
-            }
-        });
-
-        if (count === 0) return null;
-
-        return {
-            simple: sum / count,
-            weighted: creds > 0 ? (wSum / creds) : 0,
-            gpa: gpCreds > 0 ? (gpWSum / gpCreds) : 0
-        };
-    };
-
-    // 3. Get Stats for "Term B"
-    const getTermB = (studentName, limitYear) => {
-        let sum = 0;
-        let count = 0;
-        let wSum = 0;
-        let creds = 0;
-        let gpWSum = 0;
-        let gpCreds = 0;
-
-        const subjects = getTargetSubjects(s => {
-            if (s.year > 0 && s.year <= limitYear) return true;
-            if (s.year === 0) {
-                const scoreObj = (state.scores[studentName] || {})[s.name];
-                return scoreObj && scoreObj.obtainedYear > 0 && scoreObj.obtainedYear <= limitYear;
-            }
-            return false;
-        });
-
-        subjects.forEach(sub => {
-            // ... rest ...
-            const v = getScore(studentName, sub.name, '学年末');
-            if (v !== undefined && v !== null && v !== '' && !isNaN(parseFloat(v))) {
-                const val = parseFloat(v);
-                sum += val;
-                count++;
-                const c = sub.credits || 0;
-                wSum += val * c;
-                creds += c;
-                let gp = 0;
-                if (val >= 90) gp = 4.0;
-                else if (val >= 80) gp = 3.0;
-                else if (val >= 70) gp = 2.0;
-                else if (val >= 60) gp = 1.0;
-                else gp = 0.0;
-                gpWSum += gp * c;
-                gpCreds += c;
-            }
-        });
-
-        if (count === 0) return null;
-        return {
-            simple: sum / count,
-            weighted: creds > 0 ? (wSum / creds) : 0,
-            gpa: gpCreds > 0 ? (gpWSum / gpCreds) : 0
-        };
-    };
-
-    // Combined Stats Calculation
-    const getStudentFinalStats = (studentName, year) => {
-        const subjects = getTargetSubjects(s => {
-            if (s.year === year) return true;
-            if (s.year === 0) {
-                const scoreObj = (state.scores[studentName] || {})[s.name];
-                return scoreObj && scoreObj.obtainedYear === year;
-            }
-            return false;
-        });
-        // ... rest ...
-        let hasAnyData = false;
-        for (const sub of subjects) {
-            const keys = ["学年末", "後期中間", "前期末", "前期中間"];
-            for (const k of keys) {
-                const v = getScore(studentName, sub.name, k);
-                if (v !== undefined && v !== null && v !== '') { hasAnyData = true; break; }
-            }
-            if (hasAnyData) break;
-        }
-
-        if (!hasAnyData) return { hasData: false };
-
-        const finished = isYearFinished(studentName, year);
-
-        if (finished) {
-            const res = getTermB(studentName, year);
-            return { hasData: res !== null, ...res };
-        } else {
-            const termA = getTermA(studentName, year);
-            let termB = null;
-            if (year > 1) {
-                termB = getTermB(studentName, year - 1);
-            }
-
-            if (!termA) return { hasData: false };
-
-            if (!termB) {
-                return { hasData: true, ...termA };
-            } else {
-                return {
-                    hasData: true,
-                    simple: (termA.simple + termB.simple) / 2,
-                    weighted: (termA.weighted + termB.weighted) / 2,
-                    gpa: (termA.gpa + termB.gpa) / 2
-                };
+            if (hasTestScores) {
+                targetTest = tk;
+                break;
             }
         }
-    };
 
-
-    // --- Main Loop ---
-    for (let targetYear = 1; targetYear <= 5; targetYear++) {
-
-        // 1. Calculate for ALL students (for Ranking)
-        const allStats = state.students.map(s => {
-            const stats = getStudentFinalStats(s, targetYear);
-            return { name: s, ...stats };
+        const studentsStats = state.students.map(name => {
+            const stats = getStudentStats(name, y, targetTest);
+            return { name, ...stats.stats2 };
         });
 
-        // 2. Current Student
-        const myStats = allStats.find(s => s.name === currentStudent);
+        const getRank = (list, key, name) => {
+            const filtered = list.filter(s => s.count > 0);
+            const sorted = [...filtered].sort((a, b) => (b[key] || 0) - (a[key] || 0));
+            const idx = sorted.findIndex(s => s.name === name);
+            if (idx === -1) return null;
 
-        // 3. Ranks
-        let rSimple = null, rWeighted = null, rGpa = null;
-        if (myStats && myStats.hasData) {
-            // Simple
-            const vSimple = allStats.filter(s => s.hasData && s.simple !== undefined).sort((a, b) => b.simple - a.simple);
-            const iSimple = vSimple.findIndex(s => s.name === currentStudent);
-            if (iSimple !== -1) rSimple = iSimple + 1;
-
-            // Weighted
-            const vWeighted = allStats.filter(s => s.hasData && s.weighted !== undefined).sort((a, b) => b.weighted - a.weighted);
-            const iWeighted = vWeighted.findIndex(s => s.name === currentStudent);
-            if (iWeighted !== -1) rWeighted = iWeighted + 1;
-
-            // GPA
-            const vGpa = allStats.filter(s => s.hasData && s.gpa !== undefined).sort((a, b) => b.gpa - a.gpa);
-            const iGpa = vGpa.findIndex(s => s.name === currentStudent);
-            if (iGpa !== -1) rGpa = iGpa + 1;
-        }
-
-        // 4. Push Chart Data
-        // Policy 3: If no data, do not display (push null)
-        if (myStats && myStats.hasData) {
-            simpleAvgData.push(myStats.simple);
-            weightedAvgData.push(myStats.weighted);
-            gpaData.push(myStats.gpa);
-            rankSimpleData.push(rSimple);
-            rankWeightedData.push(rWeighted);
-            rankGpaData.push(rGpa);
-        } else {
-            simpleAvgData.push(null);
-            weightedAvgData.push(null);
-            gpaData.push(null);
-            rankSimpleData.push(null);
-            rankWeightedData.push(null);
-            rankGpaData.push(null);
-        }
-
-        // 5. Render Table (If data exists)
-        if (myStats && myStats.hasData) {
-            // Count helper (just for display)
-            // Show count of subjects involved in Term A (Current Year)
-            // Or Total Cumulative Subjects?
-            // "Subject Count" implies total subjects counted.
-            // If In Progress: Subjects in Term A + Subjects in Term B?
-            // Let's count subjects in Year <= targetYear that have any valid score used.
-            let subCount = 0;
-            const subjects = state.subjects.filter(s => s.year <= targetYear && !s.exclude);
-            subjects.forEach(sub => {
-                const k = ["学年末", "後期中間", "前期末", "前期中間"];
-                for (const key of k) {
-                    if (getScore(currentStudent, sub.name, key) !== null) { subCount++; break; }
+            // Tie-handling
+            let rank = 1;
+            for (let i = 0; i < sorted.length; i++) {
+                if (i > 0 && Math.abs((sorted[i][key] || 0) - (sorted[i - 1][key] || 0)) > 0.0001) {
+                    rank = i + 1;
                 }
-            });
+                if (sorted[i].name === name) return rank;
+            }
+            return idx + 1;
+        };
 
-            const totalStudents = state.students.length;
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td style="text-align:center;">${targetYear}年</td>
-                <td style="text-align:center;">${subCount}</td>
-                <td style="text-align:center;">${myStats.simple.toFixed(2)}</td>
-                <td style="text-align:center;">${rSimple ? rSimple + ' / ' + totalStudents : '-'}</td>
-                <td style="text-align:center;">${myStats.weighted.toFixed(2)}</td>
-                <td style="text-align:center;">${rWeighted ? rWeighted + ' / ' + totalStudents : '-'}</td>
-                <td style="text-align:center; font-weight:bold; color:#2563eb;">${myStats.gpa.toFixed(2)}</td>
-                <td style="text-align:center;">${rGpa ? rGpa + ' / ' + totalStudents : '-'}</td>
-            `;
-            tbody.appendChild(tr);
+        const myStats = studentsStats.find(s => s.name === currentStudent);
+        if (myStats) {
+            rowData.push({
+                year: y,
+                count: myStats.count,
+                avg_sim: myStats.avg_sim,
+                avg_wgt: myStats.avg_wgt,
+                gpa: myStats.gpa,
+                rank_sim: getRank(studentsStats, 'avg_sim', currentStudent),
+                rank_wgt: getRank(studentsStats, 'avg_wgt', currentStudent),
+                rank_gpa: getRank(studentsStats, 'gpa', currentStudent)
+            });
         }
     }
 
-    // --- Helper to create a dual-axis chart for Stats2 ---
-    const createStats2Chart = (canvasId, label, valueData, rankData, instanceVar, valueMax, valueTitle) => {
-        const ctx = document.getElementById(canvasId)?.getContext('2d');
-        if (!ctx) return null;
+    // 2. Render Table
+    rowData.forEach(row => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td style="text-align:center;">${row.year}年</td>
+            <td style="text-align:center;">${row.count}</td>
+            <td style="text-align:center;">${row.avg_sim.toFixed(2)}</td>
+            <td style="text-align:center;">${row.rank_sim ? row.rank_sim + ' / ' + totalStudents : '-'}</td>
+            <td style="text-align:center;">${row.avg_wgt.toFixed(2)}</td>
+            <td style="text-align:center;">${row.rank_wgt ? row.rank_wgt + ' / ' + totalStudents : '-'}</td>
+            <td style="text-align:center; font-weight:bold; color:#2563eb;">${row.gpa.toFixed(2)}</td>
+            <td style="text-align:center;">${row.rank_gpa ? row.rank_gpa + ' / ' + totalStudents : '-'}</td>
+        `;
+        tbody.appendChild(tr);
+    });
 
-        // Destroy old instance if it exists
-        if (instanceVar && typeof instanceVar.destroy === 'function') {
-            instanceVar.destroy();
+    // 3. Update Charts
+    updateStats2Charts(rowData);
+}
+
+function updateStats2Charts(activeData) {
+    const labels = ["1年", "2年", "3年", "4年", "5年"];
+    const simpleAvgData = [null, null, null, null, null];
+    const weightedAvgData = [null, null, null, null, null];
+    const gpaData = [null, null, null, null, null];
+    const rankSimData = [null, null, null, null, null];
+    const rankWgtData = [null, null, null, null, null];
+    const rankGpaData = [null, null, null, null, null];
+
+    activeData.forEach(r => {
+        const idx = r.year - 1;
+        if (idx >= 0 && idx < 5) {
+            simpleAvgData[idx] = r.avg_sim;
+            weightedAvgData[idx] = r.avg_wgt;
+            gpaData[idx] = r.gpa;
+            rankSimData[idx] = r.rank_sim;
+            rankWgtData[idx] = r.rank_wgt;
+            rankGpaData[idx] = r.rank_gpa;
         }
+    });
 
-        return new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: labels,
-                datasets: [
-                    {
-                        label: label,
-                        data: valueData,
-                        borderColor: '#2563eb', // Blue
-                        backgroundColor: '#2563eb',
-                        yAxisID: 'y',
-                        tension: 0.1,
-                        borderWidth: 3,
-                        pointRadius: 5
-                    },
-                    {
-                        label: '順位',
-                        data: rankData,
-                        borderColor: '#ef4444', // Red
-                        backgroundColor: '#ef4444',
-                        yAxisID: 'y1',
-                        tension: 0.1,
-                        borderWidth: 2,
-                        borderDash: [5, 5],
-                        pointRadius: 4,
-                        pointStyle: 'rectRot'
-                    }
-                ]
-            },
-            plugins: [{
-                id: 'plotAreaBorder',
-                beforeDraw(chart) {
-                    const { ctx, chartArea: { top, bottom, left, right } } = chart;
-                    ctx.save();
-                    ctx.strokeStyle = '#000000'; // Black border
-                    ctx.lineWidth = 1.5;
-                    ctx.strokeRect(left, top, right - left, bottom - top);
-                    ctx.restore();
-                }
-            }],
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                layout: { padding: { top: 30, bottom: 10 } },
-                interaction: { mode: 'index', intersect: false },
-                plugins: {
-                    title: { display: true, text: label + ' 推移', font: { weight: 'bold', size: 16 } },
-                    legend: { display: true, position: 'top' },
-                    tooltip: {
-                        callbacks: {
-                            label: function (context) {
-                                if (context.datasetIndex === 1) {
-                                    return `順位: ${context.parsed.y}位 / ${state.students.length}人`;
-                                }
-                                return `${label}: ${context.parsed.y.toFixed(2)}`;
-                            }
-                        }
-                    }
+    const maxRank = Math.max(state.students.length, 1);
+
+    stats2SimpleChartInstance = createStats2Chart('stats2SimpleChart', '平均点 (単純)', labels, simpleAvgData, rankSimData, stats2SimpleChartInstance, 100, '点数', maxRank);
+    stats2WeightedChartInstance = createStats2Chart('stats2WeightedChart', '平均点 (加重)', labels, weightedAvgData, rankWgtData, stats2WeightedChartInstance, 100, '点数', maxRank);
+    stats2GpaChartInstance = createStats2Chart('stats2GpaChart', 'GPA', labels, gpaData, rankGpaData, stats2GpaChartInstance, 4.0, 'GPA', maxRank);
+}
+
+function createStats2Chart(canvasId, label, labels, valueData, rankData, instanceVar, valueMax, valueTitle, maxRank) {
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    if (instanceVar) instanceVar.destroy();
+
+    return new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: label,
+                    data: valueData,
+                    borderColor: '#2563eb',
+                    backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                    yAxisID: 'y',
+                    tension: 0.1,
+                    fill: true
                 },
-                scales: {
-                    x: {
-                        grid: { display: true, color: 'rgba(0,0,0,0.1)' },
-                        border: { display: true, color: '#000', width: 1.5 },
-                        ticks: { color: '#000' }
-                    },
-                    y: {
-                        type: 'linear',
-                        position: 'left',
-                        min: 0,
-                        max: valueMax,
-                        title: { display: true, text: valueTitle, font: { weight: 'bold' } },
-                        grid: { color: 'rgba(0,0,0,0.1)' },
-                        border: { display: true, color: '#000', width: 1.5 },
-                        ticks: { color: '#000' }
-                    },
-                    y1: {
-                        type: 'linear',
-                        position: 'right',
-                        reverse: true,
-                        min: 1,
-                        max: Math.max(state.students.length, 1),
-                        title: { display: true, text: '順位', font: { weight: 'bold' } },
-                        grid: { drawOnChartArea: false },
-                        border: { display: true, color: '#000', width: 1.5 },
-                        ticks: { color: '#000', stepSize: 1, callback: (v) => Math.floor(v) === v ? v : '' }
-                    }
+                {
+                    label: '順位',
+                    data: rankData,
+                    borderColor: '#94a3b8',
+                    borderDash: [5, 5],
+                    yAxisID: 'y1',
+                    tension: 0,
+                    pointStyle: 'circle',
+                    pointRadius: 4
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: {
+                    grid: { display: true, color: 'rgba(0,0,0,0.1)' },
+                    border: { display: true, color: '#000', width: 1.5 },
+                    ticks: { color: '#000' }
+                },
+                y: {
+                    type: 'linear',
+                    position: 'left',
+                    min: 0,
+                    max: valueMax,
+                    title: { display: true, text: valueTitle },
+                    grid: { color: 'rgba(0,0,0,0.1)' },
+                    border: { display: true, color: '#000', width: 1.5 },
+                    ticks: { color: '#000' }
+                },
+                y1: {
+                    type: 'linear',
+                    position: 'right',
+                    reverse: true,
+                    min: 1,
+                    max: Math.max(state.students.length, 1),
+                    title: { display: true, text: '順位', font: { weight: 'bold' } },
+                    grid: { drawOnChartArea: false },
+                    border: { display: true, color: '#000', width: 1.5 },
+                    ticks: { color: '#000', stepSize: 1, callback: (v) => Math.floor(v) === v ? v : '' }
                 }
             }
-        });
-    };
+        }
+    });
+};
 
-    stats2SimpleChartInstance = createStats2Chart('stats2SimpleChart', '平均点 (単純)', simpleAvgData, rankSimpleData, stats2SimpleChartInstance, 100, '点数');
-    stats2WeightedChartInstance = createStats2Chart('stats2WeightedChart', '平均点 (加重)', weightedAvgData, rankWeightedData, stats2WeightedChartInstance, 100, '点数');
-    stats2GpaChartInstance = createStats2Chart('stats2GpaChart', 'GPA', gpaData, rankGpaData, stats2GpaChartInstance, 4.0, 'GPA');
-}
+
 
 // Event listener for toggle
 
@@ -3660,12 +3942,6 @@ function calculateOverallRank(year, targetStudent) {
     return idx !== -1 ? `${idx + 1} / ${sums.length}` : "";
 }
 
-function getScore(student, subject, key) {
-    if (state.scores[student] && state.scores[student][subject]) {
-        return state.scores[student][subject][key];
-    }
-    return null;
-}
 
 function calculateRank(year, key, targetStudent) {
     // Only normal subjects
@@ -4224,183 +4500,220 @@ function renderTrendChart() {
 // ==================== CLASS STATS ====================
 
 function initClassStats() {
-    // Initial render or clear?
-    // User needs to click 'Generate' to see stats usually, or we can auto-generate.
-    // Let's auto-generate using default '学年末' if container is empty.
-    const container = document.getElementById('classStatsContainer');
-    if (container && container.innerHTML.trim() === '') {
-        document.getElementById('classStatsTest').value = '学年末'; // Default
-        generateClassStats();
+    const yearEl = document.getElementById('classStatsYear');
+    const testEl = document.getElementById('classStatsTest');
+    if (!yearEl || !testEl) return;
+
+    // 1. Sync Year
+    if (!yearEl.value || yearEl.value == "1") {
+        yearEl.value = state.currentYear || "1";
     }
+
+    // 2. Determine best default test based on ANY student's data in that year
+    const targetYear = parseInt(yearEl.value);
+    const priorities = ["前期中間", "前期末", "後期中間", "学年末"];
+    let maxFoundIdx = -1;
+
+    // Fast check for default
+    outerLoop:
+    for (const s of state.students) {
+        for (let idx = priorities.length - 1; idx >= 0; idx--) {
+            if (idx <= maxFoundIdx) break; // No point checking lower priorities
+            const testKey = priorities[idx];
+            // Check if student has at least one numeric score in this test/year
+            const hasData = state.subjects.filter(sub => sub.year === targetYear && !sub.exclude).some(sub => {
+                const v = getScore(s, sub.name, testKey);
+                return typeof v === 'number';
+            });
+            if (hasData) {
+                maxFoundIdx = idx;
+                if (maxFoundIdx === 3) break outerLoop;
+            }
+        }
+    }
+    if (maxFoundIdx !== -1) {
+        testEl.value = priorities[maxFoundIdx];
+    }
+
+    generateClassStats();
+}
+
+function sortClassStats(col) {
+    if (state.classStatsSortCol === col) {
+        state.classStatsSortOrder = state.classStatsSortOrder === 'asc' ? 'desc' : 'asc';
+    } else {
+        state.classStatsSortCol = col;
+        state.classStatsSortOrder = (col === 'name') ? 'asc' : 'desc'; // Default Desc for numeric
+    }
+    generateClassStats();
 }
 
 function generateClassStats() {
-    const testKey = document.getElementById('classStatsTest').value;
+    const yearEl = document.getElementById('classStatsYear');
+    const testEl = document.getElementById('classStatsTest');
+    const targetYear = yearEl ? parseInt(yearEl.value) : state.currentYear;
+    const testKey = testEl ? testEl.value : '学年末';
+
     const container = document.getElementById('classStatsContainer');
     if (!container) return;
 
-    container.innerHTML = '<p>集計中 (Calculating)...</p>';
+    container.innerHTML = '<div style="padding: 2rem; text-align: center; color: #64748b;">集計中...</div>';
 
-    // Filter Subjects based on User Settings
-    // 1. Course Filter
-    // 2. Hide Empty (personal relevance)
-    const courseFilter = state.currentCourse;
-    const hideEmpty = state.hideEmptySubjects; // "単位認定のない科目を隠す"
+    setTimeout(() => {
+        const studentData = calculateClassStatsList(targetYear, testKey);
 
-    // Group subjects by Year? Or just flat list?
-    // Class Stats usually implies "All Class Subjects".
-    // Let's list by Year then Subject.
-
-    // Filter
-    const targetSubjects = state.subjects.filter(s => {
-        if (s.exclude) return false;
-
-        // Course Filter
-        if (courseFilter) {
-            const t4 = s.type4 || 'コース共通';
-            if (t4 !== 'コース共通' && t4 !== courseFilter) return false;
-        }
-
-        // Hide Empty: Check if CURRENT STUDENT has data
-        // This makes the report "My Relevant Class Stats"
-        if (hideEmpty) {
-            const scoreObj = state.scores[state.currentStudent] && state.scores[state.currentStudent][s.name];
-            if (!scoreObj) return false;
-            const keys = ["前期中間", "前期末", "後期中間", "学年末"];
-            const hasValue = keys.some(k => {
-                const v = scoreObj[k];
-                return v !== undefined && v !== null && v !== '';
-            });
-            if (!hasValue) return false;
-        }
-
-        return true;
-    });
-
-    if (targetSubjects.length === 0) {
-        container.innerHTML = '<p>表示する科目がありません (No subjects match filter).</p>';
-        return;
-    }
-
-    // Sort by Year, then Name
-    targetSubjects.sort((a, b) => {
-        if (a.year !== b.year) return a.year - b.year;
-        return a.name.localeCompare(b.name, 'ja');
-    });
-
-    // Generate Table Data
-    let html = `
-        <table class="report-table" style="font-size: 0.9rem; width: 100%;">
-            <thead>
-                <tr>
-                    <th style="width: 50px;">学年</th>
-                    <th>科目名 (Subject)</th>
-                    <th style="width: 60px;">単位</th>
-                    <th style="width: 80px;">コース</th>
-                    <th style="width: 60px;">平均</th>
-                    <th style="width: 60px;">最高</th>
-                    <th style="width: 60px;">最低</th>
-                    <th style="width: 80px;">受験者数</th>
-                    <th style="width: 60px;">自分の点</th>
-                    <th style="width: 60px;">偏差値</th>
-                </tr>
-            </thead>
-            <tbody>
-    `;
-
-    targetSubjects.forEach(sub => {
-        // Calculate Class Stats
-        let total = 0;
-        let count = 0;
-        let min = 100;
-        let max = 0;
-        const scores = [];
-
-        state.students.forEach(std => {
-            const val = getScore(std, sub.name, testKey);
-            if (typeof val === 'number') {
-                scores.push(val);
-                total += val;
-                count++;
-                if (val < min) min = val;
-                if (val > max) max = val;
-            }
-        });
-
-        if (count === 0) {
-            // No data for this subject in the class
-            // Skip or show empty? Show empty to indicate it exists.
-            // Wait, if hideEmpty is checked, we might have skipped it if *I* didn't take it.
-            // If I took it but nobody has scores yet (e.g. future test), show dash.
-            html += `
-                <tr>
-                    <td style="text-align: center;">${sub.year}</td>
-                    <td>${sub.name}</td>
-                    <td style="text-align: center;">${sub.credits}</td>
-                    <td style="text-align: center;"><span class="badge badge-purple">${sub.type4 || '-'}</span></td>
-                    <td style="text-align: center;">-</td>
-                    <td style="text-align: center;">-</td>
-                    <td style="text-align: center;">-</td>
-                    <td style="text-align: center;">0</td>
-                    <td style="text-align: center;">-</td>
-                    <td style="text-align: center;">-</td>
-                </tr>
-            `;
+        if (studentData.length === 0) {
+            container.innerHTML = '<div style="padding: 2.5rem; text-align: center; color: #64748b; background: #f8fafc; border-radius: 0.5rem; border: 1px dashed #e2e8f0;">対象となる学生が見つかりません</div>';
             return;
         }
 
-        const avg = total / count;
+        const getSortIndicator = (col) => {
+            if (state.classStatsSortCol !== col) return '<span style="opacity:0.2">↕</span>';
+            return state.classStatsSortOrder === 'asc' ? '▲' : '▼';
+        };
 
-        // Std Dev
-        let sumSqDiff = 0;
-        scores.forEach(s => sumSqDiff += Math.pow(s - avg, 2));
-        const variance = sumSqDiff / count; // Population or Sample? Usually population for class stats
-        const stdDev = Math.sqrt(variance);
+        const thBase = "padding: 0.8rem 0.5rem; cursor: pointer; user-select: none; border-bottom: 2px solid #e2e8f0; transition: background 0.2s;";
 
-        // My Score
-        const myScore = getScore(state.currentStudent, sub.name, testKey);
-        let myScoreDisplay = '-';
-        let myDevDisplay = '-';
+        let html = `
+            <div style="background: white; border: 1px solid #e2e8f0; border-radius: 0.5rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); overflow: hidden;">
+                <div style="overflow-x: auto;">
+                    <table class="report-table" style="font-size: 0.82rem; width: 100%; white-space: nowrap; border-collapse: separate; border-spacing: 0;">
+                        <thead>
+                            <tr style="background: #f8fafc;">
+                                <th style="padding: 1rem 0.8rem; border-bottom: 2px solid #e2e8f0; position: sticky; left: 0; background: #f8fafc; z-index: 10; width: 180px; text-align: left;">学生氏名 (Name)</th>
+                                <th colspan="3" style="text-align: center; border-left: 2px solid #e2e8f0; border-bottom: 2px solid #e2e8f0; background: #f0f9ff; color: #1e40af; font-weight: 700;">統計1 (${testKey})</th>
+                                <th colspan="7" style="text-align: center; border-left: 2px solid #e2e8f0; border-bottom: 2px solid #e2e8f0; background: #f0fdf4; color: #166534; font-weight: 700;">統計2 (累積)</th>
+                            </tr>
+                            <tr style="background: #f1f5f9; font-size: 0.72rem; color: #475569;">
+                                <th onclick="sortClassStats('name')" style="${thBase} position: sticky; left: 0; background: #f1f5f9; z-index: 10; padding-left: 0.8rem; text-align:left;">氏名 ${getSortIndicator('name')}</th>
+                                <th style="width: 50px; text-align: center; border-left: 2px solid #e2e8f0; border-bottom: 1px solid #e2e8f0;">科目</th>
+                                <th onclick="sortClassStats('stats1_avg')" style="${thBase} width: 70px; text-align: center;">平均 ${getSortIndicator('stats1_avg')}</th>
+                                <th onclick="sortClassStats('stats1_rank')" style="${thBase} width: 50px; text-align: center;">順位 ${getSortIndicator('stats1_rank')}</th>
+                                <th style="width: 50px; text-align: center; border-left: 2px solid #e2e8f0; border-bottom: 1px solid #e2e8f0;">単位</th>
+                                <th onclick="sortClassStats('stats2_avg_sim')" style="${thBase} width: 75px; text-align: center;">単純平均 ${getSortIndicator('stats2_avg_sim')}</th>
+                                <th onclick="sortClassStats('stats2_rank_sim')" style="${thBase} width: 50px; text-align: center;">順位 ${getSortIndicator('stats2_rank_sim')}</th>
+                                <th onclick="sortClassStats('stats2_avg_wgt')" style="${thBase} width: 75px; text-align: center;">加重平均 ${getSortIndicator('stats2_avg_wgt')}</th>
+                                <th onclick="sortClassStats('stats2_rank_wgt')" style="${thBase} width: 50px; text-align: center;">順位 ${getSortIndicator('stats2_rank_wgt')}</th>
+                                <th onclick="sortClassStats('stats2_gpa')" style="${thBase} width: 60px; text-align: center; color:#1e40af; font-weight:700;">GPA ${getSortIndicator('stats2_gpa')}</th>
+                                <th onclick="sortClassStats('stats2_rank_gpa')" style="${thBase} width: 50px; text-align: center;">順位 ${getSortIndicator('stats2_rank_gpa')}</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
 
-        if (typeof myScore === 'number') {
-            myScoreDisplay = myScore;
-            if (stdDev > 0) {
-                const dev = 50 + 10 * ((myScore - avg) / stdDev);
-                myDevDisplay = dev.toFixed(1);
-            } else {
-                myDevDisplay = '50.0';
-            }
-        } else if (myScore) {
-            myScoreDisplay = myScore; // String value (Pass, etc)
-        }
+        studentData.forEach((row, idx) => {
+            const rowStyle = idx % 2 === 1 ? 'background: #f8fafc;' : 'background: white;';
+            html += `
+                <tr style="${rowStyle}">
+                    <td style="font-weight: 600; padding: 0.6rem 0.8rem; position: sticky; left: 0; background: inherit; z-index: 5; border-right: 1px solid #f1f5f9; border-bottom: 1px solid #f1f5f9; color: #334155;">${getDisplayName(row.name)}</td>
+                    <td style="text-align: center; border-left: 2px solid #f1f5f9; border-bottom: 1px solid #f1f5f9; color: #475569;">${row.stats1_count}</td>
+                    <td style="text-align: center; border-bottom: 1px solid #f1f5f9; color: #1e293b;">${row.stats1_avg.toFixed(2)}</td>
+                    <td style="text-align: center; border-bottom: 1px solid #f1f5f9; font-size: 0.8rem; color: #64748b;">${row.stats1_rank}</td>
+                    <td style="text-align: center; border-left: 2px solid #f1f5f9; border-bottom: 1px solid #f1f5f9; color: #475569;">${row.stats2_credits}</td>
+                    <td style="text-align: center; border-bottom: 1px solid #f1f5f9; color: #1e293b;">${row.stats2_avg_sim.toFixed(2)}</td>
+                    <td style="text-align: center; border-bottom: 1px solid #f1f5f9; font-size: 0.8rem; color: #64748b;">${row.stats2_rank_sim}</td>
+                    <td style="text-align: center; border-bottom: 1px solid #f1f5f9; color: #1e293b;">${row.stats2_avg_wgt.toFixed(2)}</td>
+                    <td style="text-align: center; border-bottom: 1px solid #f1f5f9; font-size: 0.8rem; color: #64748b;">${row.stats2_rank_wgt}</td>
+                    <td style="text-align: center; font-weight: 700; color: #1d4ed8; border-bottom: 1px solid #f1f5f9;">${row.stats2_gpa.toFixed(2)}</td>
+                    <td style="text-align: center; border-bottom: 1px solid #f1f5f9; font-size: 0.8rem; color: #64748b;">${row.stats2_rank_gpa}</td>
+                </tr>
+            `;
+        });
 
-        html += `
-            <tr>
-                <td style="text-align: center;">${sub.year === 0 ? ((state.scores[state.currentStudent]?.[sub.name]?.obtainedYear) || '特別') : sub.year}</td>
-                <td><div style="font-weight: 600;">${sub.name}</div></td>
-                <td style="text-align: center;">${sub.credits}</td>
-                <td style="text-align: center;"><span class="badge ${sub.type4 ? 'badge-purple' : 'badge-gray'}" style="${sub.type4 ? 'background:#faf5ff; color:#6b21a8; border-color:#e9d5ff;' : ''}">${sub.type4 || '-'}</span></td>
-                <td style="text-align: center;">${avg.toFixed(1)}</td>
-                <td style="text-align: center;">${max}</td>
-                <td style="text-align: center;">${min}</td>
-                <td style="text-align: center;">${count}</td>
-                <td style="text-align: center; font-weight: bold; ${typeof myScore === 'number' && myScore < 60 ? 'color: red;' : ''}">${myScoreDisplay}</td>
-                <td style="text-align: center;">${myDevDisplay}</td>
-            </tr>
-        `;
-    });
-
-    html += `</tbody></table>`;
-
-    // Add Summary
-    html += `<div style="margin-top: 1rem; text-align: right; color: #64748b; font-size: 0.85rem;">対象科目数: ${targetSubjects.length}</div>`;
-
-    container.innerHTML = html;
-
-    // Ensure header name is updated (for print)
-    updatePrintHeader();
+        html += `</tbody></table></div></div>
+            <div style="margin-top: 1rem; text-align: right; color: #64748b; font-size: 0.75rem;">
+                ※ 統計1は ${targetYear}年・${testKey} の集計。統計2は累積。<br>
+                ※ GPA = S:4, A:3, B:2, C:1, D/F:0
+            </div>`;
+        container.innerHTML = html;
+        updatePrintHeader();
+    }, 10);
 }
 
+function exportClassStatsCsv() {
+    const yearEl = document.getElementById('classStatsYear');
+    const testEl = document.getElementById('classStatsTest');
+    const targetYear = yearEl ? parseInt(yearEl.value) : state.currentYear;
+    const testKey = testEl ? testEl.value : '学年末';
+
+    const data = calculateClassStatsList(targetYear, testKey);
+    if (data.length === 0) { alert('データなし'); return; }
+
+    let csvContent = "\uFEFF氏名,統計1科目数,統計1平均,統計1順位,統計2単位,統計2単純平均,統計2単純順位,統計2加重平均,統計2加重順位,統計2GPA,統計2GPA順位\n";
+    data.forEach(row => {
+        csvContent += [
+            getDisplayName(row.name), row.stats1_count, row.stats1_avg.toFixed(2), row.stats1_rank,
+            row.stats2_credits, row.stats2_avg_sim.toFixed(2), row.stats2_rank_sim,
+            row.stats2_avg_wgt.toFixed(2), row.stats2_rank_wgt, row.stats2_gpa.toFixed(2), row.stats2_rank_gpa
+        ].join(',') + "\n";
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `ClassStats_${targetYear}年_${testKey}.csv`;
+    link.click();
+}
+
+function assignRank(data, scoreKey, rankKey) {
+    if (!data || data.length === 0) return;
+    data.sort((a, b) => (b[scoreKey] || 0) - (a[scoreKey] || 0));
+    data.forEach((row, idx) => {
+        if (idx > 0 && Math.abs((row[scoreKey] || 0) - (data[idx - 1][scoreKey] || 0)) < 0.0001) {
+            row[rankKey] = data[idx - 1][rankKey];
+        } else {
+            row[rankKey] = idx + 1;
+        }
+    });
+}
+
+function calculateClassStatsList(targetYear, targetTest) {
+    const students = state.students.filter(name => {
+        const meta = state.studentMetadata[name] || {};
+        const y = meta['年'] || meta['year'];
+        return !y || parseInt(y) === targetYear;
+    });
+
+    const list = students.map(name => {
+        const stats = getStudentStats(name, targetYear, targetTest);
+        return {
+            name,
+            stats1_count: stats.stats1.count,
+            stats1_avg: stats.stats1.avg,
+            stats2_credits: stats.stats2.credits,
+            stats2_avg_sim: stats.stats2.avg_sim,
+            stats2_avg_wgt: stats.stats2.avg_wgt,
+            stats2_gpa: stats.stats2.gpa,
+            count_check: stats.stats2.count // for ranking filter
+        };
+    });
+
+    assignRank(list, 'stats1_avg', 'stats1_rank');
+    assignRank(list, 'stats2_avg_sim', 'stats2_rank_sim');
+    assignRank(list, 'stats2_avg_wgt', 'stats2_rank_wgt');
+    assignRank(list, 'stats2_gpa', 'stats2_rank_gpa');
+
+    // SORTING LOGIC
+    const col = state.classStatsSortCol;
+    const order = state.classStatsSortOrder;
+
+    return list.sort((a, b) => {
+        let valA = a[col];
+        let valB = b[col];
+
+        // Handle case where we click Rank (Lower is better usually, but here we treat it as numeric)
+        // If sorting by name
+        if (col === 'name') {
+            return order === 'asc' ? valA.localeCompare(valB, 'ja') : valB.localeCompare(valA, 'ja');
+        }
+
+        // Numeric Sort
+        valA = valA || 0;
+        valB = valB || 0;
+        if (order === 'asc') return valA - valB;
+        return valB - valA;
+    });
+}
 // Helpers
 function getYearColor(year) {
     const colors = {
@@ -4574,7 +4887,7 @@ function renderAtRiskReport() {
                 <table>
                     <thead>
                         <tr style="background: #fef2f2;">
-                            <th style="width: 150px;">学生名</th>
+                            <th style="width: 150px;">${state.nameDisplayMode === 'name' ? '学生名' : '学生 (ID/Init)'}</th>
                             <th style="width: 250px;">アラート条件</th>
                             <th>対象科目と${type === 'test' ? '点数' : '平均点'}</th>
                         </tr>
@@ -4843,6 +5156,36 @@ function renderSeatingRoster() {
 
     // Students currently assigned to any seat
     const assignedStudents = new Set(Object.values(state.seating.assignments));
+
+    // Calculate seat statistics
+    const totalStudents = state.students.length;
+    const assignedCount = assignedStudents.size;
+    const { cols, rows, disabled } = state.seating;
+    const totalSeats = cols * rows;
+    const availableSeats = totalSeats - (disabled ? disabled.length : 0);
+
+    // Update count info display
+    const countInfo = document.getElementById('seatingCountInfo');
+    if (countInfo) {
+        const seatStatus = availableSeats >= totalStudents ?
+            `<span style="color: #10b981;">✓ 十分</span>` :
+            `<span style="color: #ef4444;">⚠ 不足</span>`;
+
+        countInfo.innerHTML = `
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.3rem;">
+                <span>学生数:</span>
+                <strong>${totalStudents}名</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.3rem;">
+                <span>有効席数:</span>
+                <strong>${availableSeats}席 ${seatStatus}</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+                <span>配置済み:</span>
+                <strong style="color: #3b82f6;">${assignedCount}名</strong>
+            </div>
+        `;
+    }
 
     state.students.forEach(student => {
         const item = document.createElement('div');
@@ -5285,14 +5628,44 @@ function renderPresetList() {
         state.seatingPresets = [];
     }
 
-    // Sort logic removed or keep simple?
-    // Just map
+    // Separate presets into two groups
+    const layoutOnly = [];
+    const withStudents = [];
+
     state.seatingPresets.forEach((preset, index) => {
-        const option = document.createElement('option');
-        option.value = index;
-        option.textContent = preset.name;
-        select.appendChild(option);
+        const hasAssignments = preset.assignments && Object.keys(preset.assignments).length > 0;
+        if (hasAssignments) {
+            withStudents.push({ preset, index });
+        } else {
+            layoutOnly.push({ preset, index });
+        }
     });
+
+    // Create optgroup for layout-only presets
+    if (layoutOnly.length > 0) {
+        const layoutGroup = document.createElement('optgroup');
+        layoutGroup.label = '席配置のみ';
+        layoutOnly.forEach(({ preset, index }) => {
+            const option = document.createElement('option');
+            option.value = index;
+            option.textContent = preset.name;
+            layoutGroup.appendChild(option);
+        });
+        select.appendChild(layoutGroup);
+    }
+
+    // Create optgroup for presets with student assignments
+    if (withStudents.length > 0) {
+        const studentsGroup = document.createElement('optgroup');
+        studentsGroup.label = '学生配置あり';
+        withStudents.forEach(({ preset, index }) => {
+            const option = document.createElement('option');
+            option.value = index;
+            option.textContent = preset.name;
+            studentsGroup.appendChild(option);
+        });
+        select.appendChild(studentsGroup);
+    }
 
     // Restore selection if index still exists
     if (currentVal && state.seatingPresets[currentVal]) {
@@ -5311,6 +5684,8 @@ function saveSeatingPreset() {
         cols: state.seating.cols,
         rows: state.seating.rows,
         disabled: [...(state.seating.disabled || [])],
+        assignments: { ...state.seating.assignments }, // Save student positions
+        fixed: [...(state.seating.fixed || [])],       // Save fixed seats
         timestamp: new Date().toISOString()
     };
 
@@ -5348,12 +5723,15 @@ function loadSeatingPreset(e) {
     state.seating.cols = preset.cols;
     state.seating.rows = preset.rows;
     state.seating.disabled = [...(preset.disabled || [])];
+    state.seating.assignments = { ...(preset.assignments || {}) }; // Restore assignments
+    state.seating.fixed = [...(preset.fixed || [])];               // Restore fixed
 
     // Update UI inputs
     document.getElementById('seatingCols').value = preset.cols;
     document.getElementById('seatingRows').value = preset.rows;
 
     saveSessionState();
+    renderSeatingRoster(); // Update roster list to show checked statuses
     renderSeatingGrid();
 }
 
@@ -5747,6 +6125,7 @@ function openRosterBoard(candidates) {
     importState.candidates = candidates;
     importState.selected = new Set(); // Start with NONE selected to avoid accidental full import
     importState.filters = {};
+    importState.searchText = '';
     importState.sortKey = 'original';
     importState.sortOrder = 'asc';
 
@@ -5766,20 +6145,23 @@ function openRosterBoard(candidates) {
     // Render Table
     renderRosterBoardTable();
     setupRosterHeaderSort(); // Attach listeners
+
+    // PERSIST
+    saveSessionState();
 }
 
 function renderRosterBoardFilters() {
     const filterContainer = document.getElementById('rosterFilterContainer');
     filterContainer.innerHTML = '';
 
-    const candidates = importState.candidates;
+    const candidates = importState.candidates || [];
 
     // Extract unique values
-    const years = [...new Set(candidates.map(c => c.metadata['年'] || c.year).filter(Boolean))].sort();
-    const classes = [...new Set(candidates.map(c => c.metadata['組'] || c.class).filter(Boolean))].sort();
-    const courses = [...new Set(candidates.map(c => c.metadata['コース'] || c.metadata['応用専門分野・領域']).filter(Boolean))].sort();
+    const years = [...new Set(candidates.map(c => { const m = c.metadata || {}; return m['年'] || c.year; }).filter(Boolean))].sort();
+    const classes = [...new Set(candidates.map(c => { const m = c.metadata || {}; return m['組'] || c.class; }).filter(Boolean))].sort();
+    const courses = [...new Set(candidates.map(c => { const m = c.metadata || {}; return m['コース'] || m['応用専門分野・領域']; }).filter(Boolean))].sort();
 
-    const genders = [...new Set(candidates.map(c => c.metadata['性別']).filter(Boolean))].sort();
+    const genders = [...new Set(candidates.map(c => { const m = c.metadata || {}; return m['性別']; }).filter(Boolean))].sort();
 
     // Helper
     const createSelect = (label, key, options, staticOptions = null) => {
@@ -5811,7 +6193,7 @@ function renderRosterBoardFilters() {
     if (years.length > 0) createSelect('学年', 'year', years);
     if (classes.length > 0) createSelect('組', 'class', classes);
     if (genders.length > 0) createSelect('性別', 'gender', genders);
-    if (courses.length > 0) createSelect('コース/分野', 'course', courses);
+    if (courses.length > 0) createSelect('応用専門分野', 'course', courses);
 
     // Status Filter (Static)
     createSelect('登録状況', 'status', [], [
@@ -5827,15 +6209,33 @@ function renderRosterBoardFilters() {
 function getFilteredAndSortedCandidates() {
     // 1. Filter
     let list = importState.candidates.filter(c => {
-        if (importState.filters.year && (c.metadata['年'] || String(c.year)) != importState.filters.year) return false;
-        if (importState.filters.class && (c.metadata['組'] || c.class) != importState.filters.class) return false;
-        if (importState.filters.gender && c.metadata['性別'] != importState.filters.gender) return false;
-        if (importState.filters.course && (c.metadata['コース'] || c.metadata['応用専門分野・領域']) != importState.filters.course) return false;
+        const meta = c.metadata || {};
+        if (importState.filters.year && (meta['年'] || String(c.year)) != importState.filters.year) return false;
+        if (importState.filters.class && (meta['組'] || c.class) != importState.filters.class) return false;
+        if (importState.filters.gender && meta['性別'] != importState.filters.gender) return false;
+        if (importState.filters.course && (meta['コース'] || meta['応用専門分野・領域']) != importState.filters.course) return false;
         if (importState.filters.status) {
             const isNew = !new Set(state.students).has(c.name);
             if (importState.filters.status === 'new' && !isNew) return false;
             if (importState.filters.status === 'update' && isNew) return false;
         }
+
+        // Search Text Filter
+        if (importState.searchText) {
+            const query = importState.searchText.toLowerCase();
+            const searchTargets = [
+                c.name,
+                c.metadata['暗号化氏名1'],
+                c.metadata['暗号化氏名'],
+                c.no,
+                c.metadata['出席番号'],
+                c.studentId,
+                c.metadata['学籍番号']
+            ].map(v => (v || '').toString().toLowerCase());
+
+            if (!searchTargets.some(t => t.includes(query))) return false;
+        }
+
         return true;
     });
 
@@ -5985,6 +6385,8 @@ function renderRosterBoardTable() {
             ? '<span class="status-pass" style="background:#dcfce7; color:#166534; padding:2px 8px; border-radius:4px; font-size:0.75rem;">新規</span>'
             : '<span style="background:#f1f5f9; color:#64748b; padding:2px 8px; border-radius:4px; font-size:0.75rem;">更新</span>';
 
+        const displayName = c.name;
+
         tr.innerHTML = `
             <td style="text-align: center;">
                 <input type="checkbox" class="roster-checkbox" data-name="${c.name}" ${isChecked ? 'checked' : ''}>
@@ -5992,7 +6394,7 @@ function renderRosterBoardTable() {
             <td>${c.metadata['年'] || c.year || '-'}</td>
             <td>${c.metadata['組'] || c.class || '-'}</td>
             <td>${c.metadata['出席\n番号'] || c.metadata['出席番号'] || c.no || '-'}</td>
-            <td><div style="font-weight:500;">${c.name}</div></td>
+            <td><div style="font-weight:500;">${displayName}</div></td>
             <td style="color:#cbd5e1; font-size:0.8rem; font-family:monospace;">${c.metadata['暗号化氏名1'] || c.metadata['暗号化氏名'] || ''}</td>
             <td>${c.metadata['性別'] || '-'}</td>
             <td>${c.metadata['選択'] || c.metadata['選択科目'] || '-'}</td>
@@ -6207,7 +6609,15 @@ function confirmImportFromBoard() {
         }
     });
 
+    // MERGE logic: Keep current students IF they are still relevant OR just replace?
+    // User said "絞り込んだものを流すイメージ". 
+    // Usually this means "Update the master list to MATCH the selected ones".
+
     state.students = newStudents;
+    // For metadata, we merge into existing to preserve any manually added fields not in roster?
+    // Actually, roster is usually the source of truth for 'Year/Class/No'.
+    // Let's replace metadata for THOSE students, but keep others if we were appending.
+    // Since we are replacing state.students, we just use newMetadata.
     state.studentMetadata = newMetadata;
 
     if (!state.students.includes(state.currentStudent)) {
@@ -6368,6 +6778,7 @@ function closeMetadataEditorModal() {
 
 // ==================== PRIVACY / DISPLAY NAME ====================
 function getDisplayName(originalName) {
+    if (!originalName) return '-';
     if (state.nameDisplayMode === 'name') return originalName;
 
     // Try to find encrypted name in metadata
@@ -6376,12 +6787,19 @@ function getDisplayName(originalName) {
 
     if (encrypted) return encrypted;
 
-    // Fallback if no encrypted name: Initial-like or ID
-    // If we have 'attendance no', use that? E.g. "No.15"
+    // Fallback if no encrypted name: Attendance No.
     const no = meta['出席番号'] || meta['no'];
-    if (no) return `Student ${no}`;
+    if (no) return `No.${no}`;
 
-    // Last resort
+    // Fallback if no encrypted name: Initial extraction (Simple)
+    if (/^[a-zA-Z\s]+$/.test(originalName)) {
+        const parts = originalName.trim().split(/\s+/);
+        if (parts.length >= 2) {
+            return parts.map(p => p[0].toUpperCase()).join('.') + '.';
+        }
+    }
+
+    // Kanji/Other: First character + ...
     return originalName.substring(0, 1) + '...';
 }
 
@@ -6389,12 +6807,172 @@ function updateNameDisplayMode(mode) {
     state.nameDisplayMode = mode;
     saveSessionState();
 
-    // Refresh UI
-    populateControls(); // Updates sidebar
+    // Refresh Sidebar
+    populateControls();
 
-    // Re-render current tab if it uses names
+    // Refresh Settings if active
     if (state.currentTab === 'settings') renderSettings();
-    else if (state.currentTab === 'grades') renderGradesTable();
-    else if (state.currentTab === 'stats' || state.currentTab === 'stats2') switchTab(state.currentTab);
-    else if (state.currentTab === 'class_stats') initClassStats(); // re-init
+    // Refresh Grades if active
+    if (state.currentTab === 'grades') renderGradesTable();
+    // Refresh Graduation Requirements if active
+    if (state.currentTab === 'grad_requirements') renderGraduationRequirements();
+
+    // Refresh Class Stats if previously generated
+    const csContainer = document.getElementById('classStatsContainer');
+    if (csContainer && csContainer.innerHTML.trim() !== '') {
+        generateClassStats();
+    }
+
+    // Refresh At Risk Report if previously generated
+    const atRiskBody = document.getElementById('atRiskResultsBody');
+    if (atRiskBody && atRiskBody.innerHTML.trim() !== '') {
+        renderAtRiskReport();
+    }
+
+    updatePrintHeader();
+}
+// ==================== FACULTY ROSTER LOGIC ====================
+
+function handleFacultyRosterSelect(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function (evt) {
+        let text = evt.target.result;
+        try {
+            const rows = parseCSV(text).filter(row => row.length > 0);
+            if (rows.length < 2) throw new Error("Empty or invalid CSV");
+
+            // Header: 所属,校務分掌１,校務分掌２,氏名,OMUメール,OMU ID
+            const candidates = rows.slice(1).map((row, idx) => ({
+                dept: row[0] || '',
+                duty1: row[1] || '',
+                duty2: row[2] || '',
+                name: (row[3] || '').trim(),
+                email: (row[4] || '').trim(),
+                omuid: (row[5] || '').trim(),
+                id: 'fac_' + idx
+            })).filter(c => c.name);
+
+            facultyImportState.candidates = candidates;
+            facultyImportState.selected = new Set();
+            facultyImportState.filters = {};
+            facultyImportState.searchText = '';
+
+            switchTab('faculty_roster');
+            renderFacultyFilters();
+            renderFacultyTable();
+
+            saveSessionState();
+
+            const statusEl = document.getElementById('facultyBoardStatus');
+            if (statusEl) {
+                statusEl.innerText = `${candidates.length}名読み込み完了`;
+                statusEl.style.color = '#10b981';
+            }
+        } catch (err) {
+            alert('名簿読み込みエラー: ' + err.message);
+        } finally {
+            e.target.value = '';
+        }
+    };
+    reader.readAsText(file);
+}
+
+function renderFacultyFilters() {
+    const container = document.getElementById('facultyFilterContainer');
+    if (!container) return;
+    container.innerHTML = '';
+    const candidates = facultyImportState.candidates;
+
+    const depts = [...new Set(candidates.map(c => c.dept).filter(Boolean))].sort();
+
+    const createSelect = (label, key, options) => {
+        const div = document.createElement('div');
+        div.className = 'control-group';
+        div.style.cssText = "display:flex; flex-direction:column; gap:0.4rem;";
+        div.innerHTML = `<label style="font-size:0.8rem; font-weight:700; color:#64748b;">${label}</label>`;
+        const sel = document.createElement('select');
+        sel.style.cssText = "width:100%; padding:0.4rem; border:1px solid #e2e8f0; border-radius:0.4rem; font-size:0.85rem;";
+        sel.innerHTML = '<option value="">すべて</option>' + options.map(o => `<option value="${o}">${o}</option>`).join('');
+        sel.onchange = (e) => {
+            facultyImportState.filters[key] = e.target.value;
+            renderFacultyTable();
+        };
+        div.appendChild(sel);
+        container.appendChild(div);
+    };
+
+    if (depts.length > 0) createSelect('所属', 'dept', depts);
+}
+
+function renderFacultyTable() {
+    const tbody = document.getElementById('facultyRosterBody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    const list = facultyImportState.candidates.filter(c => {
+        if (facultyImportState.filters.dept && c.dept !== facultyImportState.filters.dept) return false;
+
+        // Search Filter
+        if (facultyImportState.searchText) {
+            const query = facultyImportState.searchText.toLowerCase();
+            const targets = [c.name, c.email, c.omuid, c.duty1, c.duty2].map(v => (v || '').toString().toLowerCase());
+            if (!targets.some(t => t.includes(query))) return false;
+        }
+
+        return true;
+    });
+
+    list.forEach(c => {
+        const tr = document.createElement('tr');
+        const isSelected = facultyImportState.selected.has(c.id);
+        const rowStyle = isSelected ? 'background-color: #f0f9ff;' : '';
+        tr.style.cssText = rowStyle;
+
+        tr.innerHTML = `
+            <td style="text-align:center;"><input type="checkbox" class="fac-row-check" data-id="${c.id}" ${isSelected ? 'checked' : ''}></td>
+            <td>${c.dept}</td>
+            <td>${c.duty1}</td>
+            <td>${c.duty2}</td>
+            <td style="font-weight:600; color:#334155;">${c.name}</td>
+            <td style="font-family: monospace; font-size: 0.8rem;">${c.email}</td>
+            <td style="color:#64748b;">${c.omuid}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    // Add listeners to checkboxes
+    tbody.querySelectorAll('.fac-row-check').forEach(cb => {
+        cb.onchange = (e) => {
+            const id = e.target.dataset.id;
+            if (e.target.checked) facultyImportState.selected.add(id);
+            else facultyImportState.selected.delete(id);
+            // Toggle highlight
+            e.target.closest('tr').style.backgroundColor = e.target.checked ? '#f0f9ff' : '';
+        };
+    });
+}
+
+function openFacultyTeamsChat() {
+    const selected = facultyImportState.candidates.filter(c => facultyImportState.selected.has(c.id));
+    if (selected.length === 0) { alert('対象者を選択してください'); return; }
+
+    const emails = selected.map(c => c.email).filter(Boolean);
+    if (emails.length === 0) { alert('メールアドレスが見つかりません'); return; }
+
+    const url = `https://teams.microsoft.com/l/chat/0/0?users=${emails.join(',')}`;
+    window.open(url, '_blank');
+}
+
+function openFacultyMail() {
+    const selected = facultyImportState.candidates.filter(c => facultyImportState.selected.has(c.id));
+    if (selected.length === 0) { alert('対象者を選択してください'); return; }
+
+    const emails = selected.map(c => c.email).filter(Boolean);
+    if (emails.length === 0) { alert('メールアドレスが見つかりません'); return; }
+
+    const url = `mailto:${emails.join(';')}`;
+    window.location.href = url;
 }

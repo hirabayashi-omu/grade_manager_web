@@ -95,6 +95,15 @@
                 </svg>
                 JSON/Score
             </button>
+            <button id="importJsonBtn" class="btn btn-secondary" title="JSONファイルから成績データを読み込みます">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                    stroke-width="2" width="16" height="16">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+                JSON/Load
+            </button>
+            <input type="file" id="jsonFileInput" accept=".json" class="hidden">
             <input type="file" id="csvFileInput" accept=".csv,.json" class="hidden">
             <input type="file" id="rosterFileInput" accept=".csv" class="hidden">
             <!-- Roster Import Button removed from Header, moved to new tab -->
@@ -235,16 +244,25 @@
                         d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                     <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
-                各種設定 (Settings)
+                システム環境設定 (System Settings)
             </div>
-            <!-- New Roster Board Tab -->
-            <div class="nav-item" data-tab="roster_board">
+            <!-- Student Roster Board Tab -->
+            <div class="nav-item" data-tab="roster_board" title="学籍名簿の管理と取り込みを行います">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
                     stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round"
                         d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                 </svg>
-                名簿管理・取り込み
+                学名名簿
+            </div>
+            <!-- Faculty Roster Board Tab -->
+            <div class="nav-item" data-tab="faculty_roster" title="教職員名簿の管理と取り込みを行います">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                    stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+                教職員名簿
             </div>
             <div class="nav-item" data-tab="help" title="システムのセキュリティと使用上の注意を確認します">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
@@ -498,7 +516,7 @@
                     <div class="card chart-container">
                         <div class="card-header"
                             style="margin-bottom:0.5rem; display:flex; justify-content:space-between; align-items:center;">
-                            <div class="card-title">箱ひげ図 (Box Plot)</div>
+                            <div class="card-title">クラス学生リスト</div>
                             <div style="display:flex; gap:0.5rem; align-items:center;">
                                 <select id="boxPlotYearSelect"
                                     style="padding:0.25rem 0.5rem; border:1px solid #cbd5e1; border-radius:4px;"
@@ -618,7 +636,7 @@
                                     <option value="学年末">学年末</option>
                                 </select>
                             </div>
-                            <button id="generateClassStatsBtn" class="btn-primary" style="padding: 0.5rem 1rem;">
+                            <button id="generateClassStatsBtn" class="btn btn-primary" style="padding: 0.5rem 1rem;">
                                 帳票作成 (Generate Report)
                             </button>
                             <button id="exportClassStatsCsvBtn" class="btn-secondary" style="padding: 0.5rem 1rem;">
@@ -761,8 +779,12 @@
                         <!-- Roster Sidebar -->
                         <div class="seating-roster-sidebar"
                             style="background: #f8fafc; border-radius: 0.5rem; border: 1px solid #e2e8f0; padding: 1rem; height: 600px; display: flex; flex-direction: column;">
-                            <h3 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 0.75rem; color: #475569;">名簿
+                            <h3 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 0.5rem; color: #475569;">名簿
                                 (学生リスト)</h3>
+                            <div id="seatingCountInfo"
+                                style="font-size: 0.8rem; color: #64748b; margin-bottom: 0.75rem; padding: 0.5rem; background: #fff; border-radius: 0.3rem; border: 1px solid #e2e8f0;">
+                                <!-- Populated by JS -->
+                            </div>
                             <div id="seatingRosterList"
                                 style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 0.25rem;">
                                 <!-- Populated by JS -->
@@ -792,6 +814,87 @@
             </div>
 
             <!-- Roster Board View (Replaces specific modal) -->
+            <div id="faculty_roster-content" class="tab-content hidden fade-in">
+                <div class="card" style="height: calc(100vh - 140px); display: flex; flex-direction: column;">
+                    <div class="card-header"
+                        style="justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <div class="card-title">教職員名簿 (Faculty Roster)</div>
+                        <div style="display: flex; gap: 1.5rem; align-items: center;">
+                            <!-- Communication Group -->
+                            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                <span style="font-size: 0.85rem; font-weight: 600; color: #64748b;">連絡:</span>
+                                <button id="facultyTeamsChatBtn" class="btn btn-secondary"
+                                    style="border: 1px solid #cbd5e1; color: #4f46e5; background: #eef2ff;">
+                                    Teams
+                                </button>
+                                <button id="facultySendMailBtn" class="btn btn-secondary"
+                                    style="border: 1px solid #cbd5e1; color: #0891b2; background: #ecfeff;">
+                                    メール
+                                </button>
+                            </div>
+
+                            <!-- Import/Register Group -->
+                            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                <span style="font-size: 0.85rem; font-weight: 600; color: #64748b;">読込:</span>
+                                <input type="file" id="facultyFileInput" accept=".csv" style="display: none;">
+                                <button id="triggerFacultyLoadBtn" class="btn btn-primary" style="background:#4f46e5;">
+                                    教職員名簿CSV読込
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Board Layout -->
+                    <div style="flex: 1; display: grid; grid-template-columns: 240px 1fr; gap: 1.5rem; min-height: 0;">
+                        <!-- Sidebar: Filters & Info -->
+                        <div
+                            style="background: #f8fafc; border-radius: 0.6rem; padding: 1rem; border: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 1.2rem; overflow-y: auto;">
+                            <div>
+                                <div
+                                    style="font-size: 0.8rem; font-weight: 700; color: #475569; margin-bottom: 0.8rem;">
+                                    絞り込み</div>
+                                <div class="control-group" style="margin-bottom: 1rem;">
+                                    <input type="text" id="facultySearchInput" placeholder="氏名・IDで検索..."
+                                        style="width: 100%; padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 0.4rem; font-size: 0.85rem;">
+                                </div>
+                                <div id="facultyFilterContainer"
+                                    style="display: flex; flex-direction: column; gap: 1rem;">
+                                    <!-- Populated by JS -->
+                                </div>
+                            </div>
+
+                            <div style="margin-top: auto; padding-top: 1rem; border-top: 1px solid #e2e8f0;">
+                                <div id="facultyBoardStatus"
+                                    style="font-size: 0.85rem; font-weight: 600; color: #64748b;">
+                                    ファイル未選択</div>
+                            </div>
+                        </div>
+
+                        <!-- Main Table Area -->
+                        <div class="table-container" style="border: 1px solid #e2e8f0; border-radius: 0.6rem;">
+                            <table class="roster-table" style="font-size: 0.85rem;">
+                                <thead style="position: sticky; top: 0; background: #f8fafc; z-index: 20;">
+                                    <tr>
+                                        <th style="width: 40px; text-align: center;">
+                                            <input type="checkbox" id="facultySelectAll">
+                                        </th>
+                                        <th style="width: 120px;">所属</th>
+                                        <th style="width: 150px;">校務分掌１</th>
+                                        <th style="width: 150px;">校務分掌２</th>
+                                        <th style="width: 120px;">氏名</th>
+                                        <th style="width: 200px;">OMUメール</th>
+                                        <th style="width: 100px;">OMU ID</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="facultyRosterBody">
+                                    <!-- Populated by JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div id="roster_board-content" class="tab-content hidden fade-in">
                 <div class="card" style="height: calc(100vh - 140px); display: flex; flex-direction: column;">
                     <div class="card-header"
@@ -826,7 +929,6 @@
                             <!-- Import/Register Group -->
                             <div style="display: flex; gap: 0.5rem; align-items: center;">
                                 <span style="font-size: 0.85rem; font-weight: 600; color: #64748b;">読込・登録:</span>
-                                <input type="file" id="rosterFileInput" accept=".csv" style="display: none;">
                                 <button id="triggerRosterLoadBtn" class="btn btn-primary" style="background:#4f46e5;">
                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                                         stroke="currentColor" stroke-width="2" width="18" height="18">
@@ -866,6 +968,10 @@
                                 <h4
                                     style="font-size: 0.9rem; font-weight: 600; color: #475569; margin-bottom: 1rem; border-bottom: 1px solid #cbd5e1; padding-bottom: 0.5rem;">
                                     絞り込み条件</h4>
+                                <div class="control-group" style="margin-bottom: 1rem;">
+                                    <input type="text" id="rosterSearchInput" placeholder="氏名・番号で検索..."
+                                        style="width: 100%; padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 0.4rem; font-size: 0.85rem;">
+                                </div>
                                 <!-- Dynamic Filters Helper -->
                                 <div id="rosterFilterContainer"
                                     style="display: flex; flex-direction: column; gap: 0.5rem;">
@@ -1021,8 +1127,18 @@
                                     <path stroke-linecap="round" stroke-linejoin="round"
                                         d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                 </svg>
-                                学生リストをCSV出力
+                                学生リストをCSV出力（メタデータ対応）
                             </button>
+                            <button id="importStudentsCsvBtn" class="btn btn-secondary"
+                                style="width: 100%; justify-content: center; margin-top: 0.5rem;">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor" stroke-width="2" width="16" height="16">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                </svg>
+                                学生リストをCSV読出
+                            </button>
+                            <input type="file" id="studentsCsvFileInput" accept=".csv" class="hidden">
                         </div>
                     </div>
 
@@ -1030,7 +1146,7 @@
                     <div class="card">
                         <div class="card-header"
                             style="justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 1rem; margin-bottom: 1.5rem;">
-                            <div class="card-title">科目定義（学年別リスト）</div>
+                            <div class="card-title">全学年科目定義</div>
                             <div style="display: flex; gap: 0.8rem; align-items: center;">
                                 <button id="exportSubjectsCsvBtn" class="btn btn-secondary" style="font-size: 0.85rem;">
                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
@@ -1040,6 +1156,15 @@
                                     </svg>
                                     CSV保存
                                 </button>
+                                <button id="importSubjectsCsvBtn" class="btn btn-secondary" style="font-size: 0.85rem;">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                        stroke="currentColor" stroke-width="2" width="16" height="16">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                    </svg>
+                                    CSV読出
+                                </button>
+                                <input type="file" id="subjectsCsvFileInput" accept=".csv" class="hidden">
                                 <!-- Course Filter -->
                                 <select id="subjectCourseFilter"
                                     style="padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 0.4rem; font-size: 0.85rem; margin-right: 0.5rem;">
@@ -1430,7 +1555,6 @@
     </div>
 
     <script src="script.js"></script>
-    <script src="class_stats.js"></script>
 </body>
 
 </html>
