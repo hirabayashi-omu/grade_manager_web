@@ -767,12 +767,12 @@
                                 style="gap: 1.5rem; display: none;">
                                 <div style="display:flex; align-items:center; gap:0.5rem;">
                                     <label style="white-space:nowrap;">欠席回数以上:</label>
-                                    <input type="number" id="atRiskAbsLimit" value="10" min="1"
+                                    <input type="number" id="atRiskAbsLimit" value="15" min="1"
                                         style="width: 60px; padding: 0.3rem;">
                                 </div>
                                 <div style="display:flex; align-items:center; gap:0.5rem;">
                                     <label style="white-space:nowrap;">遅刻回数以上:</label>
-                                    <input type="number" id="atRiskLatLimit" value="15" min="1"
+                                    <input type="number" id="atRiskLatLimit" value="20" min="1"
                                         style="width: 60px; padding: 0.3rem;">
                                 </div>
                             </div>
@@ -791,7 +791,7 @@
                         </div>
                         <div id="instr-attendance" class="hidden">
                             <strong>【出欠状況ベース】</strong> 以下のいずれかに該当する学生を抽出：<br>
-                            ・指定した累計欠席回数以上 / ・指定した累計遅刻回数以上 / ・科目別で欠席が5回以上の科目がある
+                            ・指定した累計欠席回数以上 / ・指定した累計遅刻回数以上 / ・科目別で欠席が10.0回相当分（2遅刻=1欠席換算）以上の科目がある（オレンジ判定以上）
                         </div>
                     </div>
                     <div id="atRiskReportArea">
@@ -833,6 +833,7 @@
                                     <option value="roster_v">名簿順 (縦)</option>
                                     <option value="roster_h">名簿順 (横)</option>
                                     <option value="grades_asc">成績順 (前=低)</option>
+                                    <option value="attendance_desc">出欠順 (前=多)</option>
                                 </select>
                                 <button class="btn btn-primary" id="autoAssignBtn">実行</button>
                             </div>
@@ -852,13 +853,14 @@
                             <button class="btn btn-secondary" id="printSeatingBtn">印刷 (PDF)</button>
                             <div class="divider-v"></div>
                             <div class="control-group">
-                                <label>
-                                    <input type="checkbox" id="seatingColorByGrade"
-                                        style="width: auto; margin-right: 0.25rem;">
-                                    成績で色分け
-                                </label>
+                                <label>色分け:</label>
+                                <select id="seatingColorMode" style="width: 130px;">
+                                    <option value="none">なし</option>
+                                    <option value="grade">成績（平均点）</option>
+                                    <option value="attendance">出欠（遅刻欠席）</option>
+                                </select>
                             </div>
-                            <div class="control-group">
+                            <div class="control-group" id="seatingGradeMethodWrapper">
                                 <label>計算方法:</label>
                                 <select id="seatingGradeMethod" style="width: 140px;">
                                     <option value="cumulative">単純平均（累積）</option>

@@ -244,7 +244,7 @@ let state = {
         fixed: [],
         disabled: [],
         perspective: 'teacher',
-        colorByGrade: false,
+        colorMode: 'none', // 'none', 'grade', 'attendance'
         gradeThreshold: 60,
         gradeMethod: 'cumulative'
     },
@@ -1149,8 +1149,10 @@ function setupEventListeners() {
     document.getElementById('randomAssignBtn')?.addEventListener('click', randomAssignSeats);
     document.getElementById('clearSeatingBtn')?.addEventListener('click', clearSeatingAssignments);
     document.getElementById('printSeatingBtn')?.addEventListener('click', () => window.print());
-    document.getElementById('seatingColorByGrade')?.addEventListener('change', (e) => {
-        state.seating.colorByGrade = e.target.checked;
+    document.getElementById('seatingColorMode')?.addEventListener('change', (e) => {
+        state.seating.colorMode = e.target.value;
+        const methodWrapper = document.getElementById('seatingGradeMethodWrapper');
+        if (methodWrapper) methodWrapper.style.display = (e.target.value === 'grade') ? 'flex' : 'none';
         saveSessionState();
         renderSeatingGrid();
     });
@@ -1158,7 +1160,7 @@ function setupEventListeners() {
         state.seating.gradeMethod = e.target.value;
         saveSessionState();
         updateGradeMethodInfo();
-        if (state.seating.colorByGrade) renderSeatingGrid();
+        if (state.seating.colorMode === 'grade') renderSeatingGrid();
     });
     document.getElementById('saveSeatingBtn')?.addEventListener('click', saveSeatingLayout);
     document.getElementById('loadSeatingBtn')?.addEventListener('click', loadSeatingLayout);
@@ -4900,20 +4902,23 @@ function renderAtRiskReport() {
                                     totalAbs++;
                                     if (ev.subj) subAbs[ev.subj] = (subAbs[ev.subj] || 0) + 1;
                                 }
-                                else if (ev.status === "遅") totalLat++;
+                                else if (ev.status === "遅") {
+                                    totalLat++;
+                                    if (ev.subj) subAbs[ev.subj] = (subAbs[ev.subj] || 0) + 0.5;
+                                }
                                 else if (ev.status === "早") totalEarly++;
                             });
                         }
                     });
 
-                    const heavyAbsSub = Object.entries(subAbs).filter(([s, c]) => c >= 5);
+                    const heavyAbsSub = Object.entries(subAbs).filter(([s, c]) => c >= 10);
                     const isAtRisk = totalAbs >= absLimitTotal || totalLat >= latLimitTotal || heavyAbsSub.length > 0;
 
                     if (isAtRisk) {
                         let reasons = [];
                         if (totalAbs >= absLimitTotal) reasons.push(`累計欠席:${totalAbs}回 (閾値:${absLimitTotal})`);
                         if (totalLat >= latLimitTotal) reasons.push(`累計遅刻:${totalLat}回 (閾値:${latLimitTotal})`);
-                        heavyAbsSub.forEach(([s, c]) => reasons.push(`${s}欠席:${c}回`));
+                        heavyAbsSub.forEach(([s, c]) => reasons.push({ subject: s, count: c }));
 
                         results.push({
                             name: studentName,
@@ -4949,7 +4954,9 @@ function renderAtRiskReport() {
                         }
                     });
 
-                    let isAtRisk = (type === 'test') ? (count59 >= 4 || count49 >= 3 || count39 >= 2)
+                    // Restore original conditions for grades
+                    let isAtRisk = (type === 'test')
+                        ? (count59 >= 4 || count49 >= 3 || count39 >= 2)
                         : (count59 >= 3 || count49 >= 2 || count39 >= 1);
 
                     if (isAtRisk) {
@@ -5006,7 +5013,21 @@ function renderAtRiskReport() {
             if (res.type === 'attendance') {
                 reasonHtml = '<span style="color:#ef4444; font-weight:bold;">⚠️ 出席不良</span>';
                 detailHtml = `<div style="display:flex; flex-wrap:wrap; gap:0.4rem;">
-                    ${res.reasons.map(r => `<span style="background:#fee2e2; color:#b91c1c; padding:2px 10px; border-radius:999px; font-size:0.8rem; font-weight:600; border:1px solid #fecaca;">${r}</span>`).join('')}
+                    <div style="width:100%; font-size:0.8rem; color:#64748b; margin-bottom:0.2rem;">累計: 欠${res.totalAbs}・遅${res.totalLat}</div>
+                    ${res.reasons.map(r => {
+                    if (typeof r === 'string') {
+                        return `<span style="background:#fee2e2; color:#b91c1c; padding:2px 10px; border-radius:999px; font-size:0.8rem; font-weight:600; border:1px solid #fecaca;">${r}</span>`;
+                    } else {
+                        // Subject-specific color coding
+                        let bg = '#fee2e2', tc = '#b91c1c', border = '#fecaca';
+                        if (r.count >= 20) { bg = '#000'; tc = '#fff'; border = '#000'; }
+                        else if (r.count >= 15) { bg = '#ef4444'; tc = '#fff'; border = '#b91c1c'; }
+                        else if (r.count >= 10) { bg = '#fb923c'; tc = '#fff'; border = '#ea580c'; }
+                        else if (r.count >= 5) { bg = '#fde047'; tc = '#854d0e'; border = '#eab308'; }
+
+                        return `<span style="background:${bg}; color:${tc}; padding:2px 10px; border-radius:999px; font-size:0.8rem; font-weight:600; border:1px solid ${border};">${r.subject}:${r.count.toFixed(1)}回</span>`;
+                    }
+                }).join('')}
                 </div>`;
             } else {
                 reasonHtml = res.reasons.join('<br>');
@@ -5189,13 +5210,16 @@ function initSeating() {
     const colInput = document.getElementById('seatingCols');
     const rowInput = document.getElementById('seatingRows');
     const perspectiveInput = document.getElementById('seatingPerspective');
-    const colorByGradeInput = document.getElementById('seatingColorByGrade');
+    const colorModeInput = document.getElementById('seatingColorMode');
     const gradeMethodInput = document.getElementById('seatingGradeMethod');
     if (colInput) colInput.value = state.seating.cols;
     if (rowInput) rowInput.value = state.seating.rows;
     if (perspectiveInput) perspectiveInput.value = state.seating.perspective || 'teacher';
-    if (colorByGradeInput) colorByGradeInput.checked = state.seating.colorByGrade || false;
+    if (colorModeInput) colorModeInput.value = state.seating.colorMode || 'none';
     if (gradeMethodInput) gradeMethodInput.value = state.seating.gradeMethod || 'cumulative';
+
+    const methodWrapper = document.getElementById('seatingGradeMethodWrapper');
+    if (methodWrapper) methodWrapper.style.display = (state.seating.colorMode === 'grade') ? 'flex' : 'none';
 
     updateGradeMethodInfo();
 
@@ -5374,14 +5398,14 @@ function renderSeatingGrid() {
     for (let currentR = 0; currentR < rows; currentR++) {
         for (let currentC = 0; currentC < cols; currentC++) {
             // Coordinate mapping based on perspective
-            const r = isTeacher ? rows - 1 - currentR : currentR;
-            const c = isTeacher ? cols - 1 - currentC : currentC;
+            const rowIdx = isTeacher ? rows - 1 - currentR : currentR;
+            const colIdx = isTeacher ? cols - 1 - currentC : currentC;
 
-            const pos = `${r}-${c}`;
+            const pos = `${rowIdx}-${colIdx}`;
             const student = state.seating.assignments[pos];
             const isFixed = state.seating.fixed.includes(pos);
             const isDisabled = state.seating.disabled.includes(pos);
-            const label = String.fromCharCode(65 + c) + (r + 1);
+            const label = String.fromCharCode(65 + colIdx) + (rowIdx + 1);
 
             const cell = document.createElement('div');
             cell.className = 'seat-item' +
@@ -5390,80 +5414,106 @@ function renderSeatingGrid() {
                 (isDisabled ? ' disabled' : '');
             cell.dataset.pos = pos;
 
-            // Calculate average grade for color coding
-            let avgGrade = null;
-            if (student && state.seating.colorByGrade) {
-                const scoreData = state.scores[student];
-                if (scoreData) {
-                    const method = state.seating.gradeMethod || 'cumulative';
-
-                    if (method === 'latest') {
-                        // Find latest test with data based on current year (same logic as Class Stats)
-                        const targetYear = state.currentYear || 5;
-                        // Use detection logic similar to Class Stats
-                        // For visualization, simple accumulation is often enough or reuse getStudentAverage
-                        avgGrade = getStudentAverage(student);
-                    } else {
-                        avgGrade = getStudentAverage(student);
-                    }
-                }
-            }
-
             // Look for attendance number in metadata
             let attendanceNo = '';
             if (student && state.studentMetadata && state.studentMetadata[student]) {
                 const meta = state.studentMetadata[student];
-                // Try common keys for attendance number
                 attendanceNo = meta['出席番号'] || meta['番号'] || meta['No.'] || meta['No'] || '';
             }
 
+            // Display base labels and name
             cell.innerHTML = `
                 <div class="seat-label" style="font-size: ${labelFontSize};">${label}</div>
                 ${attendanceNo ? `<div class="attendance-no" style="position: absolute; top: 2px; right: 4px; font-size: ${labelFontSize}; color: #64748b; font-weight: bold;">${attendanceNo}</div>` : ''}
                 <div class="student-name" style="font-size: ${fontSize};">${student || ''}</div>
             `;
 
-            // Apply color coding with gradient
-            if (avgGrade !== null && state.seating.colorByGrade) {
-                // Gradient from red (50) -> yellow (75) -> green (100)
-                let r, g, b;
+            // Calculate color coding
+            let r_col, g_col, b_col, displayVal = '';
+            let hasColor = false;
+            const colorMode = state.seating.colorMode || 'none';
 
-                if (avgGrade < 50) {
-                    // Below 50: Solid Red
-                    r = 255;
-                    g = 100;
-                    b = 100;
-                } else if (avgGrade < 75) {
-                    // 50-75: Red to Yellow
-                    const p = (avgGrade - 50) / 25;
-                    r = 255;
-                    g = Math.round(100 + (155 * p));
-                    b = Math.round(100 * (1 - p)); // reduce blue/white tint
-                } else {
-                    // 75-100: Yellow to Green
-                    const p = (avgGrade - 75) / 25;
-                    r = Math.round(255 * (1 - p));
-                    g = 255;
-                    b = 0;
+            if (student && colorMode === 'grade') {
+                const avg = getStudentAverage(student);
+                if (avg !== null) {
+                    hasColor = true;
+                    displayVal = avg.toFixed(1);
+                    if (avg < 50) { r_col = 255; g_col = 100; b_col = 100; }
+                    else if (avg < 75) {
+                        const p = (avg - 50) / 25;
+                        r_col = 255; g_col = Math.round(100 + (155 * p)); b_col = Math.round(100 * (1 - p));
+                    } else {
+                        const p = (avg - 75) / 25;
+                        r_col = Math.round(255 * (1 - p)); g_col = 255; b_col = 0;
+                    }
+                }
+            } else if (student && colorMode === 'attendance') {
+                const attendance = state.attendance.records[student] || {};
+                let totalAbs = 0, totalLat = 0;
+                Object.values(attendance).forEach(dayEvents => {
+                    dayEvents.forEach(ev => {
+                        if (ev.status === "欠") totalAbs++;
+                        else if (ev.status === "遅") totalLat++;
+                    });
+                });
+
+                if (totalAbs > 0 || totalLat > 0) {
+                    hasColor = true;
+                    // Milestones: 5(Yellow), 10(Orange), 15(Red), 20(Black)
+                    const score = totalAbs + (totalLat * 0.5);
+                    displayVal = `欠${totalAbs}・遅${totalLat} (${score.toFixed(1)}pt)`;
+
+                    // RGB Values for milestones
+                    const m = [
+                        { p: 0, r: 255, g: 255, b: 255 }, // White
+                        { p: 5, r: 253, g: 224, b: 71 },  // Yellow (fde047)
+                        { p: 10, r: 251, g: 146, b: 60 }, // Orange (fb923c)
+                        { p: 15, r: 239, g: 68, b: 68 },  // Red (ef4444)
+                        { p: 20, r: 0, g: 0, b: 0 }       // Black
+                    ];
+
+                    let r, g, b;
+                    if (score <= m[0].p) {
+                        hasColor = false;
+                    } else if (score >= m[m.length - 1].p) {
+                        r = m[m.length - 1].r; g = m[m.length - 1].g; b = m[m.length - 1].b;
+                    } else {
+                        for (let i = 0; i < m.length - 1; i++) {
+                            if (score >= m[i].p && score < m[i + 1].p) {
+                                const ratio = (score - m[i].p) / (m[i + 1].p - m[i].p);
+                                r = Math.round(m[i].r + (m[i + 1].r - m[i].r) * ratio);
+                                g = Math.round(m[i].g + (m[i + 1].g - m[i].g) * ratio);
+                                b = Math.round(m[i].b + (m[i + 1].b - m[i].b) * ratio);
+                                break;
+                            }
+                        }
+                    }
+                    r_col = r; g_col = g; b_col = b;
+                }
+            }
+
+            if (hasColor) {
+                cell.style.background = `rgba(${r_col}, ${g_col}, ${b_col}, 0.2)`;
+                cell.style.borderColor = `rgba(${r_col}, ${g_col}, ${b_col}, 0.6)`;
+
+                // Adjust text color for dark backgrounds
+                const brightness = (r_col * 299 + g_col * 587 + b_col * 114) / 1000;
+                if (brightness < 100) {
+                    cell.querySelector('.student-name').style.color = '#fff';
+                    cell.querySelector('.seat-label').style.color = 'rgba(255,255,255,0.7)';
+                    if (cell.querySelector('.attendance-no')) cell.querySelector('.attendance-no').style.color = 'rgba(255,255,255,0.9)';
                 }
 
-                // Light bg
-                cell.style.background = `rgba(${r}, ${g}, ${b}, 0.15)`;
-                cell.style.borderColor = `rgba(${r}, ${g}, ${b}, 0.5)`;
-
-                // Badge
-                const gradeDisplay = document.createElement('div');
-                gradeDisplay.className = 'no-print';
-                gradeDisplay.style.cssText = `
-                    position: absolute;
-                    bottom: 2px;
-                    right: 4px;
-                    font-size: 0.65rem;
-                    font-weight: 600;
-                    color: rgb(${r}, ${g}, ${b});
+                const badge = document.createElement('div');
+                badge.className = 'no-print';
+                badge.style.cssText = `
+                    position: absolute; bottom: 2px; right: 4px;
+                    font-size: 0.65rem; font-weight: 700;
+                    color: ${brightness < 128 ? '#fff' : '#000'};
+                    text-shadow: ${brightness >= 128 ? 'none' : '0 0 2px #000'};
                 `;
-                gradeDisplay.textContent = avgGrade.toFixed(1);
-                cell.appendChild(gradeDisplay);
+                badge.textContent = displayVal;
+                cell.appendChild(badge);
             }
 
             // Drag & Drop events
@@ -6005,52 +6055,52 @@ function autoAssignSeating() {
         // Prepare students list (Exclude fixed students)
         let studentsToAssign = state.students.filter(s => !fixedStudents.has(s));
 
-        if (method === 'grades_asc') {
-            // Sort by average grade Ascending (Lower grades come first)
-            studentsToAssign.sort((a, b) => {
-                const avgA = getStudentAverage(a);
-                const avgB = getStudentAverage(b);
-                return avgA - avgB;
-            });
+        if (method === 'grades_asc' || method === 'attendance_desc') {
+            // Sort students based on selected metric
+            if (method === 'grades_asc') {
+                // Ascending Grade (Lower grades come first)
+                studentsToAssign.sort((a, b) => getStudentAverage(a) - getStudentAverage(b));
+            } else {
+                // Descending Attendance Score (Higher risks come first)
+                const getAttScore = (name) => {
+                    const att = state.attendance.records[name] || {};
+                    let score = 0;
+                    Object.values(att).forEach(day => {
+                        day.forEach(ev => {
+                            if (ev.status === "欠") score += 1.0;
+                            else if (ev.status === "遅") score += 0.5;
+                        });
+                    });
+                    return score;
+                };
+                studentsToAssign.sort((a, b) => getAttScore(b) - getAttScore(a));
+            }
 
-            // Special Logic: Fill rows from Front to Back, but randomize WITHIN the row
+            // Fill rows from Front to Back, but randomize WITHIN each row
             let studentIndex = 0;
-
             for (let r = 0; r < rows; r++) {
-                // 1. Find valid seats in this row
                 const seatsInRow = [];
                 for (let c = 0; c < cols; c++) {
                     const pos = r + '-' + c;
-                    if (!isExcluded(pos)) {
-                        seatsInRow.push(pos);
-                    }
+                    if (!isExcluded(pos)) seatsInRow.push(pos);
                 }
-
                 if (seatsInRow.length === 0) continue;
 
-                // 2. Take the next N students (where N = seats in row)
-                // Need to handle if we run out of students
-                const count = seatsInRow.length;
-                const chunk = studentsToAssign.slice(studentIndex, studentIndex + count);
-                studentIndex += count;
+                const chunk = studentsToAssign.slice(studentIndex, studentIndex + seatsInRow.length);
+                studentIndex += seatsInRow.length;
 
-                // 3. Shuffle these students
+                // Shuffle WITHIN this row group
                 for (let i = chunk.length - 1; i > 0; i--) {
                     const j = Math.floor(Math.random() * (i + 1));
                     [chunk[i], chunk[j]] = [chunk[j], chunk[i]];
                 }
 
-                // 4. Assign shuffled students to seats in this row
                 seatsInRow.forEach((pos, idx) => {
-                    if (idx < chunk.length) {
-                        state.seating.assignments[pos] = chunk[idx];
-                    }
+                    if (idx < chunk.length) state.seating.assignments[pos] = chunk[idx];
                 });
 
                 if (studentIndex >= studentsToAssign.length) break;
             }
-
-            // Skip standard assignment loop
         } else {
             // Standard Assignment for other methods
             // Sort students
