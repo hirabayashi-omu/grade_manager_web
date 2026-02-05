@@ -4986,7 +4986,7 @@ function renderAtRiskReport() {
         let html = `
             <div style="margin-bottom: 1rem; font-weight: bold; color: #ef4444; font-size: 1.1rem; display: flex; justify-content: space-between; align-items: center;">
                 <span>抽出結果: ${results.length} 名</span>
-                <span style="font-size:0.8rem; color:#64748b; font-weight:normal;">対象: ${year}年 / 形式: ${type === 'attendance' ? '出欠' : (type === 'test' ? test : '通年平均')}</span>
+                <span style="font-size:0.8rem; color:#64748b; font-weight:normal;">対象学年: ${year}年 / 判定基準: ${type === 'attendance' ? '出欠状況' : (type === 'test' ? test : '科目別通年平均')}</span>
             </div>
             <div class="table-container">
                 <table style="width: 100%; border-collapse: collapse;">
