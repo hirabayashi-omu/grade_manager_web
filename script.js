@@ -4853,163 +4853,188 @@ function initAtRiskDefaults() {
 }
 
 function renderAtRiskReport() {
-    const type = document.getElementById('atRiskTypeSelect')?.value;
-    const yearSelect = document.getElementById('atRiskYearSelect');
-    const testSelect = document.getElementById('atRiskTestSelect');
-    if (!yearSelect || !testSelect) return;
+    try {
+        const typeSelect = document.getElementById('atRiskTypeSelect');
+        const yearSelect = document.getElementById('atRiskYearSelect');
+        const testSelect = document.getElementById('atRiskTestSelect');
+        if (!typeSelect || !yearSelect || !testSelect) {
+            console.error('At Risk UI elements not found');
+            return;
+        }
 
-    const year = yearSelect.value;
-    const test = testSelect.value;
-    const reportArea = document.getElementById('atRiskReportArea');
-    if (!reportArea) return;
+        const type = typeSelect.value;
+        const year = yearSelect.value;
+        const test = testSelect.value;
+        const reportArea = document.getElementById('atRiskReportArea');
+        if (!reportArea) return;
 
-    const yearSubjects = state.subjects.filter(s => s.year == year && !s.exclude);
-    const results = [];
+        // Defensive check for state structure
+        if (!state.subjects || !state.students) {
+            reportArea.innerHTML = '<div style="color:red; padding:1rem;">データが読み込まれていません。</div>';
+            return;
+        }
 
-    // Attendance limits from UI
-    const absLimitTotal = parseInt(document.getElementById('atRiskAbsLimit')?.value || 10);
-    const latLimitTotal = parseInt(document.getElementById('atRiskLatLimit')?.value || 15);
+        const yearSubjects = state.subjects.filter(s => s.year == year && !s.exclude);
+        const results = [];
 
-    state.students.forEach(studentName => {
-        if (type === 'attendance') {
-            // --- ATTENDANCE MODE ---
-            const attendance = state.attendance.records[studentName] || {};
-            let totalAbs = 0, totalLat = 0, totalEarly = 0;
-            const subAbs = {};
+        // Attendance limits from UI
+        const absLimitTotal = parseInt(document.getElementById('atRiskAbsLimit')?.value || 10);
+        const latLimitTotal = parseInt(document.getElementById('atRiskLatLimit')?.value || 15);
 
-            Object.values(attendance).forEach(dayEvents => {
-                dayEvents.forEach(ev => {
-                    if (ev.status === "欠") {
-                        totalAbs++;
-                        if (ev.subj) subAbs[ev.subj] = (subAbs[ev.subj] || 0) + 1;
-                    }
-                    else if (ev.status === "遅") totalLat++;
-                    else if (ev.status === "早") totalEarly++;
-                });
-            });
+        state.students.forEach(studentName => {
+            try {
+                if (type === 'attendance') {
+                    // --- ATTENDANCE MODE ---
+                    // Ensure attendance structure exists
+                    const attObj = state.attendance || {};
+                    const records = attObj.records || {};
+                    const studentAttendance = records[studentName] || {};
 
-            const heavyAbsSub = Object.entries(subAbs).filter(([s, c]) => c >= 5);
-            const isAtRisk = totalAbs >= absLimitTotal || totalLat >= latLimitTotal || heavyAbsSub.length > 0;
+                    let totalAbs = 0, totalLat = 0, totalEarly = 0;
+                    const subAbs = {};
 
-            if (isAtRisk) {
-                let reasons = [];
-                if (totalAbs >= absLimitTotal) reasons.push(`累計欠席:${totalAbs}回 (閾値:${absLimitTotal})`);
-                if (totalLat >= latLimitTotal) reasons.push(`累計遅刻:${totalLat}回 (閾値:${latLimitTotal})`);
-                heavyAbsSub.forEach(([s, c]) => reasons.push(`${s}欠席:${c}回`));
-
-                results.push({
-                    name: studentName,
-                    type: 'attendance',
-                    reasons: reasons,
-                    totalAbs, totalLat
-                });
-            }
-        } else {
-            // --- GRADE MODE (test or year_avg) ---
-            let count59 = 0, count49 = 0, count39 = 0;
-            const lowScores = [];
-
-            yearSubjects.forEach(sub => {
-                let scoreValue = NaN;
-                if (type === 'test') {
-                    scoreValue = parseFloat(getScore(studentName, sub.name, test));
-                } else {
-                    const tests = ["前期中間", "前期末", "後期中間", "学年末"];
-                    let sum = 0, count = 0;
-                    tests.forEach(t => {
-                        const s = parseFloat(getScore(studentName, sub.name, t));
-                        if (!isNaN(s)) { sum += s; count++; }
+                    Object.values(studentAttendance).forEach(dayEvents => {
+                        if (Array.isArray(dayEvents)) {
+                            dayEvents.forEach(ev => {
+                                if (ev.status === "欠") {
+                                    totalAbs++;
+                                    if (ev.subj) subAbs[ev.subj] = (subAbs[ev.subj] || 0) + 1;
+                                }
+                                else if (ev.status === "遅") totalLat++;
+                                else if (ev.status === "早") totalEarly++;
+                            });
+                        }
                     });
-                    if (count > 0) scoreValue = sum / count;
-                }
 
-                if (!isNaN(scoreValue) && scoreValue <= 59.9) {
-                    count59++;
-                    if (scoreValue <= 49.9) count49++;
-                    if (scoreValue <= 39.9) count39++;
-                    lowScores.push({ name: sub.name, score: scoreValue });
-                }
-            });
+                    const heavyAbsSub = Object.entries(subAbs).filter(([s, c]) => c >= 5);
+                    const isAtRisk = totalAbs >= absLimitTotal || totalLat >= latLimitTotal || heavyAbsSub.length > 0;
 
-            let isAtRisk = (type === 'test') ? (count59 >= 4 || count49 >= 3 || count39 >= 2)
-                : (count59 >= 3 || count49 >= 2 || count39 >= 1);
+                    if (isAtRisk) {
+                        let reasons = [];
+                        if (totalAbs >= absLimitTotal) reasons.push(`累計欠席:${totalAbs}回 (閾値:${absLimitTotal})`);
+                        if (totalLat >= latLimitTotal) reasons.push(`累計遅刻:${totalLat}回 (閾値:${latLimitTotal})`);
+                        heavyAbsSub.forEach(([s, c]) => reasons.push(`${s}欠席:${c}回`));
 
-            if (isAtRisk) {
-                const reasons = [];
-                if (type === 'test') {
-                    if (count59 >= 4) reasons.push(`60点未満 × ${count59}`);
-                    if (count49 >= 3) reasons.push(`50点未満 × ${count49}`);
-                    if (count39 >= 2) reasons.push(`40点未満 × ${count39}`);
+                        results.push({
+                            name: studentName,
+                            type: 'attendance',
+                            reasons: reasons,
+                            totalAbs, totalLat
+                        });
+                    }
                 } else {
-                    if (count59 >= 3) reasons.push(`平均60点未満 × ${count59}`);
-                    if (count49 >= 2) reasons.push(`平均50点未満 × ${count49}`);
-                    if (count39 >= 1) reasons.push(`平均40点未満 × ${count39}`);
+                    // --- GRADE MODE (test or year_avg) ---
+                    let count59 = 0, count49 = 0, count39 = 0;
+                    const lowScores = [];
+
+                    yearSubjects.forEach(sub => {
+                        let scoreValue = NaN;
+                        if (type === 'test') {
+                            scoreValue = parseFloat(getScore(studentName, sub.name, test));
+                        } else {
+                            const tests = ["前期中間", "前期末", "後期中間", "学年末"];
+                            let sum = 0, count = 0;
+                            tests.forEach(t => {
+                                const s = parseFloat(getScore(studentName, sub.name, t));
+                                if (!isNaN(s)) { sum += s; count++; }
+                            });
+                            if (count > 0) scoreValue = sum / count;
+                        }
+
+                        if (!isNaN(scoreValue) && scoreValue <= 59.9) {
+                            count59++;
+                            if (scoreValue <= 49.9) count49++;
+                            if (scoreValue <= 39.9) count39++;
+                            lowScores.push({ name: sub.name, score: scoreValue });
+                        }
+                    });
+
+                    let isAtRisk = (type === 'test') ? (count59 >= 4 || count49 >= 3 || count39 >= 2)
+                        : (count59 >= 3 || count49 >= 2 || count39 >= 1);
+
+                    if (isAtRisk) {
+                        const reasons = [];
+                        if (type === 'test') {
+                            if (count59 >= 4) reasons.push(`60点未満 × ${count59}`);
+                            if (count49 >= 3) reasons.push(`50点未満 × ${count49}`);
+                            if (count39 >= 2) reasons.push(`40点未満 × ${count39}`);
+                        } else {
+                            if (count59 >= 3) reasons.push(`平均60点未満 × ${count59}`);
+                            if (count49 >= 2) reasons.push(`平均50点未満 × ${count49}`);
+                            if (count39 >= 1) reasons.push(`平均40点未満 × ${count39}`);
+                        }
+                        results.push({
+                            name: studentName,
+                            type: 'grade',
+                            reasons: reasons,
+                            lowScores: lowScores.sort((a, b) => a.score - b.score)
+                        });
+                    }
                 }
-                results.push({
-                    name: studentName,
-                    type: 'grade',
-                    reasons: reasons,
-                    lowScores: lowScores.sort((a, b) => a.score - b.score)
-                });
+            } catch (studentErr) {
+                console.warn(`Error processing student ${studentName}:`, studentErr);
             }
-        }
-    });
+        });
 
-    if (results.length === 0) {
-        reportArea.innerHTML = `<div style="text-align: center; padding: 3rem; color: #10b981; font-weight: bold; background: #f0fdf4; border-radius: 0.5rem; border: 1px solid #bbf7d0;">
-            該当する要注意学生は見つかりませんでした。
-        </div>`;
-        return;
-    }
-
-    let html = `
-        <div style="margin-bottom: 1rem; font-weight: bold; color: #ef4444; font-size: 1.1rem; display: flex; justify-content: space-between; align-items: center;">
-            <span>抽出結果: ${results.length} 名</span>
-            <span style="font-size:0.8rem; color:#64748b; font-weight:normal;">対象: ${year}年 / 形式: ${type === 'attendance' ? '出欠' : (type === 'test' ? test : '通年平均')}</span>
-        </div>
-        <div class="table-container">
-            <table style="width: 100%; border-collapse: collapse;">
-                <thead>
-                    <tr style="background: #fee2e2;">
-                        <th style="padding: 10px; text-align: left; width: 160px;">氏名</th>
-                        <th style="padding: 10px; text-align: left; width: 220px;">抽出理由 (アラート)</th>
-                        <th style="padding: 10px; text-align: left;">詳細情報</th>
-                    </tr>
-                </thead>
-                <tbody>
-    `;
-
-    results.forEach(res => {
-        let detailHtml = '';
-        let reasonHtml = '';
-        if (res.type === 'attendance') {
-            reasonHtml = '<span style="color:#ef4444; font-weight:bold;">⚠️ 出席不良</span>';
-            detailHtml = `<div style="display:flex; flex-wrap:wrap; gap:0.4rem;">
-                ${res.reasons.map(r => `<span style="background:#fee2e2; color:#b91c1c; padding:2px 10px; border-radius:999px; font-size:0.8rem; font-weight:600; border:1px solid #fecaca;">${r}</span>`).join('')}
+        if (results.length === 0) {
+            reportArea.innerHTML = `<div style="text-align: center; padding: 3rem; color: #10b981; font-weight: bold; background: #f0fdf4; border-radius: 0.5rem; border: 1px solid #bbf7d0;">
+                該当する要注意学生は見つかりませんでした。
             </div>`;
-        } else {
-            reasonHtml = res.reasons.join('<br>');
-            detailHtml = `
-                <div style="display: flex; flex-wrap: wrap; gap: 5px;">
-                    ${res.lowScores.map(s => {
-                const color = s.score < 40 ? 'background:#450a0a; color:#fff;' : 'background:#fff1f2; color:#b91c1c; border:1px solid #fca5a5;';
-                return `<span style="padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; ${color}">${s.name}: ${Math.round(s.score)}点</span>`;
-            }).join('')}
-                </div>
-            `;
+            return;
         }
 
-        html += `
-            <tr style="border-bottom: 1px solid #fecaca;">
-                <td style="padding: 12px 10px; font-weight: bold; background: #fff;">${getDisplayName(res.name)}</td>
-                <td style="padding: 12px 10px; background: #fff;">${reasonHtml}</td>
-                <td style="padding: 12px 10px; background: #fff;">${detailHtml}</td>
-            </tr>
+        let html = `
+            <div style="margin-bottom: 1rem; font-weight: bold; color: #ef4444; font-size: 1.1rem; display: flex; justify-content: space-between; align-items: center;">
+                <span>抽出結果: ${results.length} 名</span>
+                <span style="font-size:0.8rem; color:#64748b; font-weight:normal;">対象: ${year}年 / 形式: ${type === 'attendance' ? '出欠' : (type === 'test' ? test : '通年平均')}</span>
+            </div>
+            <div class="table-container">
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="background: #fee2e2;">
+                            <th style="padding: 10px; text-align: left; width: 160px;">氏名</th>
+                            <th style="padding: 10px; text-align: left; width: 220px;">抽出理由 (アラート)</th>
+                            <th style="padding: 10px; text-align: left;">詳細情報</th>
+                        </tr>
+                    </thead>
+                    <tbody>
         `;
-    });
 
-    html += `</tbody></table></div>`;
-    reportArea.innerHTML = html;
+        results.forEach(res => {
+            let detailHtml = '';
+            let reasonHtml = '';
+            if (res.type === 'attendance') {
+                reasonHtml = '<span style="color:#ef4444; font-weight:bold;">⚠️ 出席不良</span>';
+                detailHtml = `<div style="display:flex; flex-wrap:wrap; gap:0.4rem;">
+                    ${res.reasons.map(r => `<span style="background:#fee2e2; color:#b91c1c; padding:2px 10px; border-radius:999px; font-size:0.8rem; font-weight:600; border:1px solid #fecaca;">${r}</span>`).join('')}
+                </div>`;
+            } else {
+                reasonHtml = res.reasons.join('<br>');
+                detailHtml = `
+                    <div style="display: flex; flex-wrap: wrap; gap: 5px;">
+                        ${res.lowScores.map(s => {
+                    const color = s.score < 40 ? 'background:#450a0a; color:#fff;' : 'background:#fff1f2; color:#b91c1c; border:1px solid #fca5a5;';
+                    return `<span style="padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; ${color}">${s.name}: ${Math.round(s.score)}点</span>`;
+                }).join('')}
+                    </div>
+                `;
+            }
+
+            html += `
+                <tr style="border-bottom: 1px solid #fecaca;">
+                    <td style="padding: 12px 10px; font-weight: bold; background: #fff;">${getDisplayName(res.name)}</td>
+                    <td style="padding: 12px 10px; background: #fff;">${reasonHtml}</td>
+                    <td style="padding: 12px 10px; background: #fff;">${detailHtml}</td>
+                </tr>
+            `;
+        });
+
+        html += `</tbody></table></div>`;
+        reportArea.innerHTML = html;
+    } catch (globalErr) {
+        console.error('renderAtRiskReport Failed:', globalErr);
+        alert('抽出実行中にエラーが発生しました。コンソールを確認してください。');
+    }
 }
 
 function renderMandatoryGanttChart(studentName, subjects, isPassed) {
