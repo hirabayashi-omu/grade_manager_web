@@ -741,6 +741,7 @@
                                 <select id="atRiskTypeSelect" onchange="toggleAtRiskInputs()">
                                     <option value="test">試験1回ごとの成績</option>
                                     <option value="year_avg">科目ごとの通年平均</option>
+                                    <option value="attendance">出欠状況 (欠席・遅刻超過)</option>
                                 </select>
                             </div>
                             <div class="control-group">
@@ -762,6 +763,19 @@
                                     <option value="学年末">学年末</option>
                                 </select>
                             </div>
+                            <div class="control-group hidden" id="atRiskAttendanceWrapper"
+                                style="gap: 1.5rem; display: none;">
+                                <div style="display:flex; align-items:center; gap:0.5rem;">
+                                    <label style="white-space:nowrap;">欠席回数以上:</label>
+                                    <input type="number" id="atRiskAbsLimit" value="10" min="1"
+                                        style="width: 60px; padding: 0.3rem;">
+                                </div>
+                                <div style="display:flex; align-items:center; gap:0.5rem;">
+                                    <label style="white-space:nowrap;">遅刻回数以上:</label>
+                                    <input type="number" id="atRiskLatLimit" value="15" min="1"
+                                        style="width: 60px; padding: 0.3rem;">
+                                </div>
+                            </div>
                             <button class="btn btn-primary" onclick="renderAtRiskReport()">抽出実行</button>
                         </div>
                     </div>
@@ -774,6 +788,10 @@
                         <div id="instr-year_avg" class="hidden">
                             <strong>【通年平均ベース】</strong> 以下のいずれかに該当する学生を抽出：<br>
                             ・平均59点以下が3科目以上 / ・平均49点以下が2科目以上 / ・平均39点以下が1科目以上
+                        </div>
+                        <div id="instr-attendance" class="hidden">
+                            <strong>【出欠状況ベース】</strong> 以下のいずれかに該当する学生を抽出：<br>
+                            ・指定した累計欠席回数以上 / ・指定した累計遅刻回数以上 / ・科目別で欠席が5回以上の科目がある
                         </div>
                     </div>
                     <div id="atRiskReportArea">

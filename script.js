@@ -4794,12 +4794,17 @@ document.addEventListener('DOMContentLoaded', init);
 function toggleAtRiskInputs() {
     const type = document.getElementById('atRiskTypeSelect')?.value;
     const testWrapper = document.getElementById('atRiskTestWrapper');
+    const attWrapper = document.getElementById('atRiskAttendanceWrapper');
     const instrTest = document.getElementById('instr-test');
     const instrYear = document.getElementById('instr-year_avg');
+    const instrAtt = document.getElementById('instr-attendance');
 
     if (testWrapper) testWrapper.style.display = (type === 'test') ? 'flex' : 'none';
+    if (attWrapper) attWrapper.style.display = (type === 'attendance') ? 'flex' : 'none';
+
     if (instrTest) instrTest.classList.toggle('hidden', type !== 'test');
     if (instrYear) instrYear.classList.toggle('hidden', type !== 'year_avg');
+    if (instrAtt) instrAtt.classList.toggle('hidden', type !== 'attendance');
 }
 
 function initAtRiskDefaults() {
@@ -4861,148 +4866,149 @@ function renderAtRiskReport() {
     const yearSubjects = state.subjects.filter(s => s.year == year && !s.exclude);
     const results = [];
 
+    // Attendance limits from UI
+    const absLimitTotal = parseInt(document.getElementById('atRiskAbsLimit')?.value || 10);
+    const latLimitTotal = parseInt(document.getElementById('atRiskLatLimit')?.value || 15);
+
     state.students.forEach(studentName => {
-        let count59 = 0;
-        let count49 = 0;
-        let count39 = 0;
-        const lowScores = [];
+        if (type === 'attendance') {
+            // --- ATTENDANCE MODE ---
+            const attendance = state.attendance.records[studentName] || {};
+            let totalAbs = 0, totalLat = 0, totalEarly = 0;
+            const subAbs = {};
 
-        yearSubjects.forEach(sub => {
-            let scoreValue = NaN;
-
-            if (type === 'test') {
-                scoreValue = parseFloat(getScore(studentName, sub.name, test));
-            } else {
-                // Year Average
-                const tests = ["前期中間", "前期末", "後期中間", "学年末"];
-                let sum = 0;
-                let count = 0;
-                tests.forEach(t => {
-                    const s = parseFloat(getScore(studentName, sub.name, t));
-                    if (!isNaN(s)) {
-                        sum += s;
-                        count++;
+            Object.values(attendance).forEach(dayEvents => {
+                dayEvents.forEach(ev => {
+                    if (ev.status === "欠") {
+                        totalAbs++;
+                        if (ev.subj) subAbs[ev.subj] = (subAbs[ev.subj] || 0) + 1;
                     }
+                    else if (ev.status === "遅") totalLat++;
+                    else if (ev.status === "早") totalEarly++;
                 });
-                if (count > 0) scoreValue = sum / count;
-            }
+            });
 
-            if (!isNaN(scoreValue)) {
-                if (scoreValue <= 59.9) { // Using 59.9 to capture below 60
+            const heavyAbsSub = Object.entries(subAbs).filter(([s, c]) => c >= 5);
+            const isAtRisk = totalAbs >= absLimitTotal || totalLat >= latLimitTotal || heavyAbsSub.length > 0;
+
+            if (isAtRisk) {
+                let reasons = [];
+                if (totalAbs >= absLimitTotal) reasons.push(`累計欠席:${totalAbs}回 (閾値:${absLimitTotal})`);
+                if (totalLat >= latLimitTotal) reasons.push(`累計遅刻:${totalLat}回 (閾値:${latLimitTotal})`);
+                heavyAbsSub.forEach(([s, c]) => reasons.push(`${s}欠席:${c}回`));
+
+                results.push({
+                    name: studentName,
+                    type: 'attendance',
+                    reasons: reasons,
+                    totalAbs, totalLat
+                });
+            }
+        } else {
+            // --- GRADE MODE (test or year_avg) ---
+            let count59 = 0, count49 = 0, count39 = 0;
+            const lowScores = [];
+
+            yearSubjects.forEach(sub => {
+                let scoreValue = NaN;
+                if (type === 'test') {
+                    scoreValue = parseFloat(getScore(studentName, sub.name, test));
+                } else {
+                    const tests = ["前期中間", "前期末", "後期中間", "学年末"];
+                    let sum = 0, count = 0;
+                    tests.forEach(t => {
+                        const s = parseFloat(getScore(studentName, sub.name, t));
+                        if (!isNaN(s)) { sum += s; count++; }
+                    });
+                    if (count > 0) scoreValue = sum / count;
+                }
+
+                if (!isNaN(scoreValue) && scoreValue <= 59.9) {
                     count59++;
                     if (scoreValue <= 49.9) count49++;
                     if (scoreValue <= 39.9) count39++;
                     lowScores.push({ name: sub.name, score: scoreValue });
                 }
-            }
-        });
-
-        // Condition Test: (<=59) >= 4 OR (<=49) >= 3 OR (<=39) >= 2
-        // Condition Year Avg: (<=59) >= 3 OR (<=49) >= 2 OR (<=39) >= 1
-        let isAtRisk = false;
-        if (type === 'test') {
-            isAtRisk = (count59 >= 4 || count49 >= 3 || count39 >= 2);
-        } else {
-            isAtRisk = (count59 >= 3 || count49 >= 2 || count39 >= 1);
-        }
-
-        if (isAtRisk) {
-            results.push({
-                name: studentName,
-                count59,
-                count49,
-                count39,
-                lowScores: lowScores
             });
+
+            let isAtRisk = (type === 'test') ? (count59 >= 4 || count49 >= 3 || count39 >= 2)
+                : (count59 >= 3 || count49 >= 2 || count39 >= 1);
+
+            if (isAtRisk) {
+                const reasons = [];
+                if (type === 'test') {
+                    if (count59 >= 4) reasons.push(`60点未満 × ${count59}`);
+                    if (count49 >= 3) reasons.push(`50点未満 × ${count49}`);
+                    if (count39 >= 2) reasons.push(`40点未満 × ${count39}`);
+                } else {
+                    if (count59 >= 3) reasons.push(`平均60点未満 × ${count59}`);
+                    if (count49 >= 2) reasons.push(`平均50点未満 × ${count49}`);
+                    if (count39 >= 1) reasons.push(`平均40点未満 × ${count39}`);
+                }
+                results.push({
+                    name: studentName,
+                    type: 'grade',
+                    reasons: reasons,
+                    lowScores: lowScores.sort((a, b) => a.score - b.score)
+                });
+            }
         }
     });
 
     if (results.length === 0) {
-        reportArea.innerHTML = `
-            <div style="text-align: center; padding: 4rem; background: #f8fafc; border-radius: 1rem; border: 2px dashed #e2e8f0;">
-                <div style="font-size: 3rem; margin-bottom: 1rem;">✅</div>
-                <div style="font-size: 1.1rem; font-weight: 600; color: #1e293b;">該当する学生はいません</div>
-                <div style="color: #64748b; margin-top: 0.5rem;">${year}年 ${type === 'test' ? test : '通年平均'} において、抽出条件に合致する学生は見つかりませんでした。</div>
-            </div>
-        `;
+        reportArea.innerHTML = `<div style="text-align: center; padding: 3rem; color: #10b981; font-weight: bold; background: #f0fdf4; border-radius: 0.5rem; border: 1px solid #bbf7d0;">
+            該当する要注意学生は見つかりませんでした。
+        </div>`;
         return;
     }
 
     let html = `
-        <div class="card" style="border: 2px solid #fee2e2; background: #fff;">
-            <div style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                    <div style="font-weight: 700; font-size: 1.25rem; color: #b91c1c;">抽出結果: ${results.length} 名</div>
-                    <div style="font-size: 0.85rem; color: #64748b; margin-top: 2px;">対象: ${year}年 ${type === 'test' ? test : '科目別通年平均'}</div>
-                </div>
-                <div class="no-print">
-                    <button class="btn btn-secondary" onclick="window.print()" style="gap: 0.5rem; display: flex; align-items: center; border: 1px solid #cbd5e1;">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="18" height="18">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                        </svg>
-                        帳票として印刷 (Print)
-                    </button>
-                </div>
-            </div>
-            <div class="table-container">
-                <table>
-                    <thead>
-                        <tr style="background: #fef2f2;">
-                            <th style="width: 150px;">${state.nameDisplayMode === 'name' ? '学生名' : '学生 (ID/Init)'}</th>
-                            <th style="width: 250px;">アラート条件</th>
-                            <th>対象科目と${type === 'test' ? '点数' : '平均点'}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
+        <div style="margin-bottom: 1rem; font-weight: bold; color: #ef4444; font-size: 1.1rem; display: flex; justify-content: space-between; align-items: center;">
+            <span>抽出結果: ${results.length} 名</span>
+            <span style="font-size:0.8rem; color:#64748b; font-weight:normal;">対象: ${year}年 / 形式: ${type === 'attendance' ? '出欠' : (type === 'test' ? test : '通年平均')}</span>
+        </div>
+        <div class="table-container">
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="background: #fee2e2;">
+                        <th style="padding: 10px; text-align: left; width: 160px;">氏名</th>
+                        <th style="padding: 10px; text-align: left; width: 220px;">抽出理由 (アラート)</th>
+                        <th style="padding: 10px; text-align: left;">詳細情報</th>
+                    </tr>
+                </thead>
+                <tbody>
     `;
 
     results.forEach(res => {
-        const reasons = [];
-        if (type === 'test') {
-            if (res.count59 >= 4) reasons.push(`59点以下 × ${res.count59}`);
-            if (res.count49 >= 3) reasons.push(`49点以下 × ${res.count49}`);
-            if (res.count39 >= 2) reasons.push(`39点以下 × ${res.count39}`);
+        let detailHtml = '';
+        let reasonHtml = '';
+        if (res.type === 'attendance') {
+            reasonHtml = '<span style="color:#ef4444; font-weight:bold;">⚠️ 出席不良</span>';
+            detailHtml = `<div style="display:flex; flex-wrap:wrap; gap:0.4rem;">
+                ${res.reasons.map(r => `<span style="background:#fee2e2; color:#b91c1c; padding:2px 10px; border-radius:999px; font-size:0.8rem; font-weight:600; border:1px solid #fecaca;">${r}</span>`).join('')}
+            </div>`;
         } else {
-            if (res.count59 >= 3) reasons.push(`平均59点以下 × ${res.count59}`);
-            if (res.count49 >= 2) reasons.push(`平均49点以下 × ${res.count49}`);
-            if (res.count39 >= 1) reasons.push(`平均39点以下 × ${res.count39}`);
+            reasonHtml = res.reasons.join('<br>');
+            detailHtml = `
+                <div style="display: flex; flex-wrap: wrap; gap: 5px;">
+                    ${res.lowScores.map(s => {
+                const color = s.score < 40 ? 'background:#450a0a; color:#fff;' : 'background:#fff1f2; color:#b91c1c; border:1px solid #fca5a5;';
+                return `<span style="padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; ${color}">${s.name}: ${Math.round(s.score)}点</span>`;
+            }).join('')}
+                </div>
+            `;
         }
 
-        const scoreBadges = res.lowScores
-            .sort((a, b) => a.score - b.score)
-            .map(s => {
-                let colorClass = 'background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca;';
-                if (s.score <= 39.9) colorClass = 'background: #450a0a; color: #fff;';
-                else if (s.score <= 49.9) colorClass = 'background: #7f1d1d; color: #fff;';
-
-                const valDisplay = type === 'test' ? s.score : s.score.toFixed(1);
-                return `<span style="display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; ${colorClass} margin-right: 4px; margin-bottom: 4px;">
-                    ${s.name}: ${valDisplay}
-                </span>`;
-            }).join('');
-
         html += `
-            <tr>
-                <td style="font-weight: 700; color: #1e293b; font-size: 1.1rem;">${getDisplayName(res.name)}</td>
-                <td>
-                    <div style="display: flex; flex-direction: column; gap: 4px;">
-                        ${reasons.map(r => `<span style="color: #dc2626; font-weight: 600; font-size: 0.85rem;">⚠️ ${r}</span>`).join('')}
-                    </div>
-                </td>
-                <td style="padding: 1rem;">
-                    ${scoreBadges}
-                </td>
+            <tr style="border-bottom: 1px solid #fecaca;">
+                <td style="padding: 12px 10px; font-weight: bold; background: #fff;">${getDisplayName(res.name)}</td>
+                <td style="padding: 12px 10px; background: #fff;">${reasonHtml}</td>
+                <td style="padding: 12px 10px; background: #fff;">${detailHtml}</td>
             </tr>
         `;
     });
 
-    html += `
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    `;
-
+    html += `</tbody></table></div>`;
     reportArea.innerHTML = html;
 }
 
