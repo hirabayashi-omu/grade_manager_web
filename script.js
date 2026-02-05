@@ -251,8 +251,20 @@ let state = {
     seatingPresets: [],
     seatingPresets: [],
     studentMetadata: {}, // Store tag info (extra columns from roster)
-    nameDisplayMode: localStorage.getItem('gm_state_name_display') || 'name' // 'name' or 'initial'
+    nameDisplayMode: localStorage.getItem('gm_state_name_display') || 'name', // 'name' or 'initial'
+    attendance: {
+        records: {}, // Key: StudentName, Value: { "YYYY/MM/DD": [ { p:1, subj:"Math", status:"欠", teacher:"Tanaka" }, ... ] }
+        periodInfo: { start: '', end: '' },
+        fileName: '',
+        memos: {} // Key: "StudentName_YYYY/MM/DD", Value: { text: "...", color: "blue" }
+    }
 };
+
+const ATTENDANCE_STATUS_GAP = "-";
+const ATTENDANCE_STATUS_ABSENT = "欠";
+const ATTENDANCE_STATUS_LATE = "遅";
+const ATTENDANCE_STATUS_EARLY = "早";
+const ATTENDANCE_STATUS_CANCELLED = "休講";
 
 const SCORE_KEYS = ["前期中間", "前期末", "後期中間", "学年末"];
 const SCORE_KEYS_EN = ["earlyMid", "earlyFinal", "lateMid", "lateFinal"]; // map for object keys
@@ -305,9 +317,11 @@ function saveSessionState() {
         localStorage.setItem('gm_master_subjects_json', JSON.stringify(state.subjects));
         localStorage.setItem('grade_manager_scores', JSON.stringify(state.scores));
 
-        // Roster Persistence
         localStorage.setItem('gm_roster_candidates', JSON.stringify(importState.candidates));
         localStorage.setItem('gm_faculty_candidates', JSON.stringify(facultyImportState.candidates));
+
+        // Attendance Persistence
+        localStorage.setItem('gm_attendance_data', JSON.stringify(state.attendance));
 
     } catch (e) {
         console.error('Save State Error:', e);
@@ -383,6 +397,17 @@ function loadSessionState() {
     } catch (e) {
         console.error('Failed to restore faculty roster:', e);
         facultyImportState.candidates = [];
+    }
+
+    // Restore Attendance Data
+    try {
+        const savedAttendance = localStorage.getItem('gm_attendance_data');
+        if (savedAttendance) {
+            state.attendance = JSON.parse(savedAttendance);
+            console.log("Attendance records loaded.");
+        }
+    } catch (e) {
+        console.error('Failed to restore attendance data:', e);
     }
 
     // Force automatic year detection on load to ensure we start at the latest data year
@@ -907,7 +932,10 @@ function setupEventListeners() {
         });
     });
     document.getElementById('saveBtn')?.addEventListener('click', saveData);
-    document.getElementById('printBtn')?.addEventListener('click', () => window.print());
+    document.getElementById('printBtn')?.addEventListener('click', () => {
+        updatePrintHeader();
+        window.print();
+    });
     document.getElementById('exportJsonBtn')?.addEventListener('click', exportJson);
 
     // Import JSON
@@ -1035,6 +1063,25 @@ function setupEventListeners() {
         generateClassStats();
     });
     document.getElementById('exportClassStatsCsvBtn')?.addEventListener('click', exportClassStatsCsv);
+
+    // Class Stats Sub-nav Listener
+    document.querySelectorAll('.sub-nav-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+            const targetTab = e.target.dataset.csTab;
+            const parent = e.target.closest('.card');
+
+            // Toggle buttons
+            parent.querySelectorAll('.sub-nav-item').forEach(btn => btn.classList.remove('active'));
+            e.target.classList.add('active');
+
+            // Toggle contents
+            parent.querySelectorAll('.cs-tab-content').forEach(content => content.classList.add('hidden'));
+            parent.querySelector(`#cs-tab-${targetTab}`).classList.remove('hidden');
+        });
+    });
+
+    document.getElementById('generateClassAttendanceStatsBtn')?.addEventListener('click', generateClassAttendanceStats);
+    document.getElementById('exportClassAttendanceCsvBtn')?.addEventListener('click', exportClassAttendanceCsv);
 
     // Mobile tabs
     document.querySelectorAll('.mobile-tab').forEach(tab => {
@@ -1188,6 +1235,35 @@ function setupEventListeners() {
         if (yearWrapper) yearWrapper.style.display = isSpecial ? 'none' : 'flex';
         if (type1Wrapper) type1Wrapper.style.display = isSpecial ? 'none' : 'flex';
     });
+
+    setupAttendanceListeners();
+}
+
+function setupAttendanceListeners() {
+    document.getElementById('attendanceMonthSelect')?.addEventListener('change', (e) => {
+        renderAttendanceCalendar();
+        renderAttendanceStats();
+    });
+
+    document.getElementById('importAttendanceCsvBtn')?.addEventListener('click', () => {
+        document.getElementById('attendanceCsvFileInput')?.click();
+    });
+
+    document.getElementById('attendanceCsvFileInput')?.addEventListener('change', handleAttendanceFileUpload);
+
+    document.getElementById('attendanceSubjectFilter')?.addEventListener('change', () => {
+        renderSubjectAttendanceChart();
+    });
+
+    document.getElementById('attendanceDayFilter')?.addEventListener('change', () => {
+        renderDayAttendanceChart();
+    });
+
+    document.getElementById('attendancePeriodFilter')?.addEventListener('change', () => {
+        renderPeriodAttendanceChart();
+    });
+
+    document.getElementById('attendanceExportPdfBtn')?.addEventListener('click', () => window.print());
 }
 
 function switchTab(tabName) {
@@ -1236,6 +1312,8 @@ function switchTab(tabName) {
     } else if (tabName === 'faculty_roster') {
         renderFacultyFilters();
         renderFacultyTable();
+    } else if (tabName === 'attendance') {
+        initAttendance();
     }
 }
 
@@ -2794,6 +2872,8 @@ function render() {
         initClassStats();
     } else if (state.currentTab === 'settings') {
         renderSettings();
+    } else if (state.currentTab === 'attendance') {
+        initAttendance();
     }
 }
 
@@ -2829,6 +2909,10 @@ function updatePrintHeader() {
 let stats2SimpleChartInstance = null;
 let stats2WeightedChartInstance = null;
 let stats2GpaChartInstance = null;
+let attendanceChartInstance = null;
+let subjectAttendanceChartInstance = null;
+let dayAttendanceChartInstance = null;
+let periodAttendanceChartInstance = null;
 
 // --- GPA / Year Utilities ---
 
@@ -7104,3 +7188,994 @@ function openFacultyMail() {
     const url = `mailto:${emails.join(';')}`;
     window.location.href = url;
 }
+
+
+// ==================== ATTENDANCE MANAGEMENT (出欠管理) ====================
+
+function initAttendance() {
+    const monthSelect = document.getElementById('attendanceMonthSelect');
+    if (!monthSelect) return;
+
+    // Populate Months (4月 to 3月 of current or detected year)
+    if (monthSelect.options.length === 0) {
+        const months = ["4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月", "1月", "2月", "3月"];
+        months.forEach(m => {
+            const opt = document.createElement('option');
+            opt.value = m;
+            opt.textContent = m;
+            monthSelect.appendChild(opt);
+        });
+        // Default to current month
+        const now = new Date();
+        const curM = now.getMonth() + 1; // 1-12
+        let idx = curM >= 4 ? curM - 4 : curM + 8;
+        monthSelect.selectedIndex = idx;
+    }
+
+    document.getElementById('attendanceFileInfo').textContent = `ファイル：${state.attendance.fileName || '未読込'}`;
+
+    // Populate Subject Filter
+    populateAttendanceSubjectFilter();
+
+    renderAttendanceCalendar();
+    renderAttendanceStats();
+    renderCumulativeAttendanceChart();
+    renderSubjectAttendanceChart();
+    renderDayAttendanceChart();
+    renderPeriodAttendanceChart();
+}
+
+function populateAttendanceSubjectFilter() {
+    const filter = document.getElementById('attendanceSubjectFilter');
+    if (!filter) return;
+
+    const studentName = state.currentStudent;
+    const subjects = new Set();
+
+    if (studentName && state.attendance.records[studentName]) {
+        const records = state.attendance.records[studentName];
+        Object.values(records).forEach(dayEvents => {
+            dayEvents.forEach(ev => {
+                if (ev.subj) subjects.add(ev.subj);
+            });
+        });
+    }
+
+    const sortedSubjects = Array.from(subjects).sort();
+    const currentVal = filter.value;
+
+    filter.innerHTML = '<option value="">-- 科目を選択 --</option>';
+    sortedSubjects.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s;
+        opt.textContent = s;
+        filter.appendChild(opt);
+    });
+
+    if (sortedSubjects.includes(currentVal)) {
+        filter.value = currentVal;
+    } else if (sortedSubjects.length > 0) {
+        filter.value = sortedSubjects[0];
+    }
+}
+
+function handleAttendanceFileUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        try {
+            // Use a simple CSV parser that can handle multiple header rows
+            const text = event.target.result;
+            const lines = text.split(/\r?\n/).map(l => l.split(','));
+            if (lines.length < 5) throw new Error("CSV行数が不足しています。");
+
+            // Python Logic:
+            // df = pd.read_csv(path, encoding="cp932", header=1) -> headers are line 1 (0-indexed)
+            // subject_df = skiprows 2, nrows 1 -> line 2
+            // teacher_df = skiprows 3, nrows 1 -> line 3
+            // df_data = SKIPROWS [2,3] -> line 1 is header, line 4+ is data
+
+            const headerRow = lines[1];
+            const subjectRow = lines[2];
+            const teacherRow = lines[3];
+            const dataRows = lines.slice(4);
+
+            // Find first date column (starts with YYYY/MM/DD)
+            const dateRegex = /^\d{4}\/\d{1,2}\/\d{1,2}/;
+            let firstDateIdx = -1;
+            for (let i = 0; i < headerRow.length; i++) {
+                if (dateRegex.test(headerRow[i].trim())) {
+                    firstDateIdx = i;
+                    break;
+                }
+            }
+
+            if (firstDateIdx === -1) throw new Error("日付列が見つかりません。");
+
+            const records = {};
+            let globalMinDate = null;
+            let globalMaxDate = null;
+
+            dataRows.forEach(row => {
+                if (row.length < 3) return;
+                const studentName = row[2].trim(); // Name is in col 2 (0:No, 1:ID, 2:Name)
+                if (!studentName) return;
+
+                if (!records[studentName]) records[studentName] = {};
+
+                for (let i = firstDateIdx; i < headerRow.length; i++) {
+                    const dp = headerRow[i].trim();
+                    if (!dp) continue;
+                    const parts = dp.split(/\s+/);
+                    const dateStr = parts[0];
+                    const period = (parts.length > 1) ? parseInt(parseFloat(parts[1])) : 0;
+                    const subject = (subjectRow[i] || "").trim();
+                    const teacher = (teacherRow[i] || "").trim();
+                    const status = (row[i] || "").trim();
+
+                    if (!dateRegex.test(dateStr)) continue;
+
+                    if (!records[studentName][dateStr]) records[studentName][dateStr] = [];
+                    records[studentName][dateStr].push({
+                        p: period,
+                        subj: subject,
+                        status: status,
+                        teacher: teacher
+                    });
+
+                    // Track date range
+                    const d = new Date(dateStr);
+                    if (!isNaN(d)) {
+                        if (!globalMinDate || d < globalMinDate) globalMinDate = d;
+                        if (!globalMaxDate || d > globalMaxDate) globalMaxDate = d;
+                    }
+                }
+            });
+
+            state.attendance.records = records;
+            state.attendance.fileName = file.name;
+            if (globalMinDate && globalMaxDate) {
+                state.attendance.periodInfo = {
+                    start: globalMinDate.toISOString().split('T')[0].replace(/-/g, '/'),
+                    end: globalMaxDate.toISOString().split('T')[0].replace(/-/g, '/')
+                };
+            }
+
+            // Sync with master student list
+            const foundNames = Object.keys(records);
+            let addedNew = false;
+            foundNames.forEach(name => {
+                if (!state.students.includes(name)) {
+                    state.students.push(name);
+                    addedNew = true;
+                }
+            });
+
+            if (addedNew) {
+                state.students.sort();
+                if (typeof populateControls === 'function') populateControls();
+            }
+
+            saveSessionState();
+            initAttendance();
+            alert('出欠データを読み込みました。');
+        } catch (err) {
+            console.error(err);
+            alert('CSVの解析に失敗しました: ' + err.message);
+        }
+    };
+    // Note: Python uses CP932. For web, maybe Shift-JIS or UTF-8. 
+    // Usually school systems export in Shift-JIS.
+    reader.readAsText(file, 'Shift_JIS');
+    e.target.value = '';
+}
+
+function renderAttendanceCalendar() {
+    const grid = document.getElementById('attendanceCalendarGrid');
+    if (!grid) return;
+    grid.innerHTML = '';
+
+    const studentName = state.currentStudent;
+    if (!studentName || !state.attendance.records[studentName]) {
+        grid.innerHTML = '<div style="grid-column: span 7; padding: 3rem; text-align: center; color: #94a3b8; background: white;">学生を選択するか、データを読み込んでください。</div>';
+        return;
+    }
+
+    const monthStr = document.getElementById('attendanceMonthSelect').value;
+    const monthNum = parseInt(monthStr.replace("月", ""));
+    // Detect year: look at periodInfo or use current year
+    let year = new Date().getFullYear();
+    if (state.attendance.periodInfo.start) {
+        year = parseInt(state.attendance.periodInfo.start.split('/')[0]);
+        // If month is Jan-Mar, and start is Apr, year might need adjustment
+        if (monthNum < 4 && state.attendance.periodInfo.start.includes('/04/')) {
+            year += 1;
+        }
+    }
+
+    const firstDay = new Date(year, monthNum - 1, 1);
+    const lastDay = new Date(year, monthNum, 0);
+
+    // Day offset (0:Mon, ..., 6:Sun)
+    let startOffset = firstDay.getDay();
+    startOffset = (startOffset === 0) ? 6 : startOffset - 1;
+
+    // Empty cells at start
+    for (let i = 0; i < startOffset; i++) {
+        const cell = document.createElement('div');
+        cell.style.background = '#f1f5f9';
+        cell.style.minHeight = '100px';
+        grid.appendChild(cell);
+    }
+
+    const records = state.attendance.records[studentName] || {};
+
+    for (let d = 1; d <= lastDay.getDate(); d++) {
+        const dateStr = `${year}/${monthNum.toString().padStart(2, '0')}/${d.toString().padStart(2, '0')}`;
+        const dayEvents = records[dateStr] || [];
+        const dayOfWeek = new Date(year, monthNum - 1, d).getDay(); // 0:Sun
+
+        const cell = document.createElement('div');
+        cell.style.background = 'white';
+        if (dayOfWeek === 6) cell.style.background = '#eff6ff'; // Sat
+        if (dayOfWeek === 0) cell.style.background = '#fef2f2'; // Sun
+        cell.style.minHeight = '100px';
+        cell.style.padding = '0.4rem';
+        cell.style.border = '1px solid #e2e8f0';
+        cell.style.display = 'flex';
+        cell.style.flexDirection = 'column';
+        cell.style.gap = '2px';
+        cell.style.cursor = 'pointer';
+
+        // Date Header
+        const header = document.createElement('div');
+        header.style.fontSize = '0.75rem';
+        header.style.fontWeight = 'bold';
+        header.style.marginBottom = '2px';
+        header.textContent = d;
+        if (dayOfWeek === 6) header.style.color = '#3b82f6';
+        if (dayOfWeek === 0) header.style.color = '#ef4444';
+
+        // Memo Star
+        const memoKey = `${studentName}_${dateStr}`;
+        if (state.attendance.memos[memoKey]) {
+            header.innerHTML += ` <span style="color:${state.attendance.memos[memoKey].color || 'blue'}">★</span>`;
+        }
+        cell.appendChild(header);
+
+        // Sort events by period
+        dayEvents.sort((a, b) => a.p - b.p);
+
+        dayEvents.forEach(ev => {
+            if (ev.status === "-") return; // Skip if no record (-)
+
+            const item = document.createElement('div');
+            item.style.fontSize = '0.7rem';
+            item.style.lineHeight = '1.1';
+            item.style.whiteSpace = 'nowrap';
+            item.style.overflow = 'hidden';
+            item.style.textOverflow = 'ellipsis';
+
+            let color = '#475569';
+            if (ev.status === "欠") color = '#ef4444';
+            else if (ev.status === "遅") color = '#f59e0b';
+            else if (ev.status === "早") color = '#10b981';
+            else if (ev.status === "休講") color = '#94a3b8';
+
+            item.style.color = color;
+            const statusDisp = ev.status ? `(${ev.status})` : '';
+            item.textContent = `${ev.p}:${ev.subj}${statusDisp}`;
+            cell.appendChild(item);
+        });
+
+        cell.onclick = () => openAttendanceMemoDialog(studentName, dateStr);
+        grid.appendChild(cell);
+    }
+}
+
+function openAttendanceMemoDialog(studentName, dateStr) {
+    const key = `${studentName}_${dateStr}`;
+    const existing = state.attendance.memos[key] || { text: "", color: "blue" };
+
+    const text = prompt(`${dateStr} のメモを入力してください:`, existing.text);
+    if (text === null) return;
+
+    if (text.trim() === "") {
+        delete state.attendance.memos[key];
+    } else {
+        const color = confirm('色を赤にしますか？ (キャンセルで青)') ? 'red' : 'blue';
+        state.attendance.memos[key] = { text: text, color: color };
+    }
+
+    saveSessionState();
+    renderAttendanceCalendar();
+}
+
+function renderAttendanceStats() {
+    const tbody = document.getElementById('attendanceStatsBody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    const studentName = state.currentStudent;
+    if (!studentName || !state.attendance.records[studentName]) return;
+
+    const monthStr = document.getElementById('attendanceMonthSelect').value;
+    const monthNum = parseInt(monthStr.replace("月", ""));
+    const records = state.attendance.records[studentName];
+
+    // Aggregation: Subject -> { teacher, month: { abs, lat, early, total }, cumulative: { abs, lat, early, total } }
+    const stats = {};
+
+    Object.keys(records).forEach(dStr => {
+        const isCurrentMonth = parseInt(dStr.split('/')[1]) === monthNum;
+        records[dStr].forEach(ev => {
+            if (!ev.subj) return;
+            if (!stats[ev.subj]) {
+                stats[ev.subj] = {
+                    teacher: ev.teacher || "-",
+                    month: { abs: 0, lat: 0, early: 0, total: 0 },
+                    cumulative: { abs: 0, lat: 0, early: 0, total: 0 }
+                };
+            }
+
+            const s = stats[ev.subj];
+            if (ev.status === "欠") {
+                s.cumulative.abs++;
+                s.cumulative.total++;
+                if (isCurrentMonth) {
+                    s.month.abs++;
+                    s.month.total++;
+                }
+            } else if (ev.status === "遅") {
+                s.cumulative.lat++;
+                s.cumulative.total++;
+                if (isCurrentMonth) {
+                    s.month.lat++;
+                    s.month.total++;
+                }
+            } else if (ev.status === "早") {
+                s.cumulative.early++;
+                s.cumulative.total++;
+                if (isCurrentMonth) {
+                    s.month.early++;
+                    s.month.total++;
+                }
+            }
+        });
+    });
+
+    const sortedSubjects = Object.keys(stats).sort();
+    sortedSubjects.forEach(s => {
+        const st = stats[s];
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td style="font-weight: 600;">${s}</td>
+            <td style="color: #64748b; font-size: 0.8rem;">${st.teacher}</td>
+            <!-- Monthly -->
+            <td style="text-align:center; color:#ef4444; border-left: 1px solid #e2e8f0;">${st.month.abs || ""}</td>
+            <td style="text-align:center; color:#f59e0b;">${st.month.lat || ""}</td>
+            <td style="text-align:center; color:#10b981;">${st.month.early || ""}</td>
+            <td style="text-align:center; font-weight:700; background:#f0f9ff; color:#1e40af;">${st.month.total || ""}</td>
+            <!-- Cumulative -->
+            <td style="text-align:center; color:#ef4444; border-left: 2px solid #e2e8f0;">${st.cumulative.abs}</td>
+            <td style="text-align:center; color:#f59e0b;">${st.cumulative.lat}</td>
+            <td style="text-align:center; color:#10b981;">${st.cumulative.early}</td>
+            <td style="text-align:center; font-weight:700; background:#fdfaf0; color:#92400e;">${st.cumulative.total}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    if (tbody.innerHTML === '') {
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding: 2rem; color:#94a3b8;">出欠データはありません。</td></tr>';
+    }
+}
+
+function renderCumulativeAttendanceChart() {
+    const ctxEl = document.getElementById('cumulativeAttendanceChart');
+    if (!ctxEl) return;
+    const ctx = ctxEl.getContext('2d');
+    if (attendanceChartInstance) attendanceChartInstance.destroy();
+
+    const studentName = state.currentStudent;
+    if (!studentName || !state.attendance.records[studentName]) {
+        // Clear chart if no data
+        return;
+    }
+
+    const records = state.attendance.records[studentName];
+    const sortedDates = Object.keys(records).sort();
+
+    const labels = [];
+    const cumulativeAbsents = [];
+    const cumulativeLates = [];
+
+    let totalAbsents = 0;
+    let totalLates = 0;
+
+    sortedDates.forEach(dateStr => {
+        labels.push(dateStr);
+        let dayAbs = 0;
+        let dayLat = 0;
+        (records[dateStr] || []).forEach(ev => {
+            if (ev.status === "欠") dayAbs++;
+            else if (ev.status === "遅") dayLat++;
+        });
+        totalAbsents += dayAbs;
+        totalLates += dayLat;
+        cumulativeAbsents.push(totalAbsents);
+        cumulativeLates.push(totalLates);
+    });
+
+    attendanceChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: '累積欠席 (Cumulative Absents)',
+                    data: cumulativeAbsents,
+                    borderColor: '#ef4444',
+                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                    fill: true,
+                    tension: 0.2,
+                    pointRadius: 2
+                },
+                {
+                    label: '累積遅刻 (Cumulative Lates)',
+                    data: cumulativeLates,
+                    borderColor: '#f59e0b',
+                    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                    fill: true,
+                    tension: 0.2,
+                    pointRadius: 2
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            scales: {
+                x: {
+                    display: true,
+                    title: { display: false },
+                    ticks: {
+                        autoSkip: true,
+                        maxRotation: 0,
+                        callback: function (val, index) {
+                            // Show month/day for cleaner labels
+                            const d = labels[index];
+                            return d.substring(5);
+                        }
+                    },
+                    grid: { display: false }
+                },
+                y: {
+                    beginAtZero: true,
+                    suggestedMax: 15,
+                    title: { display: true, text: '累積回数' },
+                    ticks: { stepSize: 1 }
+                }
+            },
+            plugins: {
+                legend: { position: 'top', align: 'end' },
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            return `${context.dataset.label}: ${context.parsed.y} 回`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function renderSubjectAttendanceChart() {
+    const ctxEl = document.getElementById('subjectAttendanceChart');
+    if (!ctxEl) return;
+    const ctx = ctxEl.getContext('2d');
+    if (subjectAttendanceChartInstance) subjectAttendanceChartInstance.destroy();
+
+    const studentName = state.currentStudent;
+    const subjectName = document.getElementById('attendanceSubjectFilter')?.value;
+
+    if (!studentName || !subjectName || !state.attendance.records[studentName]) {
+        // Clear if not possible to render
+        return;
+    }
+
+    const records = state.attendance.records[studentName];
+    const sortedDates = Object.keys(records).sort();
+
+    const labels = [];
+    const cumulativeAbsents = [];
+    const cumulativeLates = [];
+
+    let totalAbsents = 0;
+    let totalLates = 0;
+
+    sortedDates.forEach(dateStr => {
+        let dayAbs = 0;
+        let dayLat = 0;
+        let hasEvent = false;
+
+        (records[dateStr] || []).forEach(ev => {
+            if (ev.subj === subjectName) {
+                hasEvent = true;
+                if (ev.status === "欠") dayAbs++;
+                else if (ev.status === "遅") dayLat++;
+            }
+        });
+
+        if (hasEvent || dayAbs > 0 || dayLat > 0) {
+            labels.push(dateStr);
+            totalAbsents += dayAbs;
+            totalLates += dayLat;
+            cumulativeAbsents.push(totalAbsents);
+            cumulativeLates.push(totalLates);
+        }
+    });
+
+    if (labels.length === 0) return;
+
+    subjectAttendanceChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: `累積欠席 [${subjectName}]`,
+                    data: cumulativeAbsents,
+                    borderColor: '#ef4444',
+                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                    fill: true,
+                    tension: 0.2,
+                    pointRadius: 3
+                },
+                {
+                    label: `累積遅刻 [${subjectName}]`,
+                    data: cumulativeLates,
+                    borderColor: '#f59e0b',
+                    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                    fill: true,
+                    tension: 0.2,
+                    pointRadius: 3
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            scales: {
+                x: {
+                    display: true,
+                    ticks: {
+                        autoSkip: true,
+                        maxRotation: 0,
+                        callback: function (val, index) {
+                            return labels[index].substring(5); // MM/DD
+                        }
+                    },
+                    grid: { display: false }
+                },
+                y: {
+                    beginAtZero: true,
+                    suggestedMax: 15,
+                    title: { display: true, text: '累積回数' },
+                    ticks: { stepSize: 1 }
+                }
+            },
+            plugins: {
+                legend: { position: 'top', align: 'end' },
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            return `${context.dataset.label}: ${context.parsed.y} 回`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function renderDayAttendanceChart() {
+    const ctxEl = document.getElementById('dayAttendanceChart');
+    if (!ctxEl) return;
+    const ctx = ctxEl.getContext('2d');
+    if (dayAttendanceChartInstance) dayAttendanceChartInstance.destroy();
+
+    const studentName = state.currentStudent;
+    const targetDay = parseInt(document.getElementById('attendanceDayFilter')?.value || "1"); // 0:Sun, 1:Mon...
+
+    if (!studentName || !state.attendance.records[studentName]) return;
+
+    const records = state.attendance.records[studentName];
+    const sortedDates = Object.keys(records).sort();
+
+    const labels = [];
+    const cumulativeAbsents = [];
+    const cumulativeLates = [];
+
+    let totalAbsents = 0;
+    let totalLates = 0;
+
+    sortedDates.forEach(dateStr => {
+        const d = new Date(dateStr);
+        if (d.getDay() !== targetDay) return;
+
+        labels.push(dateStr);
+        let dayAbs = 0;
+        let dayLat = 0;
+        (records[dateStr] || []).forEach(ev => {
+            if (ev.status === "欠") dayAbs++;
+            else if (ev.status === "遅") dayLat++;
+        });
+        totalAbsents += dayAbs;
+        totalLates += dayLat;
+        cumulativeAbsents.push(totalAbsents);
+        cumulativeLates.push(totalLates);
+    });
+
+    if (labels.length === 0) return;
+
+    const dayNames = ["日曜日", "月曜日", "火曜日", "水曜日", "木曜日", "金曜日", "土曜日"];
+
+    dayAttendanceChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: `累積欠席 [${dayNames[targetDay]}]`,
+                    data: cumulativeAbsents,
+                    borderColor: '#ef4444',
+                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                    fill: true,
+                    tension: 0.2,
+                    pointRadius: 3
+                },
+                {
+                    label: `累積遅刻 [${dayNames[targetDay]}]`,
+                    data: cumulativeLates,
+                    borderColor: '#f59e0b',
+                    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                    fill: true,
+                    tension: 0.2,
+                    pointRadius: 3
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            scales: {
+                x: {
+                    display: true,
+                    ticks: {
+                        autoSkip: true,
+                        maxRotation: 0,
+                        callback: function (val, index) {
+                            return labels[index].substring(5); // MM/DD
+                        }
+                    },
+                    grid: { display: false }
+                },
+                y: {
+                    beginAtZero: true,
+                    suggestedMax: 15,
+                    title: { display: true, text: '累積回数' },
+                    ticks: { stepSize: 1 }
+                }
+            },
+            plugins: {
+                legend: { position: 'top', align: 'end' },
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            return `${context.dataset.label}: ${context.parsed.y} 回`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function renderPeriodAttendanceChart() {
+    const ctxEl = document.getElementById('periodAttendanceChart');
+    if (!ctxEl) return;
+    const ctx = ctxEl.getContext('2d');
+    if (periodAttendanceChartInstance) periodAttendanceChartInstance.destroy();
+
+    const studentName = state.currentStudent;
+    const targetPeriod = parseInt(document.getElementById('attendancePeriodFilter')?.value || "1");
+
+    if (!studentName || !state.attendance.records[studentName]) return;
+
+    const records = state.attendance.records[studentName];
+    const sortedDates = Object.keys(records).sort();
+
+    const labels = [];
+    const cumulativeAbsents = [];
+    const cumulativeLates = [];
+
+    let totalAbsents = 0;
+    let totalLates = 0;
+
+    sortedDates.forEach(dateStr => {
+        const eventsForPeriod = (records[dateStr] || []).filter(ev => ev.p === targetPeriod);
+        if (eventsForPeriod.length === 0) return;
+
+        labels.push(dateStr);
+        let dayAbs = 0;
+        let dayLat = 0;
+        eventsForPeriod.forEach(ev => {
+            if (ev.status === "欠") dayAbs++;
+            else if (ev.status === "遅") dayLat++;
+        });
+        totalAbsents += dayAbs;
+        totalLates += dayLat;
+        cumulativeAbsents.push(totalAbsents);
+        cumulativeLates.push(totalLates);
+    });
+
+    if (labels.length === 0) return;
+
+    periodAttendanceChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: `累積欠席 [${targetPeriod}限]`,
+                    data: cumulativeAbsents,
+                    borderColor: '#ef4444',
+                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                    fill: true,
+                    tension: 0.2,
+                    pointRadius: 3
+                },
+                {
+                    label: `累積遅刻 [${targetPeriod}限]`,
+                    data: cumulativeLates,
+                    borderColor: '#f59e0b',
+                    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                    fill: true,
+                    tension: 0.2,
+                    pointRadius: 3
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            scales: {
+                x: {
+                    display: true,
+                    ticks: {
+                        autoSkip: true,
+                        maxRotation: 0,
+                        callback: function (val, index) {
+                            return labels[index].substring(5); // MM/DD
+                        }
+                    },
+                    grid: { display: false }
+                },
+                y: {
+                    beginAtZero: true,
+                    suggestedMax: 15,
+                    title: { display: true, text: '累積回数' },
+                    ticks: { stepSize: 1 }
+                }
+            },
+            plugins: {
+                legend: { position: 'top', align: 'end' },
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            return `${context.dataset.label}: ${context.parsed.y} 回`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function generateClassAttendanceStats() {
+    const container = document.getElementById('classAttendanceStatsContainer');
+    if (!container) return;
+
+    container.innerHTML = '<div style="padding: 2rem; text-align: center; color: #64748b;">集計中...</div>';
+
+    setTimeout(() => {
+        const studentList = state.students;
+        const attendanceData = state.attendance.records;
+
+        if (studentList.length === 0) {
+            container.innerHTML = '<div style="padding: 2.5rem; text-align: center; color: #64748b; background: #f8fafc; border-radius: 0.5rem; border: 1px dashed #e2e8f0;">学生データが見つかりません</div>';
+            return;
+        }
+
+        const stats = studentList.map(name => {
+            const records = attendanceData[name] || {};
+            let totalAbs = 0;
+            let totalLat = 0;
+            let totalEarly = 0;
+            const subAbs = {};
+
+            Object.values(records).forEach(dayEvents => {
+                dayEvents.forEach(ev => {
+                    if (ev.status === "欠") {
+                        totalAbs++;
+                        if (ev.subj) subAbs[ev.subj] = (subAbs[ev.subj] || 0) + 1;
+                    }
+                    else if (ev.status === "遅") totalLat++;
+                    else if (ev.status === "早") totalEarly++;
+                });
+            });
+
+            let maxSub = "-";
+            let maxSubCount = 0;
+            Object.entries(subAbs).forEach(([sub, count]) => {
+                if (count > maxSubCount) {
+                    maxSubCount = count;
+                    maxSub = sub;
+                }
+            });
+
+            return {
+                name,
+                totalAbs,
+                totalLat,
+                totalEarly,
+                maxSub,
+                maxSubCount
+            };
+        });
+
+        stats.sort((a, b) => b.totalAbs - a.totalAbs);
+
+        let minDate = null;
+        let maxDate = null;
+        Object.values(attendanceData).forEach(records => {
+            Object.keys(records).forEach(dateStr => {
+                if (!minDate || dateStr < minDate) minDate = dateStr;
+                if (!maxDate || dateStr > maxDate) maxDate = dateStr;
+            });
+        });
+        const periodStr = (minDate && maxDate) ? `${minDate} ～ ${maxDate}` : "データなし";
+
+        let html = `
+            <div style="margin-bottom: 1rem; color: #475569; font-size: 0.85rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                統計対象期間: ${periodStr}
+            </div>
+            <div style="background: white; border: 1px solid #e2e8f0; border-radius: 0.5rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); overflow: hidden;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                    <thead>
+                        <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
+                            <th style="padding: 1rem; text-align: left; width: 180px;">氏名</th>
+                            <th style="padding: 1rem; text-align: center;">合計欠席</th>
+                            <th style="padding: 1rem; text-align: center;">合計遅刻</th>
+                            <th style="padding: 1rem; text-align: center;">合計早退</th>
+                            <th style="padding: 1rem; text-align: left;">最多欠席科目</th>
+                            <th style="padding: 1rem; text-align: center;">最大欠席数</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+
+        stats.forEach((row, idx) => {
+            const rowStyle = idx % 2 === 1 ? 'background: #f8fafc;' : 'background: white;';
+            const absColor = row.totalAbs >= 15 ? '#ef4444' : row.totalAbs >= 10 ? '#f59e0b' : 'inherit';
+            const absWeight = row.totalAbs >= 10 ? '700' : 'normal';
+
+            html += `
+                <tr style="${rowStyle} border-bottom: 1px solid #f1f5f9;">
+                    <td style="padding: 0.8rem 1rem; font-weight: 600;">${getDisplayName(row.name)}</td>
+                    <td style="padding: 0.8rem 1rem; text-align: center; color: ${absColor}; font-weight: ${absWeight};">${row.totalAbs}</td>
+                    <td style="padding: 0.8rem 1rem; text-align: center;">${row.totalLat}</td>
+                    <td style="padding: 0.8rem 1rem; text-align: center;">${row.totalEarly}</td>
+                    <td style="padding: 0.8rem 1rem;">${row.maxSub}</td>
+                    <td style="padding: 0.8rem 1rem; text-align: center;">${row.maxSubCount > 0 ? row.maxSubCount : '-'}</td>
+                </tr>
+            `;
+        });
+
+        html += `</tbody></table></div>`;
+        container.innerHTML = html;
+        if (typeof updatePrintHeader === 'function') updatePrintHeader();
+    }, 10);
+}
+
+function exportClassAttendanceCsv() {
+    const studentList = state.students;
+    const attendanceData = state.attendance.records;
+
+    if (studentList.length === 0) { alert('学生データがありません'); return; }
+
+    let csvContent = "\uFEFF氏名,合計欠席,合計遅刻,合計早退,最多欠席科目,科目別最大欠席数\n";
+
+    studentList.forEach(name => {
+        const records = attendanceData[name] || {};
+        let totalAbs = 0, totalLat = 0, totalEarly = 0;
+        const subAbs = {};
+        Object.values(records).forEach(dayEvents => {
+            dayEvents.forEach(ev => {
+                if (ev.status === "欠") {
+                    totalAbs++;
+                    if (ev.subj) subAbs[ev.subj] = (subAbs[ev.subj] || 0) + 1;
+                }
+                else if (ev.status === "遅") totalLat++;
+                else if (ev.status === "早") totalEarly++;
+            });
+        });
+        let maxSub = "-", maxSubCount = 0;
+        Object.entries(subAbs).forEach(([sub, count]) => { if (count > maxSubCount) { maxSubCount = count; maxSub = sub; } });
+
+        csvContent += [getDisplayName(name), totalAbs, totalLat, totalEarly, maxSub, maxSubCount].join(',') + "\n";
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `ClassAttendanceStats.csv`;
+    link.click();
+}
+
+function updatePrintHeader() {
+    const nameEl = document.getElementById('print-student-name');
+    const dateEl = document.getElementById('print-date');
+    const titleEl = document.getElementById('print-report-title');
+
+    if (nameEl) nameEl.textContent = state.currentStudent ? getDisplayName(state.currentStudent) : "クラス全体";
+    if (dateEl) dateEl.textContent = new Date().toLocaleDateString('ja-JP');
+
+    if (titleEl) {
+        let titleText = "成績レポート";
+        switch (state.currentTab) {
+            case 'stats':
+            case 'stats2':
+                titleText = "分析レポート (Statistics)";
+                break;
+            case 'attendance':
+                titleText = "出欠管理レポート (Attendance)";
+                break;
+            case 'class_stats':
+                titleText = "クラス統計レポート (Class Stats)";
+                break;
+            case 'seating':
+                titleText = "座席配置図 (Seating Chart)";
+                break;
+            case 'at_risk':
+                titleText = "学習指導対象者リスト (Risk/At Risk)";
+                break;
+        }
+        titleEl.textContent = titleText;
+    }
+}
+

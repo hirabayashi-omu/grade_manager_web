@@ -703,132 +703,95 @@ th {
     margin: 8mm;
 }
 
+/* ==================== PRINT STYLES (Consolidated & Enhanced) ==================== */
+@page {
+    size: A4 portrait;
+    margin: 10mm;
+}
+
 @media print {
 
-    /* Hide scrollbars globally in print */
+    /* Base Print Reset */
+    html,
+    body {
+        height: auto !important;
+        overflow: visible !important;
+        background: white !important;
+        color: black !important;
+        font-family: 'Inter', 'Noto Sans JP', sans-serif;
+    }
+
     ::-webkit-scrollbar {
         display: none !important;
     }
 
-    * {
-        scrollbar-width: none !important;
-        -ms-overflow-style: none !important;
+    /* Hide non-printable UI */
+    header,
+    .sidebar,
+    .mobile-tabs,
+    .no-print,
+    .btn,
+    .modal-overlay,
+    .context-menu,
+    .hide-print {
+        display: none !important;
     }
 
+    /* Print Header Enhancement */
     .print-only {
         display: block !important;
     }
 
-    /* Tab-based Page Control */
-    /* Dashboards: Force 1 page */
-    body.tab-stats,
-    body.tab-stats2 {
-        overflow: hidden !important;
+    #print-header {
+        border-bottom: 3px double #333;
+        padding-bottom: 15px;
+        margin-bottom: 25px;
     }
 
-    /* Reports/Lists: Allow multi-page */
-    body.tab-class_stats,
-    body.tab-at_risk,
-    body.tab-grades {
-        overflow: visible !important;
-    }
-
-    header,
-    .sidebar,
-    .modal-overlay,
-    .no-print,
-    button,
-    .btn,
-    .badge,
-    #settings-content,
-    .no-print-text,
-    .card-header,
-    p,
-    /* Hide instruction paragraphs */
-    footer,
-    [style*="height: 100px"],
-    [style*="height:100px"] {
-        display: none !important;
-    }
-
-    .card {
-        page-break-before: avoid !important;
-        break-before: avoid !important;
-    }
-
-    body {
-        background: white !important;
-        width: 100% !important;
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-    }
-
+    /* Layout adjustments */
     main,
     .content {
         display: block !important;
-        margin: 0 !important;
         padding: 0 !important;
-        overflow: visible !important;
-    }
-
-    .table-container {
-        overflow: visible !important;
-        /* Remove table scrollbars */
-        border: none !important;
-    }
-
-    /* Class Stats Table Specific Print Fixes */
-    #classStatsContainer {
-        margin-top: 0 !important;
-    }
-
-    #classStatsContainer table {
-        min-width: 0 !important;
-        /* Overwrite inline min-width */
+        margin: 0 !important;
         width: 100% !important;
-        table-layout: fixed !important;
+        overflow: visible !important;
     }
 
-    #classStatsContainer th {
-        position: static !important;
-        /* Sticky doesn't print well */
-        background: #f1f5f9 !important;
+    .tab-content {
+        display: none !important;
+        /* Hide all by default */
+    }
+
+    .tab-content:not(.hidden) {
+        display: block !important;
+        /* Show active one */
     }
 
     .card {
         box-shadow: none !important;
-        border: none !important;
+        border: 1px solid #eee !important;
         padding: 0 !important;
-        margin-bottom: 4mm !important;
-        break-inside: auto !important;
-        /* Allow breaking so it starts on page 1 */
+        margin-bottom: 15mm !important;
+        break-inside: avoid !important;
     }
 
-    .charts-grid {
-        display: grid !important;
-        grid-template-columns: 1fr !important;
-        /* One column for Portrait */
-        gap: 5mm !important;
-        width: 100% !important;
-        margin-top: 3mm !important;
-        page-break-before: auto;
+    .card-title {
+        color: #000 !important;
+        font-size: 1.3rem !important;
+        border-bottom: 1.5pt solid #333;
+        padding-bottom: 5px;
+        margin-bottom: 15px !important;
     }
 
-    .chart-container {
-        height: 380px !important;
-        /* Increased for better aspect ratio */
-        width: 100% !important;
-        padding: 2mm !important;
+    .card-title::before {
+        display: none;
+    }
+
+    /* Table styles for print */
+    .table-container {
+        overflow: visible !important;
         border: none !important;
-        /* Removed graph frame for print */
-        page-break-inside: avoid !important;
-    }
-
-    canvas {
-        max-width: 100% !important;
-        width: 100% !important;
-        height: 380px !important;
-        display: block !important;
     }
 
     table {
@@ -839,194 +802,72 @@ th {
 
     th,
     td {
-        padding: 1px 2px !important;
-        font-size: 7.2pt !important;
-        border: 0.5pt solid #ddd;
+        border: 0.5pt solid #666 !important;
+        padding: 4pt 6pt !important;
+        font-size: 8.5pt !important;
+        color: black !important;
+    }
+
+    th {
+        background: #f1f5f9 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    /* Chart styles for print */
+    .charts-grid {
+        display: block !important;
+        width: 100% !important;
+    }
+
+    .chart-container {
+        width: 100% !important;
+        height: 120mm !important;
+        /* Fixed height for consistent printing */
+        margin-bottom: 10mm;
+        page-break-inside: avoid !important;
+    }
+
+    canvas {
+        max-width: 100% !important;
+        height: auto !important;
     }
 
     #classStatsContainer td,
     #classStatsContainer th {
         border-color: #000;
-        font-size: 7.5pt !important;
-    }
-
-    #print-header {
-        margin-bottom: 4mm !important;
-    }
-
-    /* Gantt Chart Print Fixes */
-    #dpGanttChartContainer,
-    #mandatoryGanttChartContainer {
-        overflow: visible !important;
-        width: 100% !important;
-        padding: 0 !important;
-    }
-
-    #dpGanttChartContainer table,
-    #mandatoryGanttChartContainer table {
-        min-width: 0 !important;
-        width: 100% !important;
-        table-layout: fixed !important;
-        border: 0.5pt solid #e2e8f0;
-    }
-
-    #dpGanttChartContainer th,
-    #dpGanttChartContainer td,
-    #mandatoryGanttChartContainer th,
-    #mandatoryGanttChartContainer td {
-        position: static !important;
-        /* Disable sticky for print */
-        font-size: 6.5pt !important;
-        /* Smaller text to fit 5 years + DP title */
-        padding: 2px !important;
-        word-break: break-all;
-    }
-
-    #dpGanttChartContainer th:first-child,
-    #dpGanttChartContainer td:first-child,
-    #mandatoryGanttChartContainer th:first-child,
-    #mandatoryGanttChartContainer td:first-child {
-        width: 45pt !important;
-        /* Narrower DP/Category label column */
-    }
-
-    * {
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
+        font-size: 8pt !important;
     }
 }
 
-/* Context Menu */
-.context-menu {
-    position: fixed;
-    background: white;
-    border: 1px solid #ccc;
-    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);
-    z-index: 20000;
-    display: none;
-    min-width: 160px;
-    border-radius: 4px;
-    padding: 5px 0;
+/* ==================== ATTENDANCE STYLES ==================== */
+#attendanceCalendarGrid>div {
+    transition: var(--transition);
 }
 
-.context-menu-item {
-    padding: 8px 12px;
-    cursor: pointer;
-    font-size: 0.9rem;
-    color: #333;
+#attendanceCalendarGrid>div:hover {
+    background-color: #f8fafc !important;
+    transform: scale(1.02);
+    z-index: 5;
+    box-shadow: var(--shadow);
 }
 
-.context-menu-item:hover {
-    background-color: #f0f0f0;
+#attendanceStatsTable {
+    width: 100%;
+    border-collapse: collapse;
 }
 
-.context-menu-separator {
-    height: 1px;
-    background: #e0e0e0;
-    margin: 4px 0;
+#attendanceStatsTable th {
+    background: #f1f5f9;
+    color: #475569;
+    font-weight: 600;
 }
 
+#attendanceStatsTable td {
+    border-bottom: 1px solid #e2e8f0;
+}
 
-/* Print Styles */
-@media print {
-    @page {
-        size: landscape;
-        margin: 5mm;
-    }
-
-    html,
-    body {
-        height: auto !important;
-        overflow: visible !important;
-        width: 100% !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        background: white;
-    }
-
-    header,
-    .modal,
-    .context-menu {
-        display: none !important;
-    }
-
-    main {
-        padding: 0;
-        height: auto;
-        overflow: visible !important;
-        width: 100% !important;
-    }
-
-    /* Seating Tab Specifics */
-    #seating-content .seating-wrapper {
-        display: block !important;
-        width: 100% !important;
-    }
-
-    /* Hide the roster sidebar and controls when printing seating chart */
-    #seating-content .seating-roster-sidebar,
-    #seating-content .seating-controls {
-        display: none !important;
-    }
-
-    #seating-content .seating-main-area {
-        width: 100% !important;
-        height: auto !important;
-        overflow: visible !important;
-        border: none !important;
-        box-shadow: none !important;
-        padding: 0 !important;
-        margin: 0 !important;
-    }
-
-    #seatingGrid {
-        display: grid !important;
-        width: 100% !important;
-        max-width: none !important;
-        /* Remove aggressive zoom, let browser handle scale or mild zoom */
-        margin-top: 10px !important;
-        page-break-inside: avoid;
-    }
-
-    .teacher-desk {
-        display: none !important;
-    }
-
-    .teacher-desk-grid {
-        grid-column: 1 / -1 !important;
-        justify-self: center !important;
-        width: auto !important;
-        min-width: 200px !important;
-        margin: 10px 0 !important;
-        page-break-inside: avoid;
-        border: 2px solid #333 !important;
-        background-color: #f0f0f0 !important;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
-        /* Padding to match screen somewhat */
-        padding: 0.5rem 2rem !important;
-    }
-
-    /* Make sure seats look okay when printed */
-    .seat-item {
-        border: 1px solid #333 !important;
-        box-shadow: none !important;
-        break-inside: avoid;
-        aspect-ratio: 1 / 1;
-        /* Keep it square */
-    }
-
-    .seat-label {
-        display: none !important;
-    }
-
-    .student-name {
-        font-weight: bold;
-        color: #000 !important;
-    }
-
-    .attendance-no {
-        color: #000 !important;
-        font-weight: bold !important;
-    }
+.attendance-memo-star {
+    font-size: 0.8rem;
+    cursor: help;
 }
