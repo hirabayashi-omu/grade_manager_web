@@ -8023,18 +8023,31 @@ function generateClassAttendanceStats() {
             let totalLat = 0;
             let totalEarly = 0;
             const subAbs = {};
+            const subLat = {}; // { subj: { count, slots: { "Day-Period": count } } }
 
-            Object.values(records).forEach(dayEvents => {
+            Object.entries(records).forEach(([dStr, dayEvents]) => {
+                const dayIdx = new Date(dStr).getDay();
+                const dayLabel = ["日", "月", "火", "水", "木", "金", "土"][dayIdx];
+
                 dayEvents.forEach(ev => {
                     if (ev.status === "欠") {
                         totalAbs++;
                         if (ev.subj) subAbs[ev.subj] = (subAbs[ev.subj] || 0) + 1;
                     }
-                    else if (ev.status === "遅") totalLat++;
+                    else if (ev.status === "遅") {
+                        totalLat++;
+                        if (ev.subj) {
+                            if (!subLat[ev.subj]) subLat[ev.subj] = { count: 0, slots: {} };
+                            subLat[ev.subj].count++;
+                            const slotKey = `${dayLabel}/${ev.p || "?"}限`;
+                            subLat[ev.subj].slots[slotKey] = (subLat[ev.subj].slots[slotKey] || 0) + 1;
+                        }
+                    }
                     else if (ev.status === "早") totalEarly++;
                 });
             });
 
+            // Most Absent
             let maxSub = "-";
             let maxSubCount = 0;
             Object.entries(subAbs).forEach(([sub, count]) => {
@@ -8044,13 +8057,37 @@ function generateClassAttendanceStats() {
                 }
             });
 
+            // Most Late
+            let maxLatSub = "-";
+            let maxLatSlot = "";
+            let maxLatCount = 0;
+            Object.entries(subLat).forEach(([sub, data]) => {
+                if (data.count > maxLatCount) {
+                    maxLatCount = data.count;
+                    maxLatSub = sub;
+                    // Find most frequent slot for this subject
+                    let topSlot = "";
+                    let topSlotCount = 0;
+                    Object.entries(data.slots).forEach(([slot, c]) => {
+                        if (c > topSlotCount) {
+                            topSlotCount = c;
+                            topSlot = slot;
+                        }
+                    });
+                    maxLatSlot = topSlot;
+                }
+            });
+
             return {
                 name,
                 totalAbs,
                 totalLat,
                 totalEarly,
                 maxSub,
-                maxSubCount
+                maxSubCount,
+                maxLatSub,
+                maxLatSlot,
+                maxLatCount
             };
         });
 
@@ -8082,7 +8119,7 @@ function generateClassAttendanceStats() {
                             <th style="padding: 1rem; text-align: center;">合計遅刻</th>
                             <th style="padding: 1rem; text-align: center;">合計早退</th>
                             <th style="padding: 1rem; text-align: left;">最多欠席科目</th>
-                            <th style="padding: 1rem; text-align: center;">最大欠席数</th>
+                            <th style="padding: 1rem; text-align: left;">最多遅刻科目 (曜日/時限)</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -8099,8 +8136,8 @@ function generateClassAttendanceStats() {
                     <td style="padding: 0.8rem 1rem; text-align: center; color: ${absColor}; font-weight: ${absWeight};">${row.totalAbs}</td>
                     <td style="padding: 0.8rem 1rem; text-align: center;">${row.totalLat}</td>
                     <td style="padding: 0.8rem 1rem; text-align: center;">${row.totalEarly}</td>
-                    <td style="padding: 0.8rem 1rem;">${row.maxSub}</td>
-                    <td style="padding: 0.8rem 1rem; text-align: center;">${row.maxSubCount > 0 ? row.maxSubCount : '-'}</td>
+                    <td style="padding: 0.8rem 1rem;">${row.maxSub} (${row.maxSubCount})</td>
+                    <td style="padding: 0.8rem 1rem;">${row.maxLatSub !== "-" ? `${row.maxLatSub} (${row.maxLatSlot})` : "-"}</td>
                 </tr>
             `;
         });
@@ -8117,26 +8154,50 @@ function exportClassAttendanceCsv() {
 
     if (studentList.length === 0) { alert('学生データがありません'); return; }
 
-    let csvContent = "\uFEFF氏名,合計欠席,合計遅刻,合計早退,最多欠席科目,科目別最大欠席数\n";
+    let csvContent = "\uFEFF氏名,合計欠席,合計遅刻,合計早退,最多欠席科目,最多欠席数,最多遅刻科目,最多遅刻スロット\n";
 
     studentList.forEach(name => {
         const records = attendanceData[name] || {};
         let totalAbs = 0, totalLat = 0, totalEarly = 0;
-        const subAbs = {};
-        Object.values(records).forEach(dayEvents => {
+        const subAbs = {}, subLat = {};
+
+        Object.entries(records).forEach(([dStr, dayEvents]) => {
+            const di = new Date(dStr).getDay();
+            const dl = ["日", "月", "火", "水", "木", "金", "土"][di];
             dayEvents.forEach(ev => {
                 if (ev.status === "欠") {
                     totalAbs++;
                     if (ev.subj) subAbs[ev.subj] = (subAbs[ev.subj] || 0) + 1;
                 }
-                else if (ev.status === "遅") totalLat++;
+                else if (ev.status === "遅") {
+                    totalLat++;
+                    if (ev.subj) {
+                        if (!subLat[ev.subj]) subLat[ev.subj] = { count: 0, slots: {} };
+                        subLat[ev.subj].count++;
+                        const sk = `${dl}/${ev.p || "?"}限`;
+                        subLat[ev.subj].slots[sk] = (subLat[ev.subj].slots[sk] || 0) + 1;
+                    }
+                }
                 else if (ev.status === "早") totalEarly++;
             });
         });
+
         let maxSub = "-", maxSubCount = 0;
         Object.entries(subAbs).forEach(([sub, count]) => { if (count > maxSubCount) { maxSubCount = count; maxSub = sub; } });
 
-        csvContent += [getDisplayName(name), totalAbs, totalLat, totalEarly, maxSub, maxSubCount].join(',') + "\n";
+        let maxLatSub = "-", maxLatSlot = "", maxLatCount = 0;
+        Object.entries(subLat).forEach(([sub, data]) => {
+            if (data.count > maxLatCount) {
+                maxLatCount = data.count;
+                maxLatSub = sub;
+                let ts = "";
+                let tc = 0;
+                Object.entries(data.slots).forEach(([slot, c]) => { if (c > tc) { tc = c; ts = slot; } });
+                maxLatSlot = ts;
+            }
+        });
+
+        csvContent += [getDisplayName(name), totalAbs, totalLat, totalEarly, maxSub, maxSubCount, maxLatSub, maxLatSlot].join(',') + "\n";
     });
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
