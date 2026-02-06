@@ -222,6 +222,14 @@
                 </svg>
                 出欠状況
             </div>
+            <div class="nav-item" data-tab="student_summary" title="学生ごとの成績・出欠サマリーを表示します">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                    stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                学生サマリー (Summary)
+            </div>
             <div class="nav-item" data-tab="class_stats" title="クラス全体の統計情報を表示します">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
                     stroke-width="2">
@@ -286,26 +294,18 @@
             <!-- Dedicated Print Header (Visible only during print) -->
             <div id="print-header" class="print-only">
                 <div
-                    style="display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2pt solid #1e293b; padding-bottom: 8px; margin-bottom: 20px;">
-                    <div style="display: flex; align-items: center; gap: 15px;">
-                        <div
-                            style="width: 45px; height: 45px; background: #1e293b; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 24px;">
-                            G</div>
-                        <div>
-                            <h1 id="print-report-title"
-                                style="margin: 0; font-size: 22pt; font-family: 'Noto Sans JP', sans-serif; letter-spacing: 0.05em; color: #1e293b;">
-                                成績管理レポート</h1>
-                            <p style="margin: 2px 0 0 0; font-size: 11pt; color: #64748b; font-weight: 500;">Grade
-                                Manager System | Academic Record</p>
-                        </div>
+                    style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5pt solid #1e293b; padding-bottom: 4px; margin-bottom: 8px;">
+                    <div style="display: flex; align-items: baseline; gap: 15px;">
+                        <h1 id="print-report-title"
+                            style="margin: 0; font-size: 14pt; font-family: 'Noto Sans JP', sans-serif; font-weight: 700; color: #1e293b;">
+                            成績管理レポート</h1>
+                        <span style="font-size: 8pt; color: #64748b; font-weight: 500;">Academic Record</span>
                     </div>
-                    <div style="text-align: right;">
-                        <div style="font-size: 10pt; color: #64748b; margin-bottom: 4px;">Student Name</div>
-                        <div
-                            style="font-size: 14pt; font-weight: 700; color: #1e293b; border-bottom: 1pt solid #cbd5e1; padding-bottom: 2px; margin-bottom: 8px;">
-                            <span id="print-student-name">読み込み中...</span>
+                    <div style="text-align: right; display: flex; align-items: baseline; gap: 15px;">
+                        <div style="font-size: 11pt; font-weight: 700; color: #1e293b;">
+                            <span id="print-student-name">-</span>
                         </div>
-                        <div style="font-size: 9pt; color: #94a3b8;">Issued Date: <span id="print-date">-</span></div>
+                        <div style="font-size: 7.5pt; color: #94a3b8;">Issued: <span id="print-date">-</span></div>
                     </div>
                 </div>
             </div>
@@ -729,6 +729,46 @@
                 </div>
             </div>
 
+            <!-- Student Summary View -->
+            <div id="student_summary-content" class="tab-content hidden fade-in">
+                <div class="card">
+                    <div class="card-header" style="justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+                        <h2 class="card-title">学生サマリー (Individual Student Summary)</h2>
+                        <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;"
+                            class="no-print">
+
+                            <div class="control-group">
+                                <label>対象学年:</label>
+                                <select id="summaryYearSelect" onchange="renderStudentSummary()">
+                                    <option value="1">1年</option>
+                                    <option value="2">2年</option>
+                                    <option value="3">3年</option>
+                                    <option value="4">4年</option>
+                                    <option value="5">5年</option>
+                                </select>
+                            </div>
+                            <div class="control-group">
+                                <label>対象試験:</label>
+                                <select id="summaryTestSelect" onchange="renderStudentSummary()">
+                                    <option value="前期中間">前期中間</option>
+                                    <option value="前期末" selected>前期末</option>
+                                    <option value="後期中間">後期中間</option>
+                                    <option value="学年末">学年末</option>
+                                </select>
+                            </div>
+                            <button class="btn btn-secondary" onclick="window.print()">この学生を印刷 (Print One)</button>
+                            <button class="btn btn-primary" onclick="printAllStudentSummaries()">クラス全員を一括印刷 (Batch Print
+                                All)</button>
+                        </div>
+                    </div>
+                    <div id="studentSummaryArea" style="min-height: 400px; padding: 1rem; background: #fff;">
+                        <div style="text-align: center; padding: 5rem; color: #94a3b8;">
+                            学生を選択してください。
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- At Risk Students View -->
             <div id="at_risk-content" class="tab-content hidden fade-in">
                 <div class="card">
@@ -741,7 +781,9 @@
                                 <select id="atRiskTypeSelect" onchange="toggleAtRiskInputs()">
                                     <option value="test">試験1回ごとの成績</option>
                                     <option value="year_avg">科目ごとの通年平均</option>
-                                    <option value="attendance">出欠状況 (欠席・遅刻超過)</option>
+                                    <option value="attendance_abs">1. 欠席密度 (科目・時限別)</option>
+                                    <option value="attendance_lat">2. 遅刻特化 (連続・高頻度遅刻)</option>
+                                    <option value="attendance_pattern">3. 行動傾向 (連続欠席・曜日別)</option>
                                 </select>
                             </div>
                             <div class="control-group">
@@ -789,9 +831,21 @@
                             <strong>【通年平均ベース】</strong> 以下のいずれかに該当する学生を抽出：<br>
                             ・平均59点以下が3科目以上 / ・平均49点以下が2科目以上 / ・平均39点以下が1科目以上
                         </div>
-                        <div id="instr-attendance" class="hidden">
-                            <strong>【出欠状況ベース】</strong> 以下のいずれかに該当する学生を抽出：<br>
-                            ・指定した累計欠席回数以上 / ・指定した累計遅刻回数以上 / ・科目別で欠席が10.0回相当分（2遅刻=1欠席換算）以上の科目がある（オレンジ判定以上）
+                        <div id="instr-attendance_abs" class="hidden">
+                            <strong>【1. 欠席密度フィルタ】</strong> 欠席換算(2遅刻=1欠)ポイントの密度で判定：<br>
+                            ① 特定科目 欠席密度 (3/6:黄 / 4/6:橙 / 5/6:赤 / 6/6:黒)<br>
+                            ② 特定時限 欠席密度 / ③ 全科目 累積密度
+                        </div>
+                        <div id="instr-attendance_lat" class="hidden">
+                            <strong>【2. 遅刻特化フィルタ】</strong> 偶発的な遅刻も含む回数ベース。基準を調整：<br>
+                            ① 科目別 遅刻回数（2回以上:黄 / 3回以上:橙 / 4回以上:赤）<br>
+                            ② 特定曜日の遅刻（同じ曜日に3回以上）<br>
+                            ③ 累積 遅刻総数（5回以上:黄 / 10回以上:橙）
+                        </div>
+                        <div id="instr-attendance_pattern" class="hidden">
+                            <strong>【3. 行動傾向フィルタ】</strong> 欠席・遅刻の出現パターン：<br>
+                            ① 連続欠席（3日:黄 / 5日:橙 / 7日:赤 / 8日~:黒）<br>
+                            ② 特定曜日に欠席・遅刻が集中（3回以上で抽出）
                         </div>
                     </div>
                     <div id="atRiskReportArea">

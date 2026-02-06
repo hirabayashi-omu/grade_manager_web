@@ -857,10 +857,10 @@ function mockData() {
 }
 
 function populateControls() {
-    // 1. Student Select
+    // 1. Main Student Select
     const studentSelect = document.getElementById('studentSelect');
     if (studentSelect) {
-        studentSelect.innerHTML = ''; // IMPORTANT: Clear old options
+        studentSelect.innerHTML = '';
         state.students.forEach(s => {
             const opt = document.createElement('option');
             opt.value = s;
@@ -868,39 +868,37 @@ function populateControls() {
             if (s === state.currentStudent) opt.selected = true;
             studentSelect.appendChild(opt);
         });
-        // If empty
-        if (state.students.length === 0) {
-            const opt = document.createElement('option');
-            opt.textContent = '(学生なし)';
-            studentSelect.appendChild(opt);
-        }
     }
 
-    // Initialize Name Display Dropdown if exists (in Settings)
+
+
+    // 3. Name Display Dropdown
     const displaySelect = document.getElementById('settingNameDisplay');
     if (displaySelect) {
         displaySelect.value = state.nameDisplayMode || 'name';
     }
 
-    // 2. Year Select
+    // 4. Year Select
     const yearSelect = document.getElementById('yearSelect');
     if (yearSelect) {
         yearSelect.value = state.currentYear;
     }
 
-    // 3. Stats Controls
+    // 5. Stats Controls
     const statsYearSelect = document.getElementById('boxPlotYearSelect');
     if (statsYearSelect) {
-        // Sync stats year with current year initially
-        state.boxPlotYear = state.currentYear;
         statsYearSelect.value = state.boxPlotYear || '';
     }
 
-    // 4. Course Select Sync
+    // 6. Course Select Sync
     const courseFilterHeader = document.getElementById('subjectCourseFilterHeader');
     if (courseFilterHeader) courseFilterHeader.value = state.currentCourse;
     const courseFilterSettings = document.getElementById('subjectCourseFilter');
     if (courseFilterSettings) courseFilterSettings.value = state.currentCourse;
+
+    // 7. Summary Year Select
+    const summaryYear = document.getElementById('summaryYearSelect');
+    if (summaryYear) summaryYear.value = state.currentYear;
 }
 
 function setupEventListeners() {
@@ -923,6 +921,12 @@ function setupEventListeners() {
         saveSessionState();
         render();
     });
+
+
+    document.getElementById('summaryTestSelect')?.addEventListener('change', (e) => {
+        render();
+    });
+
 
     // Navigation
     document.querySelectorAll('.nav-item').forEach(item => {
@@ -1316,6 +1320,9 @@ function switchTab(tabName) {
         renderFacultyTable();
     } else if (tabName === 'attendance') {
         initAttendance();
+    } else if (tabName === 'student_summary') {
+        populateControls(); // Refresh dropdown
+        renderStudentSummary();
     }
 }
 
@@ -2690,11 +2697,19 @@ function renderGraduationRequirements() {
 
         if (passed) {
             // (1) General vs Professional count
-            if (type2 === '一般') {
+            const type2Raw = (sub.type2 || 'その他').trim();
+            let effectiveType2 = type2Raw;
+
+            // Force Arts subjects to be '一般' (General) to ensure they are counted
+            if (['音楽', '美術', '書道'].some(art => sub.name.includes(art))) {
+                effectiveType2 = '一般';
+            }
+
+            if (effectiveType2 === '一般') {
                 totalGeneralCredits += credits;
-            } else if (type2 !== 'その他') {
+            } else if (effectiveType2 !== 'その他') {
                 // Professional usually includes 専門共通, 基盤専門, 応用専門, 特別学修
-                if (type2 === '特別学修') {
+                if (effectiveType2 === '特別学修') {
                     earnedSpecialStudyRaw += credits;
                 } else {
                     totalProfessionalCredits += credits;
@@ -2876,34 +2891,8 @@ function render() {
         renderSettings();
     } else if (state.currentTab === 'attendance') {
         initAttendance();
-    }
-}
-
-function updatePrintHeader() {
-    const titleEl = document.getElementById('print-report-title');
-    const nameEl = document.getElementById('print-student-name');
-    const dateEl = document.getElementById('print-date');
-
-    if (titleEl) {
-        const titles = {
-            'grades': '成績一覧 (Grades List)',
-            'stats': '統計・推移レポート (Stats & Trend Report)',
-            'stats2': '累積推移レポート (Cumulative Stats Report)',
-            'class_stats': '全体統計・順位帳票 (Class Statistics Report)'
-        };
-        titleEl.textContent = titles[state.currentTab] || '成績管理システム';
-    }
-
-    if (nameEl) {
-        // Always show name, but respect privacy setting
-        nameEl.parentElement.style.display = 'block';
-        const display = getDisplayName(state.currentStudent);
-        nameEl.textContent = display || '-';
-    }
-
-    if (dateEl) {
-        const now = new Date();
-        dateEl.textContent = now.toLocaleString();
+    } else if (state.currentTab === 'student_summary') {
+        renderStudentSummary();
     }
 }
 
@@ -2923,20 +2912,122 @@ const getTargetSubjects = (predicate) => {
     const courseFilter = state.currentCourse;
     return state.subjects.filter(s => {
         if (!predicate(s)) return false;
-        if (s.exclude) return false;
+
+        // Exclude logic: Skip subjects marked 'exclude' (GPA exempt), 
+        // BUT allow Arts subjects (Music/Art/Calligraphy) because they count for credits even if GPA exempt.
+        const isArts = ["音楽", "美術", "書道"].some(art => s.name.includes(art));
+        if (s.exclude && !isArts) return false;
 
         // Course Filter
-        if (courseFilter) {
-            const t4 = s.type4 || 'コース共通';
+        if (courseFilter && courseFilter !== "") {
+            const t1 = (s.type1 || "").trim();
+            const t3 = (s.type3 || "").trim();
+            const t4 = (s.type4 || "").trim();
+
+            // Explicitly include Elective Required Arts subjects regardless of course
+            const isArts = ["音楽", "美術", "書道"].some(art => s.name.includes(art));
+            if (isArts) return true;
+
             if (courseFilter === 'コース未配属') {
-                if (t4 !== 'コース共通') return false;
+                // Only show truly common subjects
+                const hasNoCourseTag = (!t4 || t4 === 'コース共通' || t4 === '共通');
+                if (!hasNoCourseTag) return false;
             } else {
-                if (t4 !== 'コース共通' && t4 !== courseFilter) return false;
+                // Determine if this subject is "Common"
+                // Check multiple indicators:
+                // 1. type1: '必履修', '選必', '必修得' are common to all students
+                // 2. type3/type4: '一般', '共通', '専門共通', or numeric year tags
+                // 3. Empty type4 defaults to common
+                const isCommonByType1 = (t1 === '必履修' || t1 === '選必' || t1 === '必修得' || t1.includes('必'));
+                const isCommonByType3 = (t3 === '一般' || t3 === '共通' || t3.includes('共通'));
+                const isCommonByType4 = (!t4 || t4 === 'コース共通' || t4 === '共通' || t4 === '一般' || t4.includes('共通') || /^\d/.test(t4));
+
+                const isCommon = isCommonByType1 || isCommonByType3 || isCommonByType4;
+                const isMatch = (t4 === courseFilter || courseFilter.includes(t4) || t4.includes(courseFilter));
+
+                if (!isCommon && !isMatch) return false;
             }
         }
         return true;
     });
 };
+
+/**
+ * Standardized way to get the list of students for a specific year and course.
+ */
+// Helper to safely get metadata even if key is messy or Initialized
+function getStudentMetadataSafe(rawName) {
+    if (!rawName) return null;
+    let m = state.studentMetadata[rawName];
+    if (m) return m;
+
+    const trimmed = rawName.trim();
+    m = state.studentMetadata[trimmed];
+    if (m) return m;
+
+    // If still not found and we are in Initial mode, maybe rawName is the Initial?
+    // Try to find a key in metadata that transforms to this Initial
+    if (state.nameDisplayMode === 'initial') {
+        const realName = Object.keys(state.studentMetadata).find(k => getDisplayName(k) === rawName);
+        if (realName) return state.studentMetadata[realName];
+    }
+
+    return null;
+}
+
+/**
+ * Standardized way to get the list of students for a specific year and course.
+ */
+function getClassStudents(year, course) {
+    const currentName = state.currentStudent;
+
+    const result = state.students.filter(s => {
+        let stYear = 1;
+        let stCourse = "";
+
+        const m = getStudentMetadataSafe(s);
+
+        if (m) {
+            stYear = parseInt(m['年'] || m['year'] || 1);
+            stCourse = (m['コース'] || m['course'] || "").trim();
+        } else {
+            // Fallback: if it's the current student, use current state config
+            // (Only if direct metadata lookup failed entirely)
+            if (s === currentName || s.trim() === currentName) {
+                stYear = state.currentYear;
+                stCourse = state.currentCourse;
+            } else {
+                // If we can't identify the student's year, we have to filter them out
+                // or assume year 1. Let's filter out to avoid ghosts.
+                return false;
+            }
+        }
+
+        if (stYear !== year) return false;
+
+        // Course Filter:
+        if (!course || course === "") return true;
+
+        // If student matches course, or has NO course (assume common), include them
+        // Note: "".includes("AnyString") is false, but "AnyString".includes("") is true.
+        // So correct logic for including empty students is simple inclusion check from course side.
+        if (stCourse === "" || stCourse === course || course.includes(stCourse) || stCourse.includes(course)) return true;
+
+        return false;
+    });
+
+    // Always ensure current student is in the list
+    // (Check if currentStudent is present in result list either by raw name or resolved)
+    // To be safe, just push raw currentStudent if not found
+    if (currentName && !result.includes(currentName)) {
+        // Double check if it's not there under a different alias? 
+        // No, list should contain keys from state.students.
+        result.push(currentName);
+    }
+
+    return result;
+}
+
 
 // Check if a year is "Finished"
 const isYearFinished = (studentName, year) => {
@@ -2988,51 +3079,130 @@ const isYearFinished = (studentName, year) => {
  */
 function getStudentStats(studentName, targetYear, targetTest) {
     // 1. Stats 1 (Snapshot of current year/test)
-    const subjects1 = getTargetSubjects(s => s.year === targetYear && !s.name.startsWith('特・'));
+    const subjects1 = getTargetSubjects(s => {
+        if (s.year === targetYear) return true;
+        if (s.year === 0) {
+            const scoreObj = (state.scores[studentName] || {})[s.name];
+            return scoreObj && scoreObj.obtainedYear === targetYear;
+        }
+        return false;
+    });
+
+
     let s1Sum = 0, s1Count = 0;
     subjects1.forEach(sub => {
+        if (sub.name.startsWith('特・')) return;
+        if (!isNumericSubject(sub.name)) return;
+
         const sc = getScore(studentName, sub.name, targetTest);
         if (typeof sc === 'number') { s1Sum += sc; s1Count++; }
     });
-    const stats1 = { avg: s1Count > 0 ? (s1Sum / s1Count) : 0, count: s1Count };
+    const stats1 = { avg: s1Count > 0 ? (s1Sum / s1Count) : 0, sum: s1Sum, count: s1Count };
 
     // 2. Stats 2 (Cumulative from Year 1 up to targetYear/targetTest)
-    const subjects2 = getTargetSubjects(s => s.year <= targetYear);
-    let s2Sum = 0, s2Count = 0, s2WgtN = 0, s2WgtD = 0, s2GpN = 0, s2GpD = 0, s2Cred = 0;
+    const subjects2 = getTargetSubjects(s => {
+        // Fix: Explicitly include Arts subjects if they have any data, preventing exclusion due to missing 'year'
+        if (['音楽', '美術', '書道'].some(art => s.name.includes(art))) {
+            const scoreObj = (state.scores[studentName] || {})[s.name];
+            if (scoreObj && SCORE_KEYS.some(k => scoreObj[k])) return true;
+        }
+
+        if (s.year > 0 && s.year <= targetYear) return true;
+        if (s.year === 0) {
+            const scoreObj = (state.scores[studentName] || {})[s.name];
+            return scoreObj && scoreObj.obtainedYear > 0 && scoreObj.obtainedYear <= targetYear;
+        }
+        return false;
+    });
+
+    let s2Sum = 0, s2Count = 0, s2WgtN = 0, s2WgtD = 0, s2GpN = 0, s2GpD = 0;
+    let s2CredGen = 0, s2CredSpec = 0;
 
     subjects2.forEach(sub => {
-        const isPastYear = sub.year < targetYear;
-        // Logic: For past years, use the Final Score (学年末). 
-        // For the target year, use the requested test point (testKey).
+        const scoreObj = (state.scores[studentName] || {})[sub.name] || {};
+        const stYear = sub.year === 0 ? (scoreObj.obtainedYear || 0) : sub.year;
+        const isPastYear = stYear < targetYear;
+
+        // Average/GPA logic uses current test for current year, Final for past years
         const testKey = isPastYear ? '学年末' : targetTest;
         const val = getScore(studentName, sub.name, testKey);
 
-        const isNumeric = !sub.name.startsWith('特・');
+        const isNumeric = !sub.name.startsWith('特・') && isNumericSubject(sub.name);
 
-        if (typeof val === 'number') {
-            if (isNumeric) {
-                s2Sum += val; s2Count++;
-                const cr = sub.credits || 0;
-                s2WgtN += val * cr; s2WgtD += cr;
-                let gp = 0;
-                if (val >= 90) gp = 4; else if (val >= 80) gp = 3; else if (val >= 70) gp = 2; else if (val >= 60) gp = 1;
-                s2GpN += gp * cr; s2GpD += cr;
-            }
-            if (val >= 60) s2Cred += (sub.credits || 0);
+        if (typeof val === 'number' && isNumeric) {
+            s2Sum += val; s2Count++;
+            const cr = sub.credits || 0;
+            s2WgtN += val * cr; s2WgtD += cr;
+            let gp = 0;
+            if (val >= 90) gp = 4; else if (val >= 80) gp = 3; else if (val >= 70) gp = 2; else if (val >= 60) gp = 1;
+            s2GpN += gp * cr; s2GpD += cr;
+        }
+
+        // Credit Calculation Logic (Sync with renderStats)
+        let passed = false;
+        const finalVal = scoreObj['学年末'];
+
+        if (sub.name.includes('特別活動')) {
+            const hasFinalData = (finalVal !== undefined && finalVal !== null && finalVal !== '' && finalVal !== '-');
+            const hasAttended = SCORE_KEYS.some(k => scoreObj[k] === '履');
+            passed = hasFinalData || hasAttended;
         } else {
-            // Evaluated subjects (特・ etc) or Pass/Fail
-            if (['合', '認', '修', '履', 'S', 'A', 'B', 'C'].includes(val)) s2Cred += (sub.credits || 0);
+            // STRICT but aligned with Graduation Requirements:
+            // 1. Numeric check: Only check '学年末' (Final Exam) >= 60
+            // 2. String status check: Check ALL columns for passing status (allow early credit recognition)
+            const passingStatuses = ['合', '合格', '認', '認定', '修', '完了', '履', '履修', 'S', 'A', 'B', 'C'];
+
+            // 1. Numeric Check (Year End Only)
+            if (finalVal !== undefined && finalVal !== null && finalVal !== '') {
+                const n = parseFloat(finalVal);
+                if (!isNaN(n)) {
+                    if (n >= 60) passed = true;
+                }
+            }
+
+            // 2. String Status Check (Any Period - matches Graduation Requirements logic)
+            if (!passed) {
+                passed = SCORE_KEYS.some(k => {
+                    const val = scoreObj[k];
+                    return val !== undefined && val !== null && typeof val === 'string' && passingStatuses.includes(val.trim());
+                });
+            }
+
+            // Debug Arts
+            if (['音楽', '美術', '書道'].some(art => sub.name.includes(art))) {
+                console.log(`[Art Debug] ${sub.name}: year=${sub.year}, type2="${sub.type2}", passed=${passed}, credits=${sub.credits}, finalVal="${finalVal}"`);
+            }
+
+            // Auto-pass for other special subjects ONLY if they have some data (to match Hide Empty)
+            if (!passed && sub.name.startsWith('特・')) {
+                const hasAnyYearEnd = (finalVal !== undefined && finalVal !== null && finalVal !== '');
+                if (hasAnyYearEnd) passed = true;
+            }
+        }
+
+        // Debug logging for credit calculation
+        if (studentName === state.currentStudent && targetYear === state.currentYear) {
+            console.log(`[Credit Check] ${sub.name}: type2="${sub.type2}", finalVal="${finalVal}", passed=${passed}, credits=${sub.credits}`);
+        }
+
+        if (passed) {
+            const t2 = (sub.type2 || "").trim();
+            if (t2.includes('専門')) s2CredSpec += (sub.credits || 0);
+            else s2CredGen += (sub.credits || 0);
         }
     });
 
     return {
         stats1,
         stats2: {
-            credits: s2Cred,
+            credits: s2CredGen + s2CredSpec,
+            credGen: s2CredGen,
+            credSpec: s2CredSpec,
             avg_sim: s2Count > 0 ? (s2Sum / s2Count) : 0,
             avg_wgt: s2WgtD > 0 ? (s2WgtN / s2WgtD) : 0,
             gpa: s2GpD > 0 ? (s2GpN / s2GpD) : 0,
-            count: s2Count
+            count: s2Count,
+            total_sum: s2Sum
         }
     };
 }
@@ -3837,22 +4007,16 @@ function renderStats() {
         // Apply filters: Course Filter & Hide Empty
         const courseFilter = state.currentCourse;
 
-        const subjects = state.subjects.filter(s => {
-            // 1. Year Match (Standard or Floater)
-            let yearMatches = (s.year === year);
+        const subjects = getTargetSubjects(s => {
+            // Year Match (Standard or Floater)
+            if (s.year === year) return true;
             if (s.year === 0) {
                 const scoreObj = (state.scores[state.currentStudent] || {})[s.name];
-                yearMatches = (scoreObj && scoreObj.obtainedYear === year);
+                return scoreObj && scoreObj.obtainedYear === year;
             }
-            if (!yearMatches) return false;
-
-            // 2. Course Filter
-            if (courseFilter) {
-                const t4 = s.type4 || 'コース共通';
-                if (t4 !== 'コース共通' && t4 !== courseFilter) return false;
-            }
-
-            // 3. Hide Empty (No Credit / No Score)
+            return false;
+        }).filter(s => {
+            // Hide Empty (No Credit / No Score)
             if (state.hideEmptySubjects) {
                 const scoreObj = state.scores[state.currentStudent] && state.scores[state.currentStudent][s.name];
                 if (!scoreObj) return false;
@@ -3863,7 +4027,6 @@ function renderStats() {
                 });
                 if (!hasValue) return false;
             }
-
             return true;
         });
 
@@ -3875,100 +4038,40 @@ function renderStats() {
         // 1. Year
         tr.innerHTML = `<td style="font-weight:bold; position:sticky; left:0; background:white; z-index:1; border-right:1px solid #e2e8f0;">${year}年</td>`;
 
+        // All scores, ranks, and credits are now driven by the centralized getStudentStats
+        const sStats = getStudentStats(state.currentStudent, year, '学年末');
+
         // 2-9. Scores & Ranks for 4 tests
         SCORE_KEYS.forEach(key => {
-            let studentTotal = 0;
-            let count = 0;
-            subjects.forEach(sub => {
-                if (sub.name.startsWith('特・')) return;
-                // Exclude non-numeric subjects from Average/Rank calc
-                if (!isNumericSubject(sub.name)) return;
-
-                const s = getScore(state.currentStudent, sub.name, key);
-                if (typeof s === 'number') {
-                    studentTotal += s;
-                    count++;
-                }
-            });
-
-            const avg = count > 0 ? (studentTotal / count).toFixed(1) : "";
-            const rank = count > 0 ? calculateRank(year, key, state.currentStudent) : "";
+            const periodStats = getStudentStats(state.currentStudent, year, key);
+            const avg = periodStats.stats1.count > 0 ? periodStats.stats1.avg.toFixed(1) : "";
+            const rank = calculateRank(year, key, state.currentStudent);
 
             const avgClass = (avg !== "" && parseFloat(avg) < 60) ? 'color:red;' : '';
-
-            // Create cells without click functionality
             const avgTd = document.createElement('td');
-            avgTd.style.textAlign = 'center';
-            avgTd.style.borderLeft = '1px solid #e2e8f0';
-            avgTd.style.cssText += avgClass;
+            avgTd.style.textAlign = 'center'; avgTd.style.borderLeft = '1px solid #e2e8f0'; avgTd.style.cssText += avgClass;
             avgTd.textContent = avg;
 
             const rankTd = document.createElement('td');
-            rankTd.style.textAlign = 'center';
-            rankTd.textContent = rank;
-
+            rankTd.style.textAlign = 'center'; rankTd.textContent = rank;
             tr.appendChild(avgTd);
             tr.appendChild(rankTd);
         });
 
         // 10-12. Cumulative Credits
-        // Calculate credits for THIS year first
-        let currentYearGeneral = 0;
-        let currentYearSpecial = 0;
-
-        subjects.forEach(sub => {
-            const scoreObj = (state.scores[state.currentStudent] || {})[sub.name];
-            if (!scoreObj) return;
-
-            let passed = false;
-            if (sub.name.includes('特別活動')) {
-                const finalVal = scoreObj['学年末'];
-                const hasFinalData = (finalVal !== undefined && finalVal !== null && finalVal !== '' && finalVal !== '-');
-                const hasAttended = SCORE_KEYS.some(k => scoreObj[k] === '履');
-                passed = hasFinalData || hasAttended;
-            } else {
-                const f = scoreObj['学年末'];
-                const n = parseFloat(f);
-                if (!isNaN(n) && n >= 60) {
-                    passed = true;
-                } else {
-                    const passingStatuses = ['合', '認', '修', '履', 'S', 'A', 'B', 'C'];
-                    passed = SCORE_KEYS.some(k => {
-                        const val = scoreObj[k];
-                        return val !== undefined && val !== null && typeof val === 'string' && passingStatuses.includes(val.trim());
-                    });
-                }
-
-                // Keep the existence-based pass for other "特・" subjects for compatibility
-                if (!passed && sub.name.startsWith('特・')) {
-                    passed = true;
-                }
-            }
-
-            if (passed) {
-                if (sub.type2 === '専門') currentYearSpecial += sub.credits;
-                else currentYearGeneral += sub.credits;
-            }
-        });
-
-        cumGeneral += currentYearGeneral;
-        cumSpecial += currentYearSpecial;
-        cumTotal = cumGeneral + cumSpecial;
-
-        tr.innerHTML += `<td style="text-align:center; border-left:1px solid #e2e8f0;">${cumGeneral}</td>`;
-        tr.innerHTML += `<td style="text-align:center;">${cumSpecial}</td>`;
-        tr.innerHTML += `<td style="text-align:center; font-weight:bold;">${cumTotal}</td>`;
+        tr.innerHTML += `<td style="text-align:center; border-left:1px solid #e2e8f0;">${sStats.stats2.credGen}</td>`;
+        tr.innerHTML += `<td style="text-align:center;">${sStats.stats2.credSpec}</td>`;
+        tr.innerHTML += `<td style="text-align:center; font-weight:bold;">${sStats.stats2.credits}</td>`;
 
         // 13-14. Promotion
         const required = promotionUnits[year] || 0;
-        const shortfall = cumTotal - required;
+        const shortfall = sStats.stats2.credits - required;
         const shortFallClass = shortfall < 0 ? 'color:red; font-weight:bold;' : '';
 
         tr.innerHTML += `<td style="text-align:center; border-left:1px solid #e2e8f0;">${required}</td>`;
         tr.innerHTML += `<td style="text-align:center; ${shortFallClass}">${shortfall}</td>`;
 
-        // 15. Overall Rank (based on Total Score of Final Exam for current year)
-        // Python: cum_total_scores = sum(学年末) for current year
+        // 15. Overall Rank (Yearly Total Score)
         const overallRank = calculateOverallRank(year, state.currentStudent);
         tr.innerHTML += `<td style="text-align:center; border-left:1px solid #e2e8f0;">${overallRank}</td>`;
 
@@ -3980,54 +4083,80 @@ function renderStats() {
 }
 
 function calculateOverallRank(year, targetStudent) {
-    // Only numeric, normal subjects count for Overall Rank
-    const subjects = state.subjects.filter(s => s.year === year && isNumericSubject(s.name) && !s.name.startsWith('特・'));
-    if (subjects.length === 0) return "";
+    const course = state.currentCourse;
+
+    // Fix: Use cohort year for classmate lookup
+    let cohortYear = year;
+    const m = getStudentMetadataSafe(targetStudent);
+    if (m) {
+        cohortYear = parseInt(m['年'] || m['year'] || year);
+    } else if (targetStudent === state.currentStudent) {
+        cohortYear = state.currentYear;
+    }
+
+    const classStudents = getClassStudents(cohortYear, course);
 
     const sums = [];
-    state.students.forEach(s => {
-        let total = 0;
-        let count = 0;
-        subjects.forEach(sub => {
-            const sc = getScore(s, sub.name, '学年末');
-            if (typeof sc === 'number') {
-                total += sc;
-                count++;
-            }
-        });
-        if (count > 0) {
-            sums.push({ name: s, total });
+    classStudents.forEach(s => {
+        const sStats = getStudentStats(s, year, '学年末');
+        if (sStats.stats1.count > 0) {
+            sums.push({ name: s, total: sStats.stats1.sum });
         }
     });
 
     sums.sort((a, b) => b.total - a.total);
-    const idx = sums.findIndex(x => x.name === targetStudent);
-    return idx !== -1 ? `${idx + 1} / ${sums.length}` : "";
+
+    // Tie-handling
+    let rank = 1;
+    for (let i = 0; i < sums.length; i++) {
+        if (i > 0 && Math.abs(sums[i].total - sums[i - 1].total) > 0.0001) {
+            rank = i + 1;
+        }
+        if (sums[i].name === targetStudent) return `${rank} / ${sums.length}`;
+    }
+    return "";
 }
 
-
 function calculateRank(year, key, targetStudent) {
-    // Only normal subjects
-    const subs = state.subjects.filter(sub => sub.year === year && !sub.name.startsWith('特・'));
+    const course = state.currentCourse;
 
-    // Calc avg for each student
+    // Fix: Use the student's CURRENT enrollment year (cohort) to find classmates, 
+    // instead of the historical data year 'year'.
+    // e.g. When calculating rank for 1st year grades of a current 2nd year student, 
+    // we want to compare with other current 2nd year students.
+    let cohortYear = year;
+    const m = getStudentMetadataSafe(targetStudent);
+    if (m) {
+        cohortYear = parseInt(m['年'] || m['year'] || year);
+    } else if (targetStudent === state.currentStudent) {
+        cohortYear = state.currentYear;
+    }
+
+    const classStudents = getClassStudents(cohortYear, course);
+
     const avgs = [];
-    state.students.forEach(s => {
-        let total = 0;
-        let count = 0;
-        subs.forEach(sub => {
-            const val = getScore(s, sub.name, key);
-            if (typeof val === 'number') {
-                total += val;
-                count++;
-            }
-        });
-        if (count > 0) avgs.push({ name: s, val: total / count });
+    classStudents.forEach(s => {
+        const sStats = getStudentStats(s, year, key);
+        if (sStats.stats1.count > 0) {
+            avgs.push({ name: s, val: sStats.stats1.avg });
+        }
     });
 
     avgs.sort((a, b) => b.val - a.val);
-    const idx = avgs.findIndex(x => x.name === targetStudent);
-    if (idx !== -1) return idx + 1;
+
+
+    // Tie-handling
+    let rank = 1;
+    for (let i = 0; i < avgs.length; i++) {
+        if (i > 0 && Math.abs(avgs[i].val - avgs[i - 1].val) > 0.0001) {
+            rank = i + 1;
+        }
+        if (avgs[i].name === targetStudent) {
+            const result = `${rank} / ${avgs.length}`;
+            return result;
+        }
+    }
+
     return "";
 }
 
@@ -4631,7 +4760,7 @@ function generateClassStats() {
         }
 
         const getSortIndicator = (col) => {
-            if (state.classStatsSortCol !== col) return '<span style="opacity:0.2">↕</span>';
+            if (state.classStatsSortCol !== col) return '<span style="opacity:0.2">?</span>';
             return state.classStatsSortOrder === 'asc' ? '▲' : '▼';
         };
 
@@ -4731,11 +4860,8 @@ function assignRank(data, scoreKey, rankKey) {
 }
 
 function calculateClassStatsList(targetYear, targetTest) {
-    const students = state.students.filter(name => {
-        const meta = state.studentMetadata[name] || {};
-        const y = meta['年'] || meta['year'];
-        return !y || parseInt(y) === targetYear;
-    });
+    const course = state.currentCourse;
+    const students = getClassStudents(targetYear, course);
 
     const list = students.map(name => {
         const stats = getStudentStats(name, targetYear, targetTest);
@@ -4799,14 +4925,18 @@ function toggleAtRiskInputs() {
     const attWrapper = document.getElementById('atRiskAttendanceWrapper');
     const instrTest = document.getElementById('instr-test');
     const instrYear = document.getElementById('instr-year_avg');
-    const instrAtt = document.getElementById('instr-attendance');
+    const instrAttAbs = document.getElementById('instr-attendance_abs');
+    const instrAttLat = document.getElementById('instr-attendance_lat');
+    const instrAttPat = document.getElementById('instr-attendance_pattern');
 
     if (testWrapper) testWrapper.style.display = (type === 'test') ? 'flex' : 'none';
-    if (attWrapper) attWrapper.style.display = (type === 'attendance') ? 'flex' : 'none';
+    if (attWrapper) attWrapper.style.display = 'none'; // Replaced by fixed precision logic
 
     if (instrTest) instrTest.classList.toggle('hidden', type !== 'test');
     if (instrYear) instrYear.classList.toggle('hidden', type !== 'year_avg');
-    if (instrAtt) instrAtt.classList.toggle('hidden', type !== 'attendance');
+    if (instrAttAbs) instrAttAbs.classList.toggle('hidden', type !== 'attendance_abs');
+    if (instrAttLat) instrAttLat.classList.toggle('hidden', type !== 'attendance_lat');
+    if (instrAttPat) instrAttPat.classList.toggle('hidden', type !== 'attendance_pattern');
 }
 
 function initAtRiskDefaults() {
@@ -4885,44 +5015,161 @@ function renderAtRiskReport() {
 
         state.students.forEach(studentName => {
             try {
-                if (type === 'attendance') {
-                    // --- ATTENDANCE MODE ---
-                    // Ensure attendance structure exists
+                if (type === 'attendance_abs' || type === 'attendance_lat' || type === 'attendance_pattern') {
+                    // --- NEW PRECISION ATTENDANCE MODE (3-WAY SPLIT) ---
                     const attObj = state.attendance || {};
                     const records = attObj.records || {};
                     const studentAttendance = records[studentName] || {};
+                    const datesSorted = Object.keys(studentAttendance).sort((a, b) => new Date(a) - new Date(b));
 
-                    let totalAbs = 0, totalLat = 0, totalEarly = 0;
-                    const subAbs = {};
+                    const subStats = {}; // subj -> { abs, lat, total }
+                    const dowStats = {}; // dow -> { abs, lat }
+                    const periodStats = {}; // period -> { abs, lat, total }
+                    let totalAbs = 0, totalLat = 0, totalSessions = 0;
 
-                    Object.values(studentAttendance).forEach(dayEvents => {
-                        if (Array.isArray(dayEvents)) {
-                            dayEvents.forEach(ev => {
-                                if (ev.status === "欠") {
-                                    totalAbs++;
-                                    if (ev.subj) subAbs[ev.subj] = (subAbs[ev.subj] || 0) + 1;
-                                }
-                                else if (ev.status === "遅") {
-                                    totalLat++;
-                                    if (ev.subj) subAbs[ev.subj] = (subAbs[ev.subj] || 0) + 0.5;
-                                }
-                                else if (ev.status === "早") totalEarly++;
-                            });
+                    // 1. Consecutive Check (Bad days vs Late days)
+                    let maxStreak = 0, currentStreak = 0;
+                    let streakStart = null, maxStreakRange = { start: "", end: "" };
+
+                    let maxLatStreak = 0, currentLatStreak = 0;
+                    let latStreakStart = null, maxLatStreakRange = { start: "", end: "" };
+
+                    datesSorted.forEach(dStr => {
+                        const dayEvents = studentAttendance[dStr] || [];
+                        const isBadDay = dayEvents.some(ev => ev.status === "欠" || ev.status === "遅");
+                        const isLateDay = dayEvents.some(ev => ev.status === "遅");
+
+                        if (isBadDay) {
+                            if (currentStreak === 0) streakStart = dStr;
+                            currentStreak++;
+                            if (currentStreak >= maxStreak) {
+                                maxStreak = currentStreak;
+                                maxStreakRange = { start: streakStart, end: dStr };
+                            }
+                        } else {
+                            currentStreak = 0;
                         }
+
+                        if (isLateDay) {
+                            if (currentLatStreak === 0) latStreakStart = dStr;
+                            currentLatStreak++;
+                            if (currentLatStreak >= maxLatStreak) {
+                                maxLatStreak = currentLatStreak;
+                                maxLatStreakRange = { start: latStreakStart, end: dStr };
+                            }
+                        } else {
+                            currentLatStreak = 0;
+                        }
+
+                        dayEvents.forEach(ev => {
+                            if (!ev.subj) return;
+                            totalSessions++;
+                            if (!subStats[ev.subj]) subStats[ev.subj] = { abs: 0, lat: 0, total: 0 };
+                            subStats[ev.subj].total++;
+
+                            if (ev.status === "欠") { subStats[ev.subj].abs++; totalAbs++; }
+                            else if (ev.status === "遅") { subStats[ev.subj].lat++; totalLat++; }
+
+                            const pKey = ev.p || "?";
+                            if (!periodStats[pKey]) periodStats[pKey] = { abs: 0, lat: 0, total: 0 };
+                            periodStats[pKey].total++;
+                            if (ev.status === "欠") periodStats[pKey].abs++;
+                            else if (ev.status === "遅") periodStats[pKey].lat++;
+
+                            const di = new Date(dStr).getDay();
+                            const dl = ["日", "月", "火", "水", "木", "金", "土"][di];
+                            if (!dowStats[dl]) dowStats[dl] = { abs: 0, lat: 0, total: 0 };
+                            dowStats[dl].total++;
+                            if (ev.status === "欠") dowStats[dl].abs++;
+                            else if (ev.status === "遅") dowStats[dl].lat++;
+                        });
                     });
 
-                    const heavyAbsSub = Object.entries(subAbs).filter(([s, c]) => c >= 10);
-                    const isAtRisk = totalAbs >= absLimitTotal || totalLat >= latLimitTotal || heavyAbsSub.length > 0;
+                    const reasons = [];
 
-                    if (isAtRisk) {
-                        let reasons = [];
-                        if (totalAbs >= absLimitTotal) reasons.push(`累計欠席:${totalAbs}回 (閾値:${absLimitTotal})`);
-                        if (totalLat >= latLimitTotal) reasons.push(`累計遅刻:${totalLat}回 (閾値:${latLimitTotal})`);
-                        heavyAbsSub.forEach(([s, c]) => reasons.push({ subject: s, count: c }));
+                    if (type === 'attendance_pattern') {
+                        // Filter 1: Consecutive Abs (3:Yellow, 5:Orange, 7:Red, 8+:Black)
+                        if (maxStreak >= 3) {
+                            let level = 'yellow';
+                            if (maxStreak >= 8) level = 'black';
+                            else if (maxStreak >= 7) level = 'red';
+                            else if (maxStreak >= 5) level = 'orange';
+                            reasons.push({ type: 'consecutive', value: maxStreak, level, range: maxStreakRange });
+                        }
+                        // Filter 3: Day of Week Pattern (3+ points)
+                        Object.entries(dowStats).forEach(([dow, s]) => {
+                            const points = s.abs + s.lat * 0.5;
+                            if (points >= 3) {
+                                reasons.push({ type: 'dow', day: dow, value: points, total: s.total, level: 'yellow' });
+                            }
+                        });
+                    }
 
+                    if (type === 'attendance_lat') {
+                        // Simple high-count thresholds for "incidental" lateness
+                        Object.entries(subStats).forEach(([subj, s]) => {
+                            if (s.lat >= 2) {
+                                let level = 'yellow';
+                                if (s.lat >= 4) level = 'red';
+                                else if (s.lat >= 3) level = 'orange';
+                                reasons.push({ type: 'subject_lat', subject: subj, value: s.lat, level });
+                            }
+                        });
+                        // Day of Week Pattern (Pure Lateness)
+                        Object.entries(dowStats).forEach(([dow, s]) => {
+                            if (s.lat >= 3) {
+                                reasons.push({ type: 'dow_lat', day: dow, value: s.lat, level: 'yellow' });
+                            }
+                        });
+                        // Relaxed: Cumulative Late Count
+                        if (totalLat >= 5) {
+                            let level = 'yellow';
+                            if (totalLat >= 10) level = 'orange';
+                            reasons.push({ type: 'total_lat_count', value: totalLat, level });
+                        }
+                    }
+
+                    if (type === 'attendance_abs') {
+                        // Filter 2: Subject Density (3/6:Yellow, 4/6:Orange, 5/6:Red, 6/6:Black)
+                        Object.entries(subStats).forEach(([subj, s]) => {
+                            const points = s.abs + s.lat * 0.5;
+                            const ratio = s.total > 0 ? points / s.total : 0;
+                            if (ratio >= 0.10) {
+                                let level = 'yellow';
+                                if (ratio >= 1 / 3) level = 'black'; // 33.33%
+                                else if (ratio >= 0.30) level = 'red';
+                                else if (ratio >= 0.20) level = 'orange';
+                                reasons.push({ type: 'subject', subject: subj, value: points, total: s.total, level, ratioStr: `${(ratio * 100).toFixed(0)}%` });
+                            }
+                        });
+                        // Filter 4: Period Density
+                        Object.entries(periodStats).forEach(([p, s]) => {
+                            const points = s.abs + s.lat * 0.5;
+                            const ratio = s.total > 0 ? points / s.total : 0;
+                            if (ratio >= 0.10) {
+                                let level = 'yellow';
+                                if (ratio >= 1 / 3) level = 'black';
+                                else if (ratio >= 0.30) level = 'red';
+                                else if (ratio >= 0.20) level = 'orange';
+                                reasons.push({ type: 'period', period: p, value: points, total: s.total, level, ratioStr: `${(ratio * 100).toFixed(0)}%` });
+                            }
+                        });
+                        // Filter 5: Cumulative Density
+                        const totalPoints = totalAbs + totalLat * 0.5;
+                        const totalRatio = totalSessions > 0 ? totalPoints / totalSessions : 0;
+                        if (totalRatio >= 0.10) {
+                            let level = 'yellow';
+                            if (totalRatio >= 1 / 3) level = 'black';
+                            else if (totalRatio >= 0.30) level = 'red';
+                            else if (totalRatio >= 0.20) level = 'orange';
+                            reasons.push({ type: 'total', value: totalPoints, total: totalSessions, level });
+                        }
+                    }
+
+                    if (reasons.length > 0) {
                         results.push({
                             name: studentName,
-                            type: 'attendance',
+                            type: 'attendance_new',
                             reasons: reasons,
                             totalAbs, totalLat
                         });
@@ -5010,23 +5257,41 @@ function renderAtRiskReport() {
         results.forEach(res => {
             let detailHtml = '';
             let reasonHtml = '';
-            if (res.type === 'attendance') {
-                reasonHtml = '<span style="color:#ef4444; font-weight:bold;">⚠️ 出席不良</span>';
+            if (res.type === 'attendance_new') {
+                reasonHtml = '<span style="color:#ef4444; font-weight:bold;">?? 出欠注意</span>';
+                detailHtml = `<div style="display:flex; flex-wrap:wrap; gap:0.4rem;">`;
+                res.reasons.forEach(r => {
+                    let bg = '#fde047', tc = '#854d0e', border = '#eab308', label = '';
+                    if (r.level === 'black') { bg = '#000'; tc = '#fff'; border = '#000'; }
+                    else if (r.level === 'red') { bg = '#ef4444'; tc = '#fff'; border = '#b91c1c'; }
+                    else if (r.level === 'orange') { bg = '#fb923c'; tc = '#fff'; border = '#ea580c'; }
+
+                    const formatDate = (s) => s ? s.split('/').slice(1).join('/') : '';
+                    if (r.type === 'consecutive') {
+                        label = `連続${r.value}日 (${formatDate(r.range.start)}~${formatDate(r.range.end)})`;
+                    }
+                    else if (r.type === 'consecutive_lat') {
+                        label = `連続遅刻${r.value}日 (${formatDate(r.range.start)}~${formatDate(r.range.end)})`;
+                    }
+                    else if (r.type === 'subject') label = `${r.subject}: 欠席率 ${r.ratioStr}`;
+                    else if (r.type === 'subject_lat') label = `${r.subject}: 遅刻${r.value}回`;
+                    else if (r.type === 'period') label = `${r.period}限: 欠席率 ${r.ratioStr}`;
+                    else if (r.type === 'dow') label = `${r.day}曜日: 欠席率 ${(r.value / r.total * 100).toFixed(0)}%`; // Need total
+                    else if (r.type === 'dow_lat') label = `${r.day}曜日に遅刻集中(${r.value}回)`;
+                    else if (r.type === 'total') label = `累積欠席率: ${(r.value / r.total * 100).toFixed(1)}%`;
+                    else if (r.type === 'total_lat_count') label = `累計遅刻:${r.value}回`;
+
+                    detailHtml += `<span style="background:${bg}; color:${tc}; padding:2px 10px; border-radius:999px; font-size:0.8rem; font-weight:600; border:1px solid ${border};">${label}</span>`;
+                });
+                detailHtml += `</div>`;
+            } else if (res.type === 'attendance') {
+                // Legacy fallback (should rarely be used now)
+                reasonHtml = '<span style="color:#ef4444; font-weight:bold;">?? 出席不良</span>';
                 detailHtml = `<div style="display:flex; flex-wrap:wrap; gap:0.4rem;">
                     <div style="width:100%; font-size:0.8rem; color:#64748b; margin-bottom:0.2rem;">累計: 欠${res.totalAbs}・遅${res.totalLat}</div>
                     ${res.reasons.map(r => {
-                    if (typeof r === 'string') {
-                        return `<span style="background:#fee2e2; color:#b91c1c; padding:2px 10px; border-radius:999px; font-size:0.8rem; font-weight:600; border:1px solid #fecaca;">${r}</span>`;
-                    } else {
-                        // Subject-specific color coding
-                        let bg = '#fee2e2', tc = '#b91c1c', border = '#fecaca';
-                        if (r.count >= 20) { bg = '#000'; tc = '#fff'; border = '#000'; }
-                        else if (r.count >= 15) { bg = '#ef4444'; tc = '#fff'; border = '#b91c1c'; }
-                        else if (r.count >= 10) { bg = '#fb923c'; tc = '#fff'; border = '#ea580c'; }
-                        else if (r.count >= 5) { bg = '#fde047'; tc = '#854d0e'; border = '#eab308'; }
-
-                        return `<span style="background:${bg}; color:${tc}; padding:2px 10px; border-radius:999px; font-size:0.8rem; font-weight:600; border:1px solid ${border};">${r.subject}:${r.count.toFixed(1)}回</span>`;
-                    }
+                    if (typeof r === 'string') return `<span style="background:#fee2e2; color:#b91c1c; padding:2px 10px; border-radius:999px; font-size:0.8rem; font-weight:600; border:1px solid #fecaca;">${r}</span>`;
+                    return `<span style="background:#fee2e2; color:#b91c1c; padding:2px 10px; border-radius:999px; font-size:0.8rem; font-weight:600; border:1px solid #fecaca;">${r.subject}:${r.count.toFixed(1)}回</span>`;
                 }).join('')}
                 </div>`;
             } else {
@@ -5284,8 +5549,8 @@ function renderSeatingRoster() {
     const countInfo = document.getElementById('seatingCountInfo');
     if (countInfo) {
         const seatStatus = availableSeats >= totalStudents ?
-            `<span style="color: #10b981;">✓ 十分</span>` :
-            `<span style="color: #ef4444;">⚠ 不足</span>`;
+            `<span style="color: #10b981;">? 十分</span>` :
+            `<span style="color: #ef4444;">? 不足</span>`;
 
         countInfo.innerHTML = `
             <div style="display: flex; justify-content: space-between; margin-bottom: 0.3rem;">
@@ -6170,7 +6435,7 @@ function initContextMenu() {
 
     menu.innerHTML = `
         <div class="context-menu-item" data-action="clear-seat" style="padding: 0.6rem 1rem; cursor: pointer; color: #ef4444; font-weight: bold; font-size: 0.9rem;">席をクリア</div>
-        <div class="context-menu-item" data-action="toggle-fix" style="padding: 0.6rem 1rem; cursor: pointer; color: #475569; font-size: 0.9rem;">📌 位置を固定/解除</div>
+        <div class="context-menu-item" data-action="toggle-fix" style="padding: 0.6rem 1rem; cursor: pointer; color: #475569; font-size: 0.9rem;">?? 位置を固定/解除</div>
         <div id="sep-clear" style="height: 1px; background: #e2e8f0; margin: 0.4rem 0;"></div>
         <div class="context-menu-item" data-action="toggle-disable" style="padding: 0.6rem 1rem; cursor: pointer; color: #475569; font-size: 0.9rem;">無効化/有効化 (Toggle)</div>
         <div style="height: 1px; background: #e2e8f0; margin: 0.4rem 0;"></div>
@@ -6227,7 +6492,7 @@ function showSeatContextMenu(e, pos) {
         if (clearItem) clearItem.style.display = hasStudent ? 'block' : 'none';
         if (fixItem) {
             fixItem.style.display = hasStudent ? 'block' : 'none';
-            fixItem.textContent = isFixed ? '📌 固定解除' : '📌 位置を固定';
+            fixItem.textContent = isFixed ? '?? 固定解除' : '?? 位置を固定';
         }
         if (sep) sep.style.display = hasStudent ? 'block' : 'none';
 
@@ -6701,10 +6966,10 @@ function showRosterContextMenu(x, y) {
         `;
         menu.innerHTML = `
             <div class="ctx-item" data-action="teams">
-                <span class="ctx-icon">💬</span> Teamsチャット
+                <span class="ctx-icon">??</span> Teamsチャット
             </div>
             <div class="ctx-item" data-action="mail">
-                <span class="ctx-icon">✉️</span> メール送信
+                <span class="ctx-icon">??</span> メール送信
             </div>
         `;
         document.body.appendChild(menu);
@@ -7189,7 +7454,7 @@ function showFacultyContextMenu(event, faculty) {
 
     const menuItems = [
         {
-            icon: '💬',
+            icon: '??',
             label: 'Teams チャット',
             action: () => {
                 const url = `https://teams.microsoft.com/l/chat/0/0?users=${faculty.email}`;
@@ -7197,7 +7462,7 @@ function showFacultyContextMenu(event, faculty) {
             }
         },
         {
-            icon: '📧',
+            icon: '??',
             label: 'メール送信',
             action: () => {
                 window.location.href = `mailto:${faculty.email}`;
@@ -8313,11 +8578,419 @@ function updatePrintHeader() {
             case 'seating':
                 titleText = "座席配置図 (Seating Chart)";
                 break;
-            case 'at_risk':
-                titleText = "学習指導対象者リスト (Risk/At Risk)";
+            case 'student_summary':
+                titleText = "成績のあゆみ";
                 break;
         }
         titleEl.textContent = titleText;
     }
+}
+
+// ==================== STUDENT SUMMARY ====================
+
+function renderStudentSummary() {
+    const studentName = state.currentStudent;
+    const testKey = document.getElementById('summaryTestSelect')?.value || '前期末';
+
+    // Get year from select, fallback to current year
+    const yearSelect = document.getElementById('summaryYearSelect');
+    const targetYear = yearSelect ? parseInt(yearSelect.value) : state.currentYear;
+
+    const area = document.getElementById('studentSummaryArea');
+    if (!area) return;
+
+    if (!studentName) {
+        area.innerHTML = '<div style="text-align: center; padding: 5rem; color: #94a3b8;">学生を選択してください。</div>';
+        return;
+    }
+
+    area.innerHTML = getStudentSummaryHtml(studentName, testKey, targetYear);
+    updatePrintHeader();
+}
+
+function getStudentSummaryHtml(studentName, testKey, targetYear) {
+
+    // A. Context from Top Menu
+    const year = targetYear || state.currentYear;
+    const course = state.currentCourse;
+    const meta = state.studentMetadata[studentName] || {};
+    const studentId = meta['学籍番号'] || meta['id'] || "-";
+    const courseDisplay = course || "全体 (All Courses)";
+
+    // Use student's current cohort year to find classmates for comparison
+    // e.g. If student is Year 2, and we simply ask for Year 1 students, we get current Year 1s (wrong cohort).
+    // We want current Year 2s, but look at their Year 1 stats.
+    const cohortYear = parseInt(meta['年'] || meta['year'] || state.currentYear);
+    const classStudents = getClassStudents(cohortYear, course);
+
+    // Security: Ensure the viewed student is in the list for comparison even if metadata is slightly off
+    if (!classStudents.includes(studentName)) {
+        classStudents.push(studentName);
+    }
+
+    // B. Calculate Stats & Ranking (Class-based)
+    const stats = getStudentStats(studentName, year, testKey);
+    const testRankStr = calculateRank(year, testKey, studentName);
+    const classOverallRankStr = calculateOverallRank(year, studentName);
+
+    // 3. Previous Test Comparison Data
+    const testCycle = ["前期中間", "前期末", "後期中間", "学年末"];
+    const currentIdx = testCycle.indexOf(testKey);
+    let prevStatsLine = "";
+    let prevGpaLine = "";
+
+    if (currentIdx > 0) {
+        const prevTest = testCycle[currentIdx - 1];
+        const prevS = getStudentStats(studentName, year, prevTest);
+        const pRank = calculateRank(year, prevTest, studentName);
+        const pCount = getClassStudents(year, course).length; // Total in group
+
+        const pAvg = prevS.stats1.avg.toFixed(1);
+        prevStatsLine = `<div style="font-size: 0.7rem; color: #94a3b8; margin-top: 0.1rem;">前回: ${pAvg}点 / ${pRank}/${pCount}位</div>`;
+        prevGpaLine = `<span style="font-size: 0.7rem; color: #64748b; margin-left: 0.5rem; font-weight: normal;">(前回: GPA ${prevS.stats2.gpa.toFixed(2)})</span>`;
+    }
+
+
+    // C. Attendance Analysis (Matching At-Risk Extraction Logic)
+    const records = (state.attendance && state.attendance.records) ? state.attendance.records[studentName] : {};
+    let totalAbs = 0, totalLat = 0;
+    const subjectAttendance = {}; // Track per subject
+    const alerts = []; // For "At-Risk" items
+
+    const datesSorted = Object.keys(records).sort((a, b) => new Date(a) - new Date(b));
+    let maxStreak = 0, currentStreak = 0;
+    const dowStats = {};
+    const periodStats = {};
+
+    datesSorted.forEach(dStr => {
+        const dayEvents = records[dStr] || [];
+        const isBadDay = dayEvents.some(ev => ev.status === "欠" || ev.status === "遅");
+
+        if (isBadDay) currentStreak++;
+        else currentStreak = 0;
+        if (currentStreak > maxStreak) maxStreak = currentStreak;
+
+        const di = new Date(dStr).getDay();
+        const dl = ["日", "月", "火", "水", "木", "金", "土"][di];
+        if (!dowStats[dl]) dowStats[dl] = { abs: 0, lat: 0, total: 0 };
+
+        dayEvents.forEach(ev => {
+            if (!ev.subj && !ev.subject) return;
+            const subName = ev.subj || ev.subject;
+            if (!subjectAttendance[subName]) subjectAttendance[subName] = { abs: 0, lat: 0, total: 0, schedule: {} };
+            subjectAttendance[subName].total++;
+
+            const pKey = ev.p || "?";
+            const sk = `${dl}${pKey}限`;
+            subjectAttendance[subName].schedule[sk] = (subjectAttendance[subName].schedule[sk] || 0) + 1;
+
+            if (!periodStats[pKey]) periodStats[pKey] = { abs: 0, lat: 0, total: 0 };
+            periodStats[pKey].total++;
+
+            if (ev.status === '欠') {
+                totalAbs++;
+                subjectAttendance[subName].abs++;
+                dowStats[dl].abs++;
+                periodStats[pKey].abs++;
+            } else if (ev.status === '遅') {
+                totalLat++;
+                subjectAttendance[subName].lat++;
+                dowStats[dl].lat++;
+                periodStats[pKey].lat++;
+            }
+            // Increment total for dow stats inside the loop to count sessions
+            dowStats[dl].total++;
+        });
+    });
+
+    // 1. Pattern Alert: Consecutive Days
+    if (maxStreak >= 3) {
+        let level = 'warning', icon = '?', label = '注意';
+        if (maxStreak >= 8) { level = 'danger'; icon = '??'; label = '重度(Black)'; }
+        else if (maxStreak >= 7) { level = 'danger'; icon = '??'; label = '警告(Red)'; }
+        else if (maxStreak >= 5) { level = 'danger'; icon = '??'; label = '警戒(Orange)'; }
+        alerts.push({ type: level, icon, msg: `行動傾向: 連続${maxStreak}日の欠席/遅刻あり (${label})` });
+    }
+
+    // 2. Pattern Alert: Day of Week Concentration
+    Object.entries(dowStats).forEach(([dow, s]) => {
+        const points = s.abs + s.lat * 0.5;
+        const ratio = s.total > 0 ? points / s.total : 0;
+        if (ratio >= 0.10) {
+            alerts.push({ type: 'warning', icon: '???', msg: `行動傾向: ${dow}曜日に欠席/遅刻が集中 (欠席率: ${(ratio * 100).toFixed(0)}%)` });
+        }
+    });
+
+    // 3. Pattern Alert: Period Concentration
+    Object.entries(periodStats).forEach(([p, s]) => {
+        const points = s.abs + s.lat * 0.5;
+        const ratio = s.total > 0 ? points / s.total : 0;
+        if (ratio >= 0.10) {
+            let lv = 'warning', lab = '注意(10%超)', colorLevel = 'yellow';
+            if (ratio >= 1 / 3) { lv = 'danger'; lab = '黒(1/3超)'; colorLevel = 'black'; }
+            else if (ratio >= 0.30) { lv = 'danger'; lab = '赤(30%超)'; colorLevel = 'red'; }
+            else if (ratio >= 0.20) { lv = 'danger'; lab = '橙(20%超)'; colorLevel = 'orange'; }
+            alerts.push({ type: lv, colorLevel, icon: '??', msg: `行動傾向: ${p}限目の欠席/遅刻密度高 (${lab}: 欠席率 ${(ratio * 100).toFixed(0)}%)` });
+        }
+    });
+
+    // D. Build UI
+    let html = `
+    <div class="summary-report" style="font-family: 'Inter', system-ui, sans-serif; color: #1e293b; max-width: 900px; margin: 0 auto;">
+        <!-- Header Info -->
+        <div style="display: flex; justify-content: space-between; align-items: baseline; border-bottom: 2px solid #334155; padding-bottom: 0.2rem; margin-bottom: 0.6rem;">
+            <div>
+                <h2 style="margin: 0; font-size: 1.2rem; font-weight: 800; color: #0f172a;">${getDisplayName(studentName)} <span style="font-size: 0.8rem; color: #64748b; font-weight: 400;">様</span></h2>
+                <div style="display: flex; gap: 1rem; margin-top: 0.2rem; font-size: 0.8rem; color: #475569;">
+                    <span>学籍番号: <strong>${studentId}</strong></span>
+                    <span>年次: <strong>${year}年</strong></span>
+                    <span>所属: <strong>${courseDisplay}</strong></span>
+                </div>
+            </div>
+            <div style="text-align: right; font-size: 0.75rem; color: #94a3b8;">
+                作成日: ${new Date().toLocaleDateString('ja-JP')}
+            </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin-bottom: 0.8rem;">
+            <!-- Card 1: Scores -->
+            <div style="background: #f8fafc; padding: 0.6rem; border-radius: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">
+                <div style="font-size: 0.7rem; color: #64748b; margin-bottom: 0.1rem; font-weight: 600;">${testKey} 平均点</div>
+                <div style="font-size: 1.6rem; font-weight: 800; color: #2563eb;">${stats.stats1.avg.toFixed(1)}<span style="font-size: 0.8rem; font-weight: 400; color: #64748b; margin-left: 0.1rem;">点</span></div>
+                <div style="font-size: 0.75rem; color: #475569; margin-top: 0.1rem;">順位: ${testRankStr}</div>
+                ${prevStatsLine}
+            </div>
+            <!-- Card 2: Credits -->
+            <div style="background: #f0fdf4; padding: 0.6rem; border-radius: 0.5rem; border: 1px solid #dcfce7; text-align: center;">
+                <div style="font-size: 0.7rem; color: #166534; margin-bottom: 0.1rem; font-weight: 600;">累積修得単位数</div>
+                <div style="font-size: 1.6rem; font-weight: 800; color: #16a34a;">${stats.stats2.credits}<span style="font-size: 0.8rem; font-weight: 400; color: #166534; margin-left: 0.1rem;">単位</span></div>
+                <div style="font-size: 0.75rem; color: #166534; margin-top: 0.1rem;">GPA:${stats.stats2.gpa.toFixed(2)} ${prevGpaLine}</div>
+                <div style="font-size: 0.7rem; color: #166534;">(年間: ${classOverallRankStr})</div>
+            </div>
+            <!-- Card 3: Attendance -->
+            <div style="background: #fff7ed; padding: 0.6rem; border-radius: 0.5rem; border: 1px solid #ffedd5; text-align: center;">
+                <div style="font-size: 0.7rem; color: #9a3412; margin-bottom: 0.1rem; font-weight: 600;">欠席・遅刻状況</div>
+                <div style="display: flex; justify-content: center; gap: 0.6rem; align-items: baseline; margin-top: 0.2rem;">
+                    <div>
+                        <span style="font-size: 1.4rem; font-weight: 800; color: #ea580c;">${totalAbs}</span>
+                        <span style="font-size: 0.7rem; color: #9a3412;">欠</span>
+                    </div>
+                    <div style="width: 1px; height: 1rem; background: #fed7aa;"></div>
+                    <div>
+                        <span style="font-size: 1.4rem; font-weight: 800; color: #f59e0b;">${totalLat}</span>
+                        <span style="font-size: 0.7rem; color: #9a3412;">遅</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Subject Scores Table -->
+        <h3 style="font-size: 0.9rem; border-left: 4px solid #2563eb; padding-left: 0.6rem; margin-bottom: 0.5rem; margin-top: 0.5rem;">科目別成績一覧 (${testKey})</h3>
+        <div style="background: white; border: 1px solid #e2e8f0; border-radius: 0.5rem; overflow: hidden; margin-bottom: 1rem;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 0.75rem;">
+                <thead>
+                    <tr style="background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+                        <th style="padding: 0.4rem 0.6rem; text-align: left; color: #475569;">科目名</th>
+                        <th style="padding: 0.4rem 0.2rem; text-align: center; color: #475569; width: 40px;">単位</th>
+                        <th style="padding: 0.4rem 0.2rem; text-align: center; color: #475569; width: 45px;">欠席</th>
+                        <th style="padding: 0.4rem 0.2rem; text-align: center; color: #475569; width: 45px;">遅刻</th>
+                        <th style="padding: 0.4rem 0.2rem; text-align: center; color: #475569; width: 60px;">${testKey}</th>
+                        <th style="padding: 0.4rem 0.2rem; text-align: center; color: #475569; width: 60px;">クラス順位</th>
+                        <th style="padding: 0.4rem 0.2rem; text-align: center; color: #475569; width: 50px;">評価</th>
+                    </tr>
+                </thead>
+                <tbody>
+`;
+
+    // Filter subjects for the specific student and year
+    const subjects = state.subjects.filter(s => {
+        if (s.year !== year || s.exclude) return false;
+        if (state.hideEmptySubjects) {
+            const scoreObj = (state.scores[studentName] || {})[s.name] || {};
+            const hasData = SCORE_KEYS.some(k => {
+                const val = scoreObj[k];
+                return val !== undefined && val !== null && val !== '';
+            });
+            if (!hasData) return false;
+        }
+        return true;
+    });
+    subjects.forEach(sub => {
+        const score = getScore(studentName, sub.name, testKey);
+        let scoreDisplay = score === null ? "-" : score;
+        let evalDisplay = "-";
+        let scoreStyle = "";
+
+        if (typeof score === 'number') {
+            if (score <= 59) {
+                scoreStyle = "color: #ef4444; font-weight: 700;";
+                evalDisplay = "D";
+            } else if (score < 70) evalDisplay = "C";
+            else if (score < 80) evalDisplay = "B";
+            else if (score < 90) evalDisplay = "A";
+            else evalDisplay = "S";
+        } else if (typeof score === 'string' && score !== "") {
+            evalDisplay = score; // Non-numeric pass/fail
+        }
+
+        const subAtt = subjectAttendance[sub.name] || { abs: 0, lat: 0, total: 0, schedule: {} };
+        let absStyle = subAtt.abs > 0 ? "color: #ef4444; font-weight: 600;" : "color: #94a3b8;";
+        let latStyle = subAtt.lat > 0 ? "color: #f59e0b; font-weight: 600;" : "color: #94a3b8;";
+
+        // Calculate subject class rank
+        const subScores = classStudents.map(s => ({
+            name: s,
+            val: getScore(s, sub.name, testKey)
+        })).filter(x => typeof x.val === 'number');
+        let subRankDisplay = "-";
+        if (subScores.length > 0 && typeof score === 'number') {
+            subScores.sort((a, b) => b.val - a.val);
+            const sIdx = subScores.findIndex(x => x.name === studentName);
+            if (sIdx !== -1) subRankDisplay = `${sIdx + 1} / ${subScores.length}`;
+        }
+
+        // Alert Logic (Matching At-Risk Criteria)
+        const sched = subAtt.schedule || {};
+        const typical = Object.entries(sched).sort((a, b) => b[1] - a[1])[0]?.[0] || "";
+        const schedStr = typical ? ` [${typical}]` : "";
+
+        // 1. Grades Alerts
+        if (typeof score === 'number' && score <= 59.9) {
+            let lv = 'warning', ic = '?', lab = '不合格';
+            if (score <= 39.9) { lv = 'danger'; ic = '??'; lab = '重度不振'; }
+            else if (score <= 49.9) { lv = 'danger'; ic = '??'; lab = '警戒'; }
+            alerts.push({ type: lv, icon: ic, msg: `${sub.name}${schedStr}: ${score.toFixed(1)}点 (${lab})` });
+        }
+
+        // 2. Attendance Density Alerts (2 Lates = 1 Absence)
+        // 2. Attendance Density Alerts (2 Lates = 1 Absence)
+        const attPoints = subAtt.abs + (subAtt.lat * 0.5);
+        const ratio = subAtt.total > 0 ? attPoints / subAtt.total : 0;
+
+        if (ratio >= 0.10) {
+            let lv = 'warning', ic = '??', lab = '注意', colorLevel = 'yellow';
+            if (ratio >= 1 / 3) { lv = 'danger'; lab = '黒(1/3超)'; colorLevel = 'black'; }
+            else if (ratio >= 0.30) { lv = 'danger'; lab = '赤(30%超)'; colorLevel = 'red'; }
+            else if (ratio >= 0.20) { lv = 'danger'; lab = '橙(20%超)'; colorLevel = 'orange'; }
+            alerts.push({ type: lv, colorLevel, icon: ic, msg: `${sub.name}${schedStr}: 欠席・遅刻密度高 (${lab}: 欠席率 ${(ratio * 100).toFixed(0)}%)` });
+        }
+        // Removed strict 2-late warning based on user feedback (too sensitive)
+
+        html += `
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 0.25rem 0.6rem; font-weight: 500;">${sub.name}</td>
+            <td style="padding: 0.25rem 0.2rem; text-align: center; color: #64748b;">${sub.credits}</td>
+            <td style="padding: 0.25rem 0.2rem; text-align: center; ${absStyle}">${subAtt.abs}</td>
+            <td style="padding: 0.25rem 0.2rem; text-align: center; ${latStyle}">${subAtt.lat}</td>
+            <td style="padding: 0.25rem 0.2rem; text-align: center; ${scoreStyle}">${scoreDisplay}</td>
+            <td style="padding: 0.25rem 0.2rem; text-align: center; color: #475569;">${subRankDisplay}</td>
+            <td style="padding: 0.25rem 0.2rem; text-align: center; font-weight: 600;">${evalDisplay}</td>
+        </tr>
+    `;
+    });
+    html += `
+                </tbody>
+            </table>
+        </div>
+    `;
+
+    // E. Alerts Section (Replacing comment box)
+    if (alerts.length > 0) {
+        html += `
+        <div style="background: #fff1f2; padding: 0.5rem 0.8rem; border-radius: 0.4rem; border: 1px solid #fecaca; margin-bottom: 0.6rem;">
+            <h4 style="margin: 0 0 0.3rem 0; color: #b91c1c; font-size: 0.85rem; display: flex; align-items: center; gap: 0.4rem;">
+                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                要確認・注意項目 (Alerts)
+            </h4>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.35rem;">
+        `;
+        alerts.forEach(a => {
+            // Default Yellow
+            let bg = '#fef3c7', tc = '#92400e', bd = '#fef08a';
+
+            // Override based on colorLevel
+            if (a.colorLevel === 'black') { bg = '#000000'; tc = '#ffffff'; bd = '#000000'; }
+            else if (a.colorLevel === 'red') { bg = '#fee2e2'; tc = '#b91c1c'; bd = '#fecaca'; }
+            else if (a.colorLevel === 'orange') { bg = '#ffedd5'; tc = '#c2410c'; bd = '#fed7aa'; }
+            // Legacy/Fallback check
+            else if (a.type === 'danger' && !a.colorLevel) { bg = '#fee2e2'; tc = '#b91c1c'; bd = '#fecaca'; }
+
+            html += `
+                <div style="display: flex; align-items: center; gap: 0.4rem; padding: 0.15rem 0.5rem; background: ${bg}; border-radius: 0.3rem; font-size: 0.7rem; color: ${tc}; font-weight: 500; border: 0.5px solid ${bd};">
+                    <span style="font-size: 0.8rem;">${a.icon}</span> ${a.msg}
+                </div>
+            `;
+        });
+        html += `</div></div>`;
+    } else {
+        html += `
+        <div style="background: #f0fdf4; padding: 0.5rem; border-radius: 0.4rem; border: 1px solid #dcfce7; margin-bottom: 0.6rem; text-align: center; color: #166534; font-size: 0.75rem;">
+            ? 現在、要注意項目は認められません。
+        </div>
+        `;
+    }
+
+    html += `
+        <div class="no-print" style="margin-top: 0.8rem; text-align: center; color: #94a3b8; font-size: 0.7rem;">
+            ※ 本データはシステム上の登録状況を表示したものです。面談等で活用してください。
+        </div>
+    </div>
+    `;
+
+    return html;
+}
+
+function printAllStudentSummaries() {
+    const testKey = document.getElementById('summaryTestSelect')?.value || '前期末';
+    const year = state.currentYear;
+    const course = state.currentCourse;
+
+    const classStudents = state.students.filter(s => {
+        const m = state.studentMetadata[s] || {};
+        if (parseInt(m['年'] || m['year'] || 1) !== year) return false;
+        const stCourse = (m['コース'] || m['course'] || "").trim();
+        if (!course || course === "") return true;
+        return stCourse === course || course.includes(stCourse) || stCourse.includes(course);
+    });
+
+    if (classStudents.length === 0) {
+        alert("現在の抽出条件（学年・学科）に一致する学生がいません。");
+        return;
+    }
+
+    const confirmPrint = confirm(`${classStudents.length}名分のサマリーを一括生成します。よろしいですか？\n(生成後に印刷ダイアログが開きます)`);
+    if (!confirmPrint) return;
+
+    const area = document.getElementById('studentSummaryArea');
+    const originalContent = area.innerHTML;
+    const originalStudent = state.currentStudent;
+
+    let totalHtml = "";
+    classStudents.forEach((student, index) => {
+        // Build individual summary
+        const studentHtml = getStudentSummaryHtml(student, testKey);
+
+        // Add wrapper with page break
+        totalHtml += `
+            <div class="multi-print-wrapper" style="${index > 0 ? 'break-before: page; margin-top: 2rem;' : ''}">
+                ${studentHtml}
+            </div>
+        `;
+    });
+
+    // Temporarily swap content
+    area.innerHTML = totalHtml;
+    updatePrintHeader();
+
+    // Trigger print
+    setTimeout(() => {
+        window.print();
+        // Restore
+        const restore = confirm("印刷が完了しましたか？画面を元の表示に戻します。");
+        if (restore) {
+            state.currentStudent = originalStudent;
+            renderStudentSummary();
+        }
+    }, 500);
 }
 

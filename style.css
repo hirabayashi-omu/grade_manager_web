@@ -743,9 +743,9 @@ th {
     }
 
     #print-header {
-        border-bottom: 3px double #333;
-        padding-bottom: 15px;
-        margin-bottom: 25px;
+        border-bottom: 0.5pt solid #333;
+        padding-bottom: 4px;
+        margin-bottom: 8px;
     }
 
     /* Layout adjustments */
@@ -772,7 +772,7 @@ th {
         box-shadow: none !important;
         border: 1px solid #eee !important;
         padding: 0 !important;
-        margin-bottom: 15mm !important;
+        margin-bottom: 8mm !important;
         break-inside: avoid !important;
     }
 
@@ -837,6 +837,17 @@ th {
     #classStatsContainer th {
         border-color: #000;
         font-size: 8pt !important;
+    }
+
+    /* Summary Report specific print adjustments */
+    .summary-report {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    .summary-report div[style*="background"] {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
     }
 }
 
