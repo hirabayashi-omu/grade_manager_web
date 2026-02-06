@@ -633,7 +633,9 @@ function setDefaultYear() {
                 return val !== undefined && val !== null && val !== '';
             });
             if (hasData) {
-                const y = (subject.year === 0) ? (scoreObj.obtainedYear || 0) : subject.year;
+                const oy = scoreObj.obtainedYear ? parseInt(scoreObj.obtainedYear) : 0;
+                let y = (subject.year === 0) ? oy : subject.year;
+                if (subject.year === 0 && y === 0) y = 1; // Fallback for orphans with data
                 if (y > latestYear) latestYear = y;
             }
         }
@@ -656,7 +658,9 @@ function setDefaultYear() {
                         return val !== undefined && val !== null && val !== '';
                     });
                     if (hasData) {
-                        const y = (sub.year === 0) ? (scoreObj.obtainedYear || 0) : sub.year;
+                        const oy = scoreObj.obtainedYear ? parseInt(scoreObj.obtainedYear) : 0;
+                        let y = (sub.year === 0) ? oy : sub.year;
+                        if (sub.year === 0 && y === 0) y = 1;
                         if (y > 0) yearsWithData.add(y);
                     }
                 }
@@ -2462,7 +2466,10 @@ function handleFileUpload(e) {
                     if (!isNaN(csvCredits) && csvCredits > 0 && (!subject.credits || subject.credits === 0)) {
                         subject.credits = csvCredits;
                     }
-                    if (!isNaN(csvYear) && (!subject.year || subject.year === 0)) {
+                    // ONLY update year if currently MISSING or 0, BUT avoid changing it if it was intentionally 0 (floater)
+                    // If it's a Special Study (naming convention or type2), we likely want to keep it as year 0.
+                    const isFloater = (subject.year === 0 || subject.name.startsWith('特・') || subject.type2 === '特別学修');
+                    if (!isNaN(csvYear) && (!subject.year || (subject.year === 0 && !isFloater))) {
                         subject.year = csvYear;
                     }
                     // Only update Types if they are currently missing (don't overwrite with old CSV data)
@@ -2472,6 +2479,11 @@ function handleFileUpload(e) {
 
                 if (!state.scores[studentName]) state.scores[studentName] = {};
                 if (!state.scores[studentName][subjectName]) state.scores[studentName][subjectName] = {};
+
+                // Set obtainedYear for floater subjects using the Year column in CSV
+                if (subject && subject.year === 0 && !isNaN(csvYear) && csvYear > 0) {
+                    state.scores[studentName][subjectName].obtainedYear = csvYear;
+                }
 
                 const keys = ["前期中間", "前期末", "後期中間", "学年末"];
                 const indices = [5, 6, 7, 8];
@@ -3458,6 +3470,7 @@ function renderGradesTable() {
         // B. Floater / Special Subjects (Year = 0)
         if (s.year === 0) {
             const scoreObj = (state.scores[state.currentStudent] || {})[s.name];
+            const oy = scoreObj ? parseInt(scoreObj.obtainedYear) : 0;
 
             // SPECIAL FIX: For "Special Activities 1-3", they correspond roughly to Year 1-3.
             // If they are strictly named "特・特別活動N", map them to Year N.
@@ -3469,13 +3482,24 @@ function renderGradesTable() {
             }
 
             // Other Special Subjects:
-            // If obtainedYear is recorded, Strict Check
-            if (scoreObj && scoreObj.obtainedYear) {
-                if (scoreObj.obtainedYear === state.currentYear) return true;
-                return false; // Belongs to another year
+            // If obtainedYear is recorded, Strict Check (using loose match for safety)
+            if (oy > 0) {
+                return oy === state.currentYear;
             }
 
-            // If NO obtainedYear, default to SHOW (for new inputs)
+            // If NO obtainedYear recorded yet:
+            // 1. Check if it already has ANY score data
+            const hasData = scoreObj && SCORE_KEYS.some(k => {
+                const val = scoreObj[k];
+                return val !== undefined && val !== null && val !== '' && val !== '-';
+            });
+
+            if (hasData) {
+                // If it has data but no year, anchor it to Year 1 to prevent it showing everywhere
+                return state.currentYear === 1;
+            }
+
+            // 2. If it has NO data, show everywhere so the user can see it in any tab to start entry
             return true;
         }
 
