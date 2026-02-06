@@ -1,4 +1,4 @@
-
+﻿
 // ==================== DATA CONSTANTS ====================
 // ==================== DATA CONSTANTS ====================
 // These are factory defaults. We use localStorage for actual master data.
@@ -244,12 +244,27 @@ let state = {
         fixed: [],
         disabled: [],
         perspective: 'teacher',
-        colorByGrade: false,
+        colorMode: 'none', // 'none', 'grade', 'attendance'
         gradeThreshold: 60,
         gradeMethod: 'cumulative'
     },
-    seatingPresets: []
+    seatingPresets: [],
+    seatingPresets: [],
+    studentMetadata: {}, // Store tag info (extra columns from roster)
+    nameDisplayMode: localStorage.getItem('gm_state_name_display') || 'name', // 'name' or 'initial'
+    attendance: {
+        records: {}, // Key: StudentName, Value: { "YYYY/MM/DD": [ { p:1, subj:"Math", status:"欠", teacher:"Tanaka" }, ... ] }
+        periodInfo: { start: '', end: '' },
+        fileName: '',
+        memos: {} // Key: "StudentName_YYYY/MM/DD", Value: { text: "...", color: "blue" }
+    }
 };
+
+const ATTENDANCE_STATUS_GAP = "-";
+const ATTENDANCE_STATUS_ABSENT = "欠";
+const ATTENDANCE_STATUS_LATE = "遅";
+const ATTENDANCE_STATUS_EARLY = "早";
+const ATTENDANCE_STATUS_CANCELLED = "休講";
 
 const SCORE_KEYS = ["前期中間", "前期末", "後期中間", "学年末"];
 const SCORE_KEYS_EN = ["earlyMid", "earlyFinal", "lateMid", "lateFinal"]; // map for object keys
@@ -257,22 +272,63 @@ const SCORE_KEYS_EN = ["earlyMid", "earlyFinal", "lateMid", "lateFinal"]; // map
 // Current pasting target
 let currentPasteKey = null;
 
+// Import State
+let importState = {
+    candidates: [], // { name, sortKey, metadata }
+    filters: {},    // { key: selectedValue }
+    searchText: '', // Search Query
+    selected: new Set(),
+    sortKey: 'original', // 'year', 'class', 'no', 'name', ...
+    sortOrder: 'asc' // 'asc' or 'desc'
+};
+
+// Faculty Roster State
+let facultyImportState = {
+    candidates: [],
+    filters: {},
+    searchText: '',
+    selected: new Set(),
+    sortKey: 'original',
+    sortOrder: 'asc'
+};
+
+// ==================== STATE PERSISTENCE ====================
 // ==================== STATE PERSISTENCE ====================
 function saveSessionState() {
-    localStorage.setItem('gm_state_tab', state.currentTab);
-    localStorage.setItem('gm_state_student', state.currentStudent || '');
-    localStorage.setItem('gm_state_year', state.currentYear);
-    localStorage.setItem('gm_state_hide_empty', state.hideEmptySubjects);
-    localStorage.setItem('gm_state_boxplot_year', state.boxPlotYear || '');
-    localStorage.setItem('gm_state_boxplot_test', state.boxPlotTest || '');
-    localStorage.setItem('gm_state_course', state.currentCourse || '');
-    localStorage.setItem('gm_state_seating', JSON.stringify(state.seating));
+    try {
+        // Ensure presets are saved FIRST (to avoid quota issues/errors from other large data blocking it)
+        const presets = state.seatingPresets || [];
+        localStorage.setItem('gm_state_seatingPresets', JSON.stringify(presets));
 
-    // Auto-save the actual lists and scores so everything is remembered on reload
-    localStorage.setItem('grade_manager_students', JSON.stringify(state.students));
-    localStorage.setItem('gm_master_subjects_json', JSON.stringify(state.subjects));
-    localStorage.setItem('grade_manager_scores', JSON.stringify(state.scores));
-    localStorage.setItem('gm_state_seatingPresets', JSON.stringify(state.seatingPresets));
+        localStorage.setItem('gm_state_tab', state.currentTab);
+        localStorage.setItem('gm_state_student', state.currentStudent || '');
+        localStorage.setItem('gm_state_year', state.currentYear);
+        localStorage.setItem('gm_state_hide_empty', state.hideEmptySubjects);
+        localStorage.setItem('gm_state_boxplot_year', state.boxPlotYear || '');
+        localStorage.setItem('gm_state_boxplot_test', state.boxPlotTest || '');
+        localStorage.setItem('gm_state_course', state.currentCourse || '');
+        localStorage.setItem('gm_state_course', state.currentCourse || '');
+        localStorage.setItem('gm_state_name_display', state.nameDisplayMode || 'name');
+        localStorage.setItem('gm_state_seating', JSON.stringify(state.seating));
+
+        // Auto-save the actual lists and scores so everything is remembered on reload
+        localStorage.setItem('grade_manager_students', JSON.stringify(state.students));
+        localStorage.setItem('gm_student_metadata', JSON.stringify(state.studentMetadata));
+        localStorage.setItem('gm_master_subjects_json', JSON.stringify(state.subjects));
+        localStorage.setItem('grade_manager_scores', JSON.stringify(state.scores));
+
+        localStorage.setItem('gm_roster_candidates', JSON.stringify(importState.candidates));
+        localStorage.setItem('gm_faculty_candidates', JSON.stringify(facultyImportState.candidates));
+
+        // Attendance Persistence
+        localStorage.setItem('gm_attendance_data', JSON.stringify(state.attendance));
+
+    } catch (e) {
+        console.error('Save State Error:', e);
+        if (e.name === 'QuotaExceededError' || e.code === 22) {
+            alert('【警告】ブラウザの保存容量上限に達したため、データ（プリセット等）が保存できませんでした。\n不要なデータ（学生データなど）を減らしてください。');
+        }
+    }
 }
 
 function loadSessionState() {
@@ -283,17 +339,22 @@ function loadSessionState() {
     const savedBPYear = localStorage.getItem('gm_state_boxplot_year');
     const savedBPTest = localStorage.getItem('gm_state_boxplot_test');
     const savedCourse = localStorage.getItem('gm_state_course');
+    const savedNameDisplay = localStorage.getItem('gm_state_name_display');
     const savedSeating = localStorage.getItem('gm_state_seating');
 
     if (savedTab) state.currentTab = savedTab;
     if (savedHideEmpty !== null) state.hideEmptySubjects = (savedHideEmpty === 'true');
     if (savedBPYear) state.boxPlotYear = parseInt(savedBPYear);
     if (savedBPTest) state.boxPlotTest = savedBPTest;
+    if (savedBPTest) state.boxPlotTest = savedBPTest;
     if (savedCourse !== null) state.currentCourse = savedCourse;
+    if (savedNameDisplay) state.nameDisplayMode = savedNameDisplay;
     if (savedSeating) state.seating = JSON.parse(savedSeating);
 
-    const savedPresets = localStorage.getItem('gm_state_seatingPresets');
-    if (savedPresets) state.seatingPresets = JSON.parse(savedPresets);
+    // Load presets (Isolated function)
+    loadPresetsOnly();
+
+    // Student Metadata is now loaded in refreshMasterData() to ensure availability
 
     // MIGRATION: Rename courses to formal names
     const courseMap = {
@@ -315,6 +376,40 @@ function loadSessionState() {
         state.currentStudent = null;
     }
 
+    // Restore Roster Candidates
+    try {
+        const savedRoster = localStorage.getItem('gm_roster_candidates');
+        if (savedRoster) {
+            importState.candidates = JSON.parse(savedRoster) || [];
+            console.log(`Loaded ${importState.candidates.length} student roster candidates.`);
+        }
+    } catch (e) {
+        console.error('Failed to restore student roster:', e);
+        importState.candidates = [];
+    }
+
+    try {
+        const savedFaculty = localStorage.getItem('gm_faculty_candidates');
+        if (savedFaculty) {
+            facultyImportState.candidates = JSON.parse(savedFaculty) || [];
+            console.log(`Loaded ${facultyImportState.candidates.length} faculty roster candidates.`);
+        }
+    } catch (e) {
+        console.error('Failed to restore faculty roster:', e);
+        facultyImportState.candidates = [];
+    }
+
+    // Restore Attendance Data
+    try {
+        const savedAttendance = localStorage.getItem('gm_attendance_data');
+        if (savedAttendance) {
+            state.attendance = JSON.parse(savedAttendance);
+            console.log("Attendance records loaded.");
+        }
+    } catch (e) {
+        console.error('Failed to restore attendance data:', e);
+    }
+
     // Force automatic year detection on load to ensure we start at the latest data year
     // This MUST happen after state.scores and state.subjects are loaded (which happens in refreshMasterData and mockData)
     // Actually, loadSessionState is called in init() AFTER refreshMasterData and mockData.
@@ -322,17 +417,24 @@ function loadSessionState() {
 }
 
 // ==================== INITIALIZATION ====================
+// ==================== INITIALIZATION ====================
+// ==================== INITIALIZATION ====================
 function init() {
-    // Auth check must happen first to block UI
-    initAuth();
-
     setupEventListeners();
+
+    // 1. Load Master Data & Scores
     refreshMasterData();
     mockData();
+
+    // 2. Restore Session State (Roster, Tab, Filters, etc.)
+    // MUST be done before syncSpecialActivitiesForAll because that function triggers a save,
+    // and we need the roster data loaded so it doesn't get overwritten with empty arrays.
+    loadSessionState();
+
+    // 3. Logic that might trigger a save
     syncSpecialActivitiesForAll();
 
     // OPTIMIZATION: Clean up orphaned scores if they accumulate too much
-    // (Prevents memory/storage bloat if many students were added/removed or due to the massive array bug)
     const scoreCount = Object.keys(state.scores).length;
     if (scoreCount > 1000 && scoreCount > state.students.length * 2) {
         const validNames = new Set(state.students);
@@ -349,15 +451,21 @@ function init() {
         }
     }
 
-    // Restore persistent state
-    loadSessionState();
-
     populateControls();
 
-    // Set current year to the latest year that has actual grade data
-    setDefaultYear();
+    // Set default year if not loaded or invalid, otherwise respect saved year
+    if (!state.currentYear) {
+        setDefaultYear();
+    }
+
+    // Roster Board Sort Listeners
+    setupRosterHeaderSort();
 
     initAtRiskDefaults();
+    initContextMenu();
+
+    // 4. Initialize Auth & UI (Last, so data is ready for rendering)
+    initAuth();
 }
 
 // ==================== AUTHENTICATION ====================
@@ -525,7 +633,9 @@ function setDefaultYear() {
                 return val !== undefined && val !== null && val !== '';
             });
             if (hasData) {
-                const y = (subject.year === 0) ? (scoreObj.obtainedYear || 0) : subject.year;
+                const oy = scoreObj.obtainedYear ? parseInt(scoreObj.obtainedYear) : 0;
+                let y = (subject.year === 0) ? oy : subject.year;
+                if (subject.year === 0 && y === 0) y = 1; // Fallback for orphans with data
                 if (y > latestYear) latestYear = y;
             }
         }
@@ -548,7 +658,9 @@ function setDefaultYear() {
                         return val !== undefined && val !== null && val !== '';
                     });
                     if (hasData) {
-                        const y = (sub.year === 0) ? (scoreObj.obtainedYear || 0) : sub.year;
+                        const oy = scoreObj.obtainedYear ? parseInt(scoreObj.obtainedYear) : 0;
+                        let y = (sub.year === 0) ? oy : sub.year;
+                        if (sub.year === 0 && y === 0) y = 1;
                         if (y > 0) yearsWithData.add(y);
                     }
                 }
@@ -580,9 +692,21 @@ function refreshMasterData() {
         localStorage.setItem('grade_manager_students', JSON.stringify(state.students));
         localStorage.setItem('grade_manager_initialized', 'true');
     } else if (storedStudents) {
-        state.students = JSON.parse(storedStudents);
+        try {
+            state.students = JSON.parse(storedStudents);
+            if (!Array.isArray(state.students)) state.students = [];
+        } catch (e) {
+            console.error('Failed to parse students:', e);
+            state.students = [];
+        }
     } else {
         state.students = [];
+    }
+
+    // FALLBACK: If list became empty somehow, restore defaults for safety
+    if (state.students.length === 0) {
+        state.students = DEFAULT_STUDENTS_RAW.replace(/\n/g, '').split(',').map(s => s.trim()).filter(s => s);
+        localStorage.setItem('grade_manager_students', JSON.stringify(state.students));
     }
 
     // SAFETY CHECK: Prevent massive array freeze (Protection against user entering Student ID as No.)
@@ -614,6 +738,19 @@ function refreshMasterData() {
         state.currentStudent = state.students[0] || null;
     }
 
+    // A-2. Student Metadata (Ensure this is loaded with students)
+    const storedMetadata = localStorage.getItem('gm_student_metadata');
+    if (storedMetadata) {
+        try {
+            state.studentMetadata = JSON.parse(storedMetadata);
+        } catch (e) {
+            console.error('Failed to parse student metadata:', e);
+            state.studentMetadata = {};
+        }
+    } else {
+        state.studentMetadata = {};
+    }
+
     // B. Subjects
     state.subjects = [];
 
@@ -636,13 +773,21 @@ function refreshMasterData() {
             if (line.includes('\t')) {
                 parts = line.split('\t');
             } else if (line.includes(',')) {
-                // Improved CSV split to handle quoted fields
-                parts = line.match(/(".*?"|[^",\r\n]+)(?=\s*,|\s*$)/g);
-                if (parts) {
-                    parts = parts.map(p => p.startsWith('"') && p.endsWith('"') ? p.slice(1, -1) : p.trim());
-                } else {
-                    parts = line.split(',');
+                // Robust CSV split to handle quoted fields and empty values
+                parts = [];
+                let cur = '';
+                let inQuote = false;
+                for (let i = 0; i < line.length; i++) {
+                    const char = line[i];
+                    if (char === '"') {
+                        if (inQuote && line[i + 1] === '"') { cur += '"'; i++; }
+                        else { inQuote = !inQuote; }
+                    } else if (char === ',' && !inQuote) {
+                        parts.push(cur.trim());
+                        cur = '';
+                    } else { cur += char; }
                 }
+                parts.push(cur.trim());
                 isCsv = true;
             } else {
                 parts = line.split(/\s+/);
@@ -716,38 +861,48 @@ function mockData() {
 }
 
 function populateControls() {
-    // 1. Student Select
+    // 1. Main Student Select
     const studentSelect = document.getElementById('studentSelect');
     if (studentSelect) {
-        studentSelect.innerHTML = ''; // IMPORTANT: Clear old options
+        studentSelect.innerHTML = '';
         state.students.forEach(s => {
             const opt = document.createElement('option');
             opt.value = s;
-            opt.textContent = s;
+            opt.textContent = getDisplayName(s);
+            if (s === state.currentStudent) opt.selected = true;
             studentSelect.appendChild(opt);
         });
-        studentSelect.value = state.currentStudent;
     }
 
-    // 2. Year Select
+
+
+    // 3. Name Display Dropdown
+    const displaySelect = document.getElementById('settingNameDisplay');
+    if (displaySelect) {
+        displaySelect.value = state.nameDisplayMode || 'name';
+    }
+
+    // 4. Year Select
     const yearSelect = document.getElementById('yearSelect');
     if (yearSelect) {
         yearSelect.value = state.currentYear;
     }
 
-    // 3. Stats Controls
+    // 5. Stats Controls
     const statsYearSelect = document.getElementById('boxPlotYearSelect');
     if (statsYearSelect) {
-        // Sync stats year with current year initially
-        state.boxPlotYear = state.currentYear;
         statsYearSelect.value = state.boxPlotYear || '';
     }
 
-    // 4. Course Select Sync
+    // 6. Course Select Sync
     const courseFilterHeader = document.getElementById('subjectCourseFilterHeader');
     if (courseFilterHeader) courseFilterHeader.value = state.currentCourse;
     const courseFilterSettings = document.getElementById('subjectCourseFilter');
     if (courseFilterSettings) courseFilterSettings.value = state.currentCourse;
+
+    // 7. Summary Year Select
+    const summaryYear = document.getElementById('summaryYearSelect');
+    if (summaryYear) summaryYear.value = state.currentYear;
 }
 
 function setupEventListeners() {
@@ -771,6 +926,12 @@ function setupEventListeners() {
         render();
     });
 
+
+    document.getElementById('summaryTestSelect')?.addEventListener('change', (e) => {
+        render();
+    });
+
+
     // Navigation
     document.querySelectorAll('.nav-item').forEach(item => {
         item.addEventListener('click', (e) => {
@@ -779,14 +940,101 @@ function setupEventListeners() {
         });
     });
     document.getElementById('saveBtn')?.addEventListener('click', saveData);
-    document.getElementById('printBtn')?.addEventListener('click', () => window.print());
+    document.getElementById('printBtn')?.addEventListener('click', () => {
+        updatePrintHeader();
+        window.print();
+    });
     document.getElementById('exportJsonBtn')?.addEventListener('click', exportJson);
+
+    // Import JSON
+    document.getElementById('importJsonBtn')?.addEventListener('click', () => {
+        document.getElementById('jsonFileInput')?.click();
+    });
+    document.getElementById('jsonFileInput')?.addEventListener('change', handleJsonImport);
 
     // Import CSV
     document.getElementById('importBtn')?.addEventListener('click', () => {
         document.getElementById('csvFileInput')?.click();
     });
     document.getElementById('csvFileInput')?.addEventListener('change', handleFileUpload);
+
+    // New Roster Import (Settings Tab)
+    document.getElementById('rosterImportBtn')?.addEventListener('click', () => {
+        document.getElementById('rosterFileInput')?.click();
+    });
+    // This is shared input for both
+    document.getElementById('rosterFileInput')?.addEventListener('change', handleRosterSelect);
+
+    // Roster Board Controls (New Listeners)
+    document.getElementById('triggerRosterLoadBtn')?.addEventListener('click', () => {
+        document.getElementById('rosterFileInput')?.click();
+    });
+    document.getElementById('applyRosterImportBtn')?.addEventListener('click', confirmImportFromBoard);
+    document.getElementById('teamsChatSelectedBtn')?.addEventListener('click', openTeamsChatForSelected);
+    document.getElementById('sendMailSelectedBtn')?.addEventListener('click', openMailForSelected);
+
+    document.getElementById('rosterSortSelect')?.addEventListener('change', (e) => {
+        importState.sortMethod = e.target.value;
+        renderRosterBoardTable();
+    });
+
+    // Search Inputs
+    document.getElementById('rosterSearchInput')?.addEventListener('input', (e) => {
+        importState.searchText = e.target.value;
+        renderRosterBoardTable();
+    });
+
+    document.getElementById('facultySearchInput')?.addEventListener('input', (e) => {
+        facultyImportState.searchText = e.target.value;
+        renderFacultyTable();
+    });
+
+    document.getElementById('rosterSelectAll')?.addEventListener('click', (e) => {
+        const checked = e.target.checked;
+        const visible = getFilteredAndSortedCandidates();
+        visible.forEach(c => {
+            if (checked) importState.selected.add(c.name);
+            else importState.selected.delete(c.name);
+        });
+        renderRosterBoardTable();
+    });
+
+    // Faculty Roster Controls
+    document.getElementById('triggerFacultyLoadBtn')?.addEventListener('click', () => {
+        document.getElementById('facultyFileInput')?.click();
+    });
+    document.getElementById('facultyFileInput')?.addEventListener('change', handleFacultyRosterSelect);
+    document.getElementById('facultyTeamsChatBtn')?.addEventListener('click', openFacultyTeamsChat);
+    document.getElementById('facultySendMailBtn')?.addEventListener('click', openFacultyMail);
+    document.getElementById('facultySelectAll')?.addEventListener('click', (e) => {
+        const checked = e.target.checked;
+        facultyImportState.candidates.forEach(c => {
+            if (checked) facultyImportState.selected.add(c.id);
+            else facultyImportState.selected.delete(c.id);
+        });
+        renderFacultyTable();
+    });
+
+    // Clear Filters Buttons
+    document.getElementById('clearRosterFiltersBtn')?.addEventListener('click', () => {
+        importState.filters = {};
+        importState.searchText = '';
+        document.getElementById('rosterSearchInput').value = '';
+        document.querySelectorAll('#rosterFilterContainer select').forEach(select => {
+            select.value = '';
+        });
+        renderRosterBoardTable();
+    });
+
+    document.getElementById('clearFacultyFiltersBtn')?.addEventListener('click', () => {
+        facultyImportState.filters = {};
+        facultyImportState.searchText = '';
+        document.getElementById('facultySearchInput').value = '';
+        document.querySelectorAll('#facultyFilterContainer select').forEach(select => {
+            select.value = '';
+        });
+        renderFacultyTable();
+    });
 
     // Paste Modal
     document.getElementById('closeModalBtn')?.addEventListener('click', closePasteModal);
@@ -816,9 +1064,32 @@ function setupEventListeners() {
     document.getElementById('generateClassStatsBtn')?.addEventListener('click', () => {
         generateClassStats();
     });
+    document.getElementById('classStatsYear')?.addEventListener('change', () => {
+        generateClassStats();
+    });
     document.getElementById('classStatsTest')?.addEventListener('change', () => {
         generateClassStats();
     });
+    document.getElementById('exportClassStatsCsvBtn')?.addEventListener('click', exportClassStatsCsv);
+
+    // Class Stats Sub-nav Listener
+    document.querySelectorAll('.sub-nav-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+            const targetTab = e.target.dataset.csTab;
+            const parent = e.target.closest('.card');
+
+            // Toggle buttons
+            parent.querySelectorAll('.sub-nav-item').forEach(btn => btn.classList.remove('active'));
+            e.target.classList.add('active');
+
+            // Toggle contents
+            parent.querySelectorAll('.cs-tab-content').forEach(content => content.classList.add('hidden'));
+            parent.querySelector(`#cs-tab-${targetTab}`).classList.remove('hidden');
+        });
+    });
+
+    document.getElementById('generateClassAttendanceStatsBtn')?.addEventListener('click', generateClassAttendanceStats);
+    document.getElementById('exportClassAttendanceCsvBtn')?.addEventListener('click', exportClassAttendanceCsv);
 
     // Mobile tabs
     document.querySelectorAll('.mobile-tab').forEach(tab => {
@@ -886,21 +1157,21 @@ function setupEventListeners() {
     document.getElementById('randomAssignBtn')?.addEventListener('click', randomAssignSeats);
     document.getElementById('clearSeatingBtn')?.addEventListener('click', clearSeatingAssignments);
     document.getElementById('printSeatingBtn')?.addEventListener('click', () => window.print());
-    document.getElementById('seatingColorByGrade')?.addEventListener('change', (e) => {
-        state.seating.colorByGrade = e.target.checked;
+    document.getElementById('seatingColorMode')?.addEventListener('change', (e) => {
+        state.seating.colorMode = e.target.value;
+        const methodWrapper = document.getElementById('seatingGradeMethodWrapper');
+        if (methodWrapper) methodWrapper.style.display = (e.target.value === 'grade') ? 'flex' : 'none';
         saveSessionState();
         renderSeatingGrid();
     });
     document.getElementById('seatingGradeMethod')?.addEventListener('change', (e) => {
         state.seating.gradeMethod = e.target.value;
         saveSessionState();
-        if (state.seating.colorByGrade) renderSeatingGrid();
+        updateGradeMethodInfo();
+        if (state.seating.colorMode === 'grade') renderSeatingGrid();
     });
     document.getElementById('saveSeatingBtn')?.addEventListener('click', saveSeatingLayout);
     document.getElementById('loadSeatingBtn')?.addEventListener('click', loadSeatingLayout);
-    document.getElementById('savePresetBtn')?.addEventListener('click', saveSeatingPreset);
-    document.getElementById('deletePresetBtn')?.addEventListener('click', deleteSeatingPreset);
-    document.getElementById('seatingPresetSelect')?.addEventListener('change', loadSeatingPreset);
 
     document.getElementById('changePassBtn')?.addEventListener('click', openPasswordChange);
     document.getElementById('clearAllDataBtn')?.addEventListener('click', clearAllDataHard);
@@ -927,7 +1198,16 @@ function setupEventListeners() {
     });
 
     document.getElementById('exportStudentsCsvBtn')?.addEventListener('click', exportStudentsCsv);
+    document.getElementById('importStudentsCsvBtn')?.addEventListener('click', () => {
+        document.getElementById('studentsCsvFileInput')?.click();
+    });
+    document.getElementById('studentsCsvFileInput')?.addEventListener('change', handleStudentsCsvImport);
+
     document.getElementById('exportSubjectsCsvBtn')?.addEventListener('click', exportSubjectsCsv);
+    document.getElementById('importSubjectsCsvBtn')?.addEventListener('click', () => {
+        document.getElementById('subjectsCsvFileInput')?.click();
+    });
+    document.getElementById('subjectsCsvFileInput')?.addEventListener('change', handleSubjectsCsvImport);
 
     document.getElementById('subjectSearchInput')?.addEventListener('input', render);
 
@@ -965,6 +1245,35 @@ function setupEventListeners() {
         if (yearWrapper) yearWrapper.style.display = isSpecial ? 'none' : 'flex';
         if (type1Wrapper) type1Wrapper.style.display = isSpecial ? 'none' : 'flex';
     });
+
+    setupAttendanceListeners();
+}
+
+function setupAttendanceListeners() {
+    document.getElementById('attendanceMonthSelect')?.addEventListener('change', (e) => {
+        renderAttendanceCalendar();
+        renderAttendanceStats();
+    });
+
+    document.getElementById('importAttendanceCsvBtn')?.addEventListener('click', () => {
+        document.getElementById('attendanceCsvFileInput')?.click();
+    });
+
+    document.getElementById('attendanceCsvFileInput')?.addEventListener('change', handleAttendanceFileUpload);
+
+    document.getElementById('attendanceSubjectFilter')?.addEventListener('change', () => {
+        renderSubjectAttendanceChart();
+    });
+
+    document.getElementById('attendanceDayFilter')?.addEventListener('change', () => {
+        renderDayAttendanceChart();
+    });
+
+    document.getElementById('attendancePeriodFilter')?.addEventListener('change', () => {
+        renderPeriodAttendanceChart();
+    });
+
+    document.getElementById('attendanceExportPdfBtn')?.addEventListener('click', () => window.print());
 }
 
 function switchTab(tabName) {
@@ -1006,8 +1315,18 @@ function switchTab(tabName) {
     } else if (tabName === 'settings') {
         renderSettings();
     } else if (tabName === 'seating') {
-        document.title = '席決め | Grade Manager';
         initSeating();
+    } else if (tabName === 'roster_board') {
+        renderRosterBoardFilters();
+        renderRosterBoardTable();
+    } else if (tabName === 'faculty_roster') {
+        renderFacultyFilters();
+        renderFacultyTable();
+    } else if (tabName === 'attendance') {
+        initAttendance();
+    } else if (tabName === 'student_summary') {
+        populateControls(); // Refresh dropdown
+        renderStudentSummary();
     }
 }
 
@@ -1055,6 +1374,60 @@ function exportJson() {
     alert('JSONファイルをダウンロードしました (JSON file downloaded)');
 }
 
+function handleJsonImport(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        try {
+            const importData = JSON.parse(event.target.result);
+
+            // Validate data structure
+            if (!importData.scores) {
+                throw new Error('無効なJSONファイル形式です。成績データが見つかりません。');
+            }
+
+            // Confirm before overwriting
+            if (!confirm('現在の成績データを上書きしますか？\n\n※この操作は元に戻せません。')) {
+                e.target.value = ''; // Reset file input
+                return;
+            }
+
+            // Import scores
+            state.scores = importData.scores;
+            localStorage.setItem('grade_manager_scores', JSON.stringify(state.scores));
+
+            // Import custom subjects if available
+            if (importData.customSubjects && Array.isArray(importData.customSubjects)) {
+                // Merge custom subjects (avoid duplicates)
+                const existingNames = new Set(state.subjects.map(s => s.name));
+                importData.customSubjects.forEach(sub => {
+                    if (!existingNames.has(sub.name)) {
+                        state.subjects.push(sub);
+                        existingNames.add(sub.name);
+                    }
+                });
+                localStorage.setItem('grade_manager_subjects', JSON.stringify(state.subjects));
+                localStorage.setItem('gm_master_subjects_json', JSON.stringify(state.subjects));
+            }
+
+            saveSessionState();
+            render();
+
+            alert('成績データを読み込みました！\n\n画面を更新して反映します。');
+
+        } catch (err) {
+            console.error('JSON import error:', err);
+            alert('JSONファイルの読み込みに失敗しました:\n' + err.message);
+        } finally {
+            e.target.value = ''; // Reset file input
+        }
+    };
+
+    reader.readAsText(file);
+}
+
 function renderSettings() {
     // 1. Render Students (List style)
     const studentsList = document.getElementById('studentsList');
@@ -1073,8 +1446,12 @@ function renderSettings() {
                 <span style="font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; ${isCurrent ? 'color: #1d4ed8;' : ''}">${s} ${isCurrent ? '<span style="font-size:0.7em; color:#3b82f6; border:1px solid #3b82f6; padding:1px 4px; border-radius:4px; margin-left:4px;">選択中</span>' : ''}</span>
             </div>
             <div style="display: flex; gap: 0.2rem;">
-                <button onclick="editStudentSetting(${idx})" style="border:none; background:none; color:#94a3b8; cursor:pointer; padding: 0.2rem; display: flex;" title="編集">
+                <button onclick="editStudentMetadata('${s}')" style="border:none; background:none; color:#94a3b8; cursor:pointer; padding: 0.2rem; display: flex;" title="詳細情報を編集">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                </button>
+                <!-- Rename Button (Separate from Metadata) -->
+                <button onclick="editStudentSetting(${idx})" style="border:none; background:none; color:#94a3b8; cursor:pointer; padding: 0.2rem; display: flex;" title="氏名変更">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                 </button>
                 <button onclick="removeStudentSetting(${idx})" style="border:none; background:none; color:#94a3b8; cursor:pointer; padding: 0.2rem; display: flex;" title="削除">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
@@ -1535,10 +1912,34 @@ function exportStudentsCsv() {
         return;
     }
 
-    // Prepare CSV content (Standard format: one name per line with header)
-    const BOM = '\uFEFF'; // Add BOM for Excel compatibility
-    const header = '学生名';
-    const csvContent = BOM + [header, ...state.students].join('\n');
+    // Collect all metadata keys
+    const metadataKeys = new Set();
+    state.students.forEach(student => {
+        const meta = state.studentMetadata[student] || {};
+        Object.keys(meta).forEach(key => metadataKeys.add(key));
+    });
+
+    const BOM = '\uFEFF';
+
+    // Create header with metadata columns
+    const baseHeaders = ['学生名'];
+    const metaHeaders = Array.from(metadataKeys).sort();
+    const headers = [...baseHeaders, ...metaHeaders];
+
+    // Create rows with metadata
+    const rows = state.students.map(student => {
+        const meta = state.studentMetadata[student] || {};
+        const row = [student];
+
+        // Add metadata values in the same order as headers
+        metaHeaders.forEach(key => {
+            row.push(meta[key] || '');
+        });
+
+        return row.join(',');
+    });
+
+    const csvContent = BOM + [headers.join(','), ...rows].join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -1551,6 +1952,115 @@ function exportStudentsCsv() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+}
+
+function handleStudentsCsvImport(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        try {
+            const text = event.target.result;
+            const lines = text.split(/\r?\n/).filter(line => line.trim());
+
+            if (lines.length < 2) {
+                throw new Error('CSVファイルが空か、データが不足しています。');
+            }
+
+            // Parse header
+            const header = lines[0].replace(/^\uFEFF/, '').split(',').map(h => h.trim());
+
+            if (header[0] !== '学生名') {
+                throw new Error('CSVファイルの形式が正しくありません。\n最初の列は「学生名」である必要があります。');
+            }
+
+            // Extract metadata column names
+            const metadataColumns = header.slice(1);
+
+            // Parse students and metadata
+            const importedStudents = [];
+            const importedMetadata = {};
+
+            for (let i = 1; i < lines.length; i++) {
+                const cols = lines[i].split(',').map(c => c.trim());
+                if (cols.length < 1 || !cols[0]) continue; // Skip invalid rows
+
+                const studentName = cols[0];
+                importedStudents.push(studentName);
+
+                // Parse metadata
+                const metadata = {};
+                metadataColumns.forEach((colName, idx) => {
+                    const value = cols[idx + 1];
+                    if (value) {
+                        metadata[colName] = value;
+                    }
+                });
+
+                if (Object.keys(metadata).length > 0) {
+                    importedMetadata[studentName] = metadata;
+                }
+            }
+
+            if (importedStudents.length === 0) {
+                throw new Error('有効な学生データが見つかりませんでした。');
+            }
+
+            // Check for duplicates
+            const existingNames = new Set(state.students);
+            const duplicates = importedStudents.filter(s => existingNames.has(s));
+
+            let confirmMsg = `${importedStudents.length}名の学生データを読み込みます。\n`;
+            if (metadataColumns.length > 0) {
+                confirmMsg += `メタデータ列: ${metadataColumns.join(', ')}\n`;
+            }
+            confirmMsg += '\n';
+
+            if (duplicates.length > 0) {
+                confirmMsg += `※ ${duplicates.length}名の重複する学生が見つかりました。\n`;
+                confirmMsg += '重複する学生のメタデータは上書きされます。\n\n';
+            }
+
+            confirmMsg += '続行しますか？';
+
+            if (!confirm(confirmMsg)) {
+                e.target.value = '';
+                return;
+            }
+
+            // Merge students (add new, keep existing)
+            const studentSet = new Set(state.students);
+            importedStudents.forEach(s => studentSet.add(s));
+            state.students = Array.from(studentSet);
+
+            // Merge metadata (overwrite duplicates)
+            Object.keys(importedMetadata).forEach(name => {
+                if (!state.studentMetadata[name]) {
+                    state.studentMetadata[name] = {};
+                }
+                Object.assign(state.studentMetadata[name], importedMetadata[name]);
+            });
+
+            // Save to localStorage
+            localStorage.setItem('grade_manager_students', JSON.stringify(state.students));
+            localStorage.setItem('gm_student_metadata', JSON.stringify(state.studentMetadata));
+
+            saveSessionState();
+            renderSettings();
+            populateControls();
+
+            alert(`学生データを読み込みました！\n\n読込: ${importedStudents.length}名\n重複: ${duplicates.length}名\n合計: ${state.students.length}名`);
+
+        } catch (err) {
+            console.error('CSV import error:', err);
+            alert('CSVファイルの読み込みに失敗しました:\n' + err.message);
+        } finally {
+            e.target.value = '';
+        }
+    };
+
+    reader.readAsText(file, 'UTF-8');
 }
 
 function exportSubjectsCsv() {
@@ -1583,6 +2093,111 @@ function exportSubjectsCsv() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+}
+
+function handleSubjectsCsvImport(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        try {
+            const text = event.target.result;
+            const lines = text.split(/\r?\n/).filter(line => line.trim());
+
+            if (lines.length < 2) {
+                throw new Error('CSVファイルが空か、データが不足しています。');
+            }
+
+            // Parse header
+            const header = lines[0].replace(/^\uFEFF/, '').split(',').map(h => h.trim());
+
+            // Validate header format
+            const expectedHeaders = ['授業科目', '単位', '学年', '種別1', '種別2', '種別3', '種別4'];
+            const hasValidHeader = expectedHeaders.every((h, i) => header[i] === h);
+
+            if (!hasValidHeader) {
+                throw new Error('CSVファイルの形式が正しくありません。\n期待されるヘッダー: ' + expectedHeaders.join(', '));
+            }
+
+            // Parse subjects
+            const importedSubjects = [];
+            for (let i = 1; i < lines.length; i++) {
+                const cols = lines[i].split(',').map(c => c.trim());
+                if (cols.length < 3) continue; // Skip invalid rows
+
+                const subject = {
+                    name: cols[0],
+                    credits: parseFloat(cols[1]) || 0,
+                    year: parseInt(cols[2]) || 1,
+                    type1: cols[3] || '',
+                    type2: cols[4] || '',
+                    type3: cols[5] || '',
+                    type4: cols[6] || '',
+                    exclude: false
+                };
+
+                if (subject.name) {
+                    importedSubjects.push(subject);
+                }
+            }
+
+            if (importedSubjects.length === 0) {
+                throw new Error('有効な科目データが見つかりませんでした。');
+            }
+
+            // Check for duplicates
+            const existingNames = new Set(state.subjects.map(s => s.name));
+            const duplicates = importedSubjects.filter(s => existingNames.has(s.name));
+
+            let confirmMsg = `${importedSubjects.length}件の科目データを読み込みます。\n\n`;
+
+            if (duplicates.length > 0) {
+                confirmMsg += `※ ${duplicates.length}件の重複する科目が見つかりました。\n`;
+                confirmMsg += '重複する科目は上書きされます。\n\n';
+            }
+
+            confirmMsg += '続行しますか？';
+
+            if (!confirm(confirmMsg)) {
+                e.target.value = '';
+                return;
+            }
+
+            // Merge subjects (replace duplicates)
+            const nameToSubject = new Map();
+
+            // Add existing subjects
+            state.subjects.forEach(s => {
+                nameToSubject.set(s.name, s);
+            });
+
+            // Overwrite with imported subjects
+            importedSubjects.forEach(s => {
+                nameToSubject.set(s.name, s);
+            });
+
+            // Update state
+            state.subjects = Array.from(nameToSubject.values());
+
+            // Save to localStorage
+            localStorage.setItem('grade_manager_subjects', JSON.stringify(state.subjects));
+            localStorage.setItem('gm_master_subjects_json', JSON.stringify(state.subjects));
+
+            saveSessionState();
+            renderSettings();
+
+            alert(`科目データを読み込みました！\n\n読込: ${importedSubjects.length}件\n上書き: ${duplicates.length}件\n合計: ${state.subjects.length}件`);
+
+        } catch (err) {
+            console.error('CSV import error:', err);
+            alert('CSVファイルの読み込みに失敗しました:\n' + err.message);
+        } finally {
+            e.target.value = '';
+        }
+    };
+
+    reader.readAsText(file, 'UTF-8');
 }
 
 
@@ -1664,47 +2279,48 @@ function clearAllDataHard() {
     }
 }
 
-function handleJsonImport(file) {
-    const reader = new FileReader();
-    reader.onload = function (evt) {
-        try {
-            const jsonData = JSON.parse(evt.target.result);
+function parseCSV(text) {
+    const rows = [];
+    let row = [];
+    let cur = '';
+    let inQuote = false;
+    // Normalize newlines
+    const chars = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
-            // Validate JSON structure
-            if (!jsonData.scores) {
-                throw new Error('Invalid JSON format: missing scores data');
+    for (let i = 0; i < chars.length; i++) {
+        const c = chars[i];
+        if (inQuote) {
+            if (c === '"') {
+                if (i + 1 < chars.length && chars[i + 1] === '"') {
+                    cur += '"';
+                    i++;
+                } else {
+                    inQuote = false;
+                }
+            } else {
+                cur += c;
             }
-
-            // Import scores
-            state.scores = jsonData.scores;
-
-            // Import custom subjects if available
-            if (jsonData.customSubjects && Array.isArray(jsonData.customSubjects)) {
-                jsonData.customSubjects.forEach(customSub => {
-                    // Only add if not already in the list
-                    if (!state.subjects.find(s => normalizeStr(s.name) === normalizeStr(customSub.name))) {
-                        state.subjects.push(customSub);
-                    }
-                });
+        } else {
+            if (c === '"') {
+                inQuote = true;
+            } else if (c === ',') {
+                row.push(cur);
+                cur = '';
+            } else if (c === '\n') {
+                row.push(cur);
+                rows.push(row);
+                row = [];
+                cur = '';
+            } else {
+                cur += c;
             }
-
-            // Save to localStorage
-            saveData();
-
-            // Set default year based on imported data
-            setDefaultYear();
-
-            // Re-render
-            render();
-
-            const importDate = jsonData.exportDate ? new Date(jsonData.exportDate).toLocaleString() : '不明';
-            alert(`JSONファイルを読み込みました\nエクスポート日時: ${importDate}\n\nJSON file imported\nExport date: ${importDate}`);
-
-        } catch (err) {
-            alert(`JSONファイルの読み込みに失敗しました\nエラー: ${err.message}\n\nFailed to import JSON file\nError: ${err.message}`);
         }
-    };
-    reader.readAsText(file);
+    }
+    if (cur || row.length > 0) {
+        row.push(cur);
+        rows.push(row);
+    }
+    return rows;
 }
 
 function handleFileUpload(e) {
@@ -1715,9 +2331,8 @@ function handleFileUpload(e) {
     const fileName = file.name.toLowerCase();
 
     if (fileName.endsWith('.json')) {
-        // Handle JSON file
-        handleJsonImport(file);
-        e.target.value = ''; // Clear input
+        // Handle JSON file - pass the event to handleJsonImport
+        handleJsonImport(e);
         return;
     }
 
@@ -1726,42 +2341,28 @@ function handleFileUpload(e) {
     reader.onload = function (evt) {
         const text = evt.target.result;
         try {
-            // Improved CSV split to handle quoted fields
-            const rows = text.replace(/\r/g, '').split('\n').map(line => {
-                let parts = line.match(/(".*?"|[^",\r\n]+)(?=\s*,|\s*$)/g);
-                if (parts) {
-                    return parts.map(p => p.startsWith('"') && p.endsWith('"') ? p.slice(1, -1) : p.trim());
-                }
-                return line.split(',');
-            });
+            // New logic: Only try to parse Score CSV or Subject Definitions here. 
+            // Roster CSV should ideally go through "Roster Import" button, but we can support fallback or redirect.
+
+            const rows = parseCSV(text).filter(row => row.length > 0);
             if (rows.length < 2) throw new Error("Empty or invalid CSV");
 
             const header = rows[0];
+            const h0 = header[0]?.trim().replace(/^"|"$/g, '');
 
-            // CASE 1: Students List (students.csv)
-            // Header: 名前
-            if (header[0].trim() === '名前') {
-                const newStudents = [];
-                rows.slice(1).forEach(row => {
-                    if (row.length > 0 && row[0].trim() !== '') {
-                        newStudents.push(row[0].trim());
-                    }
-                });
+            // Check if it looks like a Roster
+            const isRoster = (h0 === '名前') || (header.some(h => h.includes('出席') && h.includes('番号')) && header.includes('氏名'));
 
-                if (newStudents.length > 0) {
-                    state.students = newStudents;
-                    // Reset current student if not in new list
-                    if (!state.students.includes(state.currentStudent)) {
-                        state.currentStudent = state.students[0];
-                    }
-                    saveSessionState(); // ENSURE THIS IS PERSISTED
-                    populateControls(); // Refresh dropdown
-                    render();
-                    alert(`学生リストを読み込みました: ${newStudents.length} 名`);
+            if (isRoster) {
+                // If user used the generic "Load" button for a roster, redirect to the new flow
+                if (confirm("名簿ファイルが検出されました。\n「名簿読込」機能として処理しますか？\n(キャンセルすると通常のファイルとして処理を続行します)")) {
+                    processRosterCSV(rows, header);
+                    e.target.value = '';
+                    return;
                 }
-                e.target.value = ''; // Clear input
-                return;
             }
+
+            // ... Continue with Score/Subject Parsing (Subject Defs, Score List) ...
 
             // CASE 2: Subject Definitions List
             // Header: 授業科目, 単位, 学年, 種別1, 種別2, [種別3], [種別4], [除外]
@@ -1865,7 +2466,10 @@ function handleFileUpload(e) {
                     if (!isNaN(csvCredits) && csvCredits > 0 && (!subject.credits || subject.credits === 0)) {
                         subject.credits = csvCredits;
                     }
-                    if (!isNaN(csvYear) && (!subject.year || subject.year === 0)) {
+                    // ONLY update year if currently MISSING or 0, BUT avoid changing it if it was intentionally 0 (floater)
+                    // If it's a Special Study (naming convention or type2), we likely want to keep it as year 0.
+                    const isFloater = (subject.year === 0 || subject.name.startsWith('特・') || subject.type2 === '特別学修');
+                    if (!isNaN(csvYear) && (!subject.year || (subject.year === 0 && !isFloater))) {
                         subject.year = csvYear;
                     }
                     // Only update Types if they are currently missing (don't overwrite with old CSV data)
@@ -1875,6 +2479,11 @@ function handleFileUpload(e) {
 
                 if (!state.scores[studentName]) state.scores[studentName] = {};
                 if (!state.scores[studentName][subjectName]) state.scores[studentName][subjectName] = {};
+
+                // Set obtainedYear for floater subjects using the Year column in CSV
+                if (subject && subject.year === 0 && !isNaN(csvYear) && csvYear > 0) {
+                    state.scores[studentName][subjectName].obtainedYear = csvYear;
+                }
 
                 const keys = ["前期中間", "前期末", "後期中間", "学年末"];
                 const indices = [5, 6, 7, 8];
@@ -1902,6 +2511,109 @@ function handleFileUpload(e) {
         }
     };
     reader.readAsText(file);
+}
+
+
+// --- New Dedicated Roster Import Logic ---
+
+function handleRosterSelect(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function (evt) {
+        const text = evt.target.result;
+        try {
+            const rows = parseCSV(text).filter(row => row.length > 0);
+            if (rows.length < 2) throw new Error("Empty or invalid CSV");
+            const header = rows[0];
+            processRosterCSV(rows, header);
+        } catch (err) {
+            alert('名簿読み込みエラー: ' + err.message);
+        } finally {
+            e.target.value = ''; // Reset
+        }
+    };
+    reader.readAsText(file);
+}
+
+function processRosterCSV(rows, header) {
+    // Shared Logic
+    const h0 = header[0].trim().replace(/^"|"$/g, '');
+    const isNewRoster = header.some(h => h.includes('出席') && h.includes('番号')) && header.includes('氏名');
+
+    const newStudents = [];
+
+    if (isNewRoster) {
+        // New Format Logic
+        const colName = header.findIndex(h => h.trim() === '氏名');
+        // Fix: Year might be quoted or contain whitespace
+        const colYear = header.findIndex(h => h.trim().replace(/"/g, '') === '年' || h.trim() === '年');
+        const colClass = header.findIndex(h => h.trim().replace(/"/g, '') === '組' || h.trim() === '組');
+        const colNo = header.findIndex(h => h.includes('出席') && h.includes('番号'));
+        const colId = header.findIndex(h => h.includes('学籍') && h.includes('番号')); // Optional
+
+        if (colName === -1) throw new Error("CSVに「氏名」列が見つかりません。");
+
+        rows.slice(1).forEach(row => {
+            const name = row[colName]?.trim();
+            if (name) {
+                const y = row[colYear]?.trim();
+                const c = row[colClass]?.trim();
+
+                // Debug fallback if extraction failed but columns seem likely position-based
+                // User hint: Year is 2nd column (index 1)
+                const finalY = y || (colYear === -1 && row[1] ? row[1] : '9');
+                // Assume Class might be 3rd column (index 2) if Year is index 1, or maybe index 2? 
+                // Let's rely on name search primarily. If Class search failed too, guess index 2.
+                const finalC = c || (colClass === -1 && row[2] ? row[2] : 'Z');
+                const n = row[colNo]?.trim();
+                const sid = colId !== -1 ? row[colId]?.trim() : '';
+
+                // Metadata
+                const meta = {};
+                header.forEach((h, idx) => {
+                    const cleanH = h.replace(/\n/g, '').replace(/"/g, '').trim();
+                    if (cleanH) meta[cleanH] = row[idx];
+                });
+
+                // Force include Year/Class in metadata if missing (using fallback values)
+                if (!meta['年'] && !meta['year']) meta['年'] = finalY;
+                if (!meta['組'] && !meta['class']) meta['組'] = finalC;
+
+                newStudents.push({
+                    name: name,
+                    sortKey: `${finalY || '9'}-${finalC || 'Z'}-${(n || '999').padStart(3, '0')}`,
+                    metadata: meta,
+                    year: finalY,
+                    class: finalC,
+                    no: n,
+                    studentId: sid
+                });
+            }
+        });
+    } else {
+        // Fallback for simple list
+        rows.slice(1).forEach(row => {
+            if (row.length > 0 && row[0].trim() !== '') {
+                const name = row[0].trim();
+                newStudents.push({
+                    name: name,
+                    sortKey: name,
+                    metadata: {},
+                    year: '',
+                    class: ''
+                });
+            }
+        });
+    }
+
+    if (newStudents.length === 0) throw new Error("有効な学生データが見つかりませんでした。");
+
+    // Default Sort
+    newStudents.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+
+    openRosterBoard(newStudents);
 }
 
 // --- Graduation Requirements Logic ---
@@ -1997,11 +2709,19 @@ function renderGraduationRequirements() {
 
         if (passed) {
             // (1) General vs Professional count
-            if (type2 === '一般') {
+            const type2Raw = (sub.type2 || 'その他').trim();
+            let effectiveType2 = type2Raw;
+
+            // Force Arts subjects to be '一般' (General) to ensure they are counted
+            if (['音楽', '美術', '書道'].some(art => sub.name.includes(art))) {
+                effectiveType2 = '一般';
+            }
+
+            if (effectiveType2 === '一般') {
                 totalGeneralCredits += credits;
-            } else if (type2 !== 'その他') {
+            } else if (effectiveType2 !== 'その他') {
                 // Professional usually includes 専門共通, 基盤専門, 応用専門, 特別学修
-                if (type2 === '特別学修') {
+                if (effectiveType2 === '特別学修' || effectiveType2 === '特別学習') {
                     earnedSpecialStudyRaw += credits;
                 } else {
                     totalProfessionalCredits += credits;
@@ -2181,36 +2901,10 @@ function render() {
         initClassStats();
     } else if (state.currentTab === 'settings') {
         renderSettings();
-    }
-}
-
-function updatePrintHeader() {
-    const titleEl = document.getElementById('print-report-title');
-    const nameEl = document.getElementById('print-student-name');
-    const dateEl = document.getElementById('print-date');
-
-    if (titleEl) {
-        const titles = {
-            'grades': '成績一覧 (Grades List)',
-            'stats': '統計・推移レポート (Stats & Trend Report)',
-            'stats2': '累積推移レポート (Cumulative Stats Report)',
-            'class_stats': '全体統計・順位帳票 (Class Statistics Report)'
-        };
-        titleEl.textContent = titles[state.currentTab] || '成績管理システム';
-    }
-
-    if (nameEl) {
-        if (state.currentTab === 'class_stats') {
-            nameEl.parentElement.style.display = 'none'; // Don't show student name on class-wide report
-        } else {
-            nameEl.parentElement.style.display = 'block';
-            nameEl.textContent = state.currentStudent || '-';
-        }
-    }
-
-    if (dateEl) {
-        const now = new Date();
-        dateEl.textContent = now.toLocaleString();
+    } else if (state.currentTab === 'attendance') {
+        initAttendance();
+    } else if (state.currentTab === 'student_summary') {
+        renderStudentSummary();
     }
 }
 
@@ -2218,6 +2912,10 @@ function updatePrintHeader() {
 let stats2SimpleChartInstance = null;
 let stats2WeightedChartInstance = null;
 let stats2GpaChartInstance = null;
+let attendanceChartInstance = null;
+let subjectAttendanceChartInstance = null;
+let dayAttendanceChartInstance = null;
+let periodAttendanceChartInstance = null;
 
 // --- GPA / Year Utilities ---
 
@@ -2226,20 +2924,124 @@ const getTargetSubjects = (predicate) => {
     const courseFilter = state.currentCourse;
     return state.subjects.filter(s => {
         if (!predicate(s)) return false;
-        if (s.exclude) return false;
+
+        // Exclude logic: Skip subjects marked 'exclude' (GPA exempt), 
+        // BUT allow Arts subjects and Special Studies because they count for credits even if GPA exempt.
+        const isArts = ["音楽", "美術", "書道"].some(art => s.name.includes(art));
+        const namesStartsContents = ['特・', '特･'];
+        const isSpecial = (s.type2 === '特別学修' || s.type2 === '特別学習' || namesStartsContents.some(prefix => s.name.startsWith(prefix)));
+        if (s.exclude && !isArts && !isSpecial) return false;
 
         // Course Filter
-        if (courseFilter) {
-            const t4 = s.type4 || 'コース共通';
+        if (courseFilter && courseFilter !== "") {
+            const t1 = (s.type1 || "").trim();
+            const t3 = (s.type3 || "").trim();
+            const t4 = (s.type4 || "").trim();
+
+            // Explicitly include Elective Required Arts subjects regardless of course
+            const isArts = ["音楽", "美術", "書道"].some(art => s.name.includes(art));
+            if (isArts) return true;
+
             if (courseFilter === 'コース未配属') {
-                if (t4 !== 'コース共通') return false;
+                // Only show truly common subjects
+                const hasNoCourseTag = (!t4 || t4 === 'コース共通' || t4 === '共通');
+                if (!hasNoCourseTag) return false;
             } else {
-                if (t4 !== 'コース共通' && t4 !== courseFilter) return false;
+                // Determine if this subject is "Common"
+                // Check multiple indicators:
+                // 1. type1: '必履修', '選必', '必修得' are common to all students
+                // 2. type3/type4: '一般', '共通', '専門共通', or numeric year tags
+                // 3. Empty type4 defaults to common
+                const isCommonByType1 = (t1 === '必履修' || t1 === '選必' || t1 === '必修得' || t1.includes('必'));
+                const isCommonByType3 = (t3 === '一般' || t3 === '共通' || t3.includes('共通'));
+                const isCommonByType4 = (!t4 || t4 === 'コース共通' || t4 === '共通' || t4 === '一般' || t4.includes('共通') || /^\d/.test(t4));
+
+                const isCommon = isCommonByType1 || isCommonByType3 || isCommonByType4;
+                const isMatch = (t4 === courseFilter || courseFilter.includes(t4) || t4.includes(courseFilter));
+
+                if (!isCommon && !isMatch) return false;
             }
         }
         return true;
     });
 };
+
+/**
+ * Standardized way to get the list of students for a specific year and course.
+ */
+// Helper to safely get metadata even if key is messy or Initialized
+function getStudentMetadataSafe(rawName) {
+    if (!rawName) return null;
+    let m = state.studentMetadata[rawName];
+    if (m) return m;
+
+    const trimmed = rawName.trim();
+    m = state.studentMetadata[trimmed];
+    if (m) return m;
+
+    // If still not found and we are in Initial mode, maybe rawName is the Initial?
+    // Try to find a key in metadata that transforms to this Initial
+    if (state.nameDisplayMode === 'initial') {
+        const realName = Object.keys(state.studentMetadata).find(k => getDisplayName(k) === rawName);
+        if (realName) return state.studentMetadata[realName];
+    }
+
+    return null;
+}
+
+/**
+ * Standardized way to get the list of students for a specific year and course.
+ */
+function getClassStudents(year, course) {
+    const currentName = state.currentStudent;
+
+    const result = state.students.filter(s => {
+        let stYear = 1;
+        let stCourse = "";
+
+        const m = getStudentMetadataSafe(s);
+
+        if (m) {
+            stYear = parseInt(m['年'] || m['year'] || 1);
+            stCourse = (m['コース'] || m['course'] || "").trim();
+        } else {
+            // Fallback: if it's the current student, use current state config
+            // (Only if direct metadata lookup failed entirely)
+            if (s === currentName || s.trim() === currentName) {
+                stYear = state.currentYear;
+                stCourse = state.currentCourse;
+            } else {
+                // If we can't identify the student's year, we have to filter them out
+                // or assume year 1. Let's filter out to avoid ghosts.
+                return false;
+            }
+        }
+
+        if (stYear !== year) return false;
+
+        // Course Filter:
+        if (!course || course === "") return true;
+
+        // If student matches course, or has NO course (assume common), include them
+        // Note: "".includes("AnyString") is false, but "AnyString".includes("") is true.
+        // So correct logic for including empty students is simple inclusion check from course side.
+        if (stCourse === "" || stCourse === course || course.includes(stCourse) || stCourse.includes(course)) return true;
+
+        return false;
+    });
+
+    // Always ensure current student is in the list
+    // (Check if currentStudent is present in result list either by raw name or resolved)
+    // To be safe, just push raw currentStudent if not found
+    if (currentName && !result.includes(currentName)) {
+        // Double check if it's not there under a different alias? 
+        // No, list should contain keys from state.students.
+        result.push(currentName);
+    }
+
+    return result;
+}
+
 
 // Check if a year is "Finished"
 const isYearFinished = (studentName, year) => {
@@ -2285,371 +3087,361 @@ const isYearFinished = (studentName, year) => {
     return hasYearEnd;
 };
 
+/**
+ * Correctly calculates cumulative statistics for a student up to a specific year and test point.
+ * This ensures consistency between Personal Stats and Class Statistics reports.
+ */
+function getStudentStats(studentName, targetYear, targetTest) {
+    // 1. Stats 1 (Snapshot of current year/test)
+    const subjects1 = getTargetSubjects(s => {
+        if (s.year === targetYear) return true;
+        if (s.year === 0) {
+            const scoreObj = (state.scores[studentName] || {})[s.name];
+            return scoreObj && scoreObj.obtainedYear === targetYear;
+        }
+        return false;
+    });
+
+
+    let s1Sum = 0, s1Count = 0;
+    subjects1.forEach(sub => {
+        if (sub.name.startsWith('特・')) return;
+        if (!isNumericSubject(sub.name)) return;
+
+        const sc = getScore(studentName, sub.name, targetTest);
+        if (typeof sc === 'number') { s1Sum += sc; s1Count++; }
+    });
+    const stats1 = { avg: s1Count > 0 ? (s1Sum / s1Count) : 0, sum: s1Sum, count: s1Count };
+
+    // 2. Stats 2 (Cumulative from Year 1 up to targetYear/targetTest)
+    const subjects2 = getTargetSubjects(s => {
+        // Fix: Explicitly include Arts subjects if they have any data, preventing exclusion due to missing 'year'
+        if (['音楽', '美術', '書道'].some(art => s.name.includes(art))) {
+            const scoreObj = (state.scores[studentName] || {})[s.name];
+            if (scoreObj && SCORE_KEYS.some(k => scoreObj[k])) return true;
+        }
+
+        if (s.year > 0 && s.year <= targetYear) return true;
+        if (s.year === 0) {
+            const scoreObj = (state.scores[studentName] || {})[s.name];
+            if (!scoreObj) return false;
+            // Support subjects obtained in specific year, or fallback to ANY year presence for stats2 (cumulative)
+            const oy = scoreObj.obtainedYear || 0;
+            if (oy > 0 && oy <= targetYear) return true;
+            // Fallback: If obtainedYear is missing, check if there's any score data recorded
+            const hasData = SCORE_KEYS.some(k => scoreObj[k] !== undefined && scoreObj[k] !== null && scoreObj[k] !== '');
+            if (hasData && oy === 0) return true; // Assume year 1 if data exists but year is missing? 
+            // Better: if year is 0 but it has data, for cumulative credits, we probably should count it.
+        }
+        return false;
+    });
+
+    let s2Sum = 0, s2Count = 0, s2WgtN = 0, s2WgtD = 0, s2GpN = 0, s2GpD = 0;
+    let s2CredGen = 0, s2CredSpec = 0;
+
+    subjects2.forEach(sub => {
+        const scoreObj = (state.scores[studentName] || {})[sub.name] || {};
+        const stYear = sub.year === 0 ? (scoreObj.obtainedYear || 0) : sub.year;
+        const isPastYear = stYear < targetYear;
+
+        // Average/GPA logic uses current test for current year, Final for past years
+        const testKey = isPastYear ? '学年末' : targetTest;
+        const val = getScore(studentName, sub.name, testKey);
+
+        const isNumeric = !sub.name.startsWith('特・') && isNumericSubject(sub.name);
+
+        if (typeof val === 'number' && isNumeric) {
+            s2Sum += val; s2Count++;
+            const cr = sub.credits || 0;
+            s2WgtN += val * cr; s2WgtD += cr;
+            let gp = 0;
+            if (val >= 90) gp = 4; else if (val >= 80) gp = 3; else if (val >= 70) gp = 2; else if (val >= 60) gp = 1;
+            s2GpN += gp * cr; s2GpD += cr;
+        }
+
+        // Credit Calculation Logic (Sync with renderStats)
+        let passed = false;
+        const finalVal = scoreObj['学年末'];
+
+        if (sub.name.includes('特別活動')) {
+            const hasFinalData = (finalVal !== undefined && finalVal !== null && finalVal !== '' && finalVal !== '-');
+            const hasAttended = SCORE_KEYS.some(k => scoreObj[k] === '履');
+            passed = hasFinalData || hasAttended;
+        } else {
+            // STRICT but aligned with Graduation Requirements:
+            // 1. Numeric check: Only check '学年末' (Final Exam) >= 60
+            // 2. String status check: Check ALL columns for passing status (allow early credit recognition)
+            const passingStatuses = ['合', '合格', '認', '認定', '修', '完了', '履', '履修', 'S', 'A', 'B', 'C'];
+
+            // 1. Numeric Check (Year End Only)
+            if (finalVal !== undefined && finalVal !== null && finalVal !== '') {
+                const n = parseFloat(finalVal);
+                if (!isNaN(n)) {
+                    if (n >= 60) passed = true;
+                }
+            }
+
+            // 2. String Status Check (Any Period - matches Graduation Requirements logic)
+            if (!passed) {
+                passed = SCORE_KEYS.some(k => {
+                    const val = scoreObj[k];
+                    return val !== undefined && val !== null && typeof val === 'string' && passingStatuses.includes(val.trim());
+                });
+            }
+
+            // Debug Arts
+            if (['音楽', '美術', '書道'].some(art => sub.name.includes(art))) {
+                console.log(`[Art Debug] ${sub.name}: year=${sub.year}, type2="${sub.type2}", passed=${passed}, credits=${sub.credits}, finalVal="${finalVal}"`);
+            }
+
+            // Auto-pass for other special subjects ONLY if they have some data (to match Hide Empty)
+            if (!passed && (sub.name.startsWith('特・') || sub.type2 === '特別学修')) {
+                const hasAnyYearEnd = (finalVal !== undefined && finalVal !== null && finalVal !== '');
+                if (hasAnyYearEnd) passed = true;
+            }
+        }
+
+        // Debug logging for credit calculation
+        if (studentName === state.currentStudent && targetYear === state.currentYear) {
+            console.log(`[Credit Check] ${sub.name}: type2="${sub.type2}", finalVal="${finalVal}", passed=${passed}, credits=${sub.credits}`);
+        }
+
+        if (passed) {
+            const t2 = (sub.type2 || "").trim();
+            const namesStartsContents = ['特・', '特･'];
+            const isSpecial = (t2 === '特別学修' || t2 === '特別学習' || namesStartsContents.some(prefix => sub.name.startsWith(prefix)));
+            const credits = parseFloat(sub.credits) || 0;
+            if (t2.includes('専門') || isSpecial) s2CredSpec += credits;
+            else s2CredGen += credits;
+        }
+    });
+
+    return {
+        stats1,
+        stats2: {
+            credits: s2CredGen + s2CredSpec,
+            credGen: s2CredGen,
+            credSpec: s2CredSpec,
+            avg_sim: s2Count > 0 ? (s2Sum / s2Count) : 0,
+            avg_wgt: s2WgtD > 0 ? (s2WgtN / s2WgtD) : 0,
+            gpa: s2GpD > 0 ? (s2GpN / s2GpD) : 0,
+            count: s2Count,
+            total_sum: s2Sum
+        }
+    };
+}
+
+/**
+ * Helper to check if a student has any recorded scores in a specific academic year.
+ */
+function hasDataForYear(studentName, year) {
+    const yearSubjects = state.subjects.filter(s => s.year === year && !s.exclude);
+    return yearSubjects.some(sub => {
+        for (const key of SCORE_KEYS) {
+            const v = getScore(studentName, sub.name, key);
+            if (v !== undefined && v !== null && v !== '') return true;
+        }
+        return false;
+    });
+}
+
+function getScore(studentName, subjectName, testKey) {
+    if (!studentName || !subjectName) return null;
+    const studentScores = state.scores[studentName] || {};
+    // Dot-agnostic lookup
+    let scoreObj = studentScores[subjectName];
+    if (!scoreObj) {
+        const altName = subjectName.includes('・') ? subjectName.replace('・', '･') : subjectName.replace('･', '・');
+        scoreObj = studentScores[altName] || {};
+    }
+    const val = scoreObj[testKey];
+    if (val === undefined || val === null || val === '') return null;
+    const num = parseFloat(val);
+    return isNaN(num) ? val : num;
+}
+
 function renderStats2() {
     const tbody = document.getElementById('stats2Body');
+    if (!tbody) return;
     tbody.innerHTML = '';
     const currentStudent = state.currentStudent;
+    if (!currentStudent) return;
 
-    const simpleAvgData = [];
-    const weightedAvgData = [];
-    const gpaData = [];
+    const totalStudents = state.students.length;
+    const testKeys = ["学年末", "後期中間", "前期末", "前期中間"];
+    const rowData = [];
 
-    const rankSimpleData = [];
-    const rankWeightedData = [];
-    const rankGpaData = [];
+    // Rule: Iterate 1 to 5. Determine if a row/plot exists for each.
+    for (let y = 1; y <= 5; y++) {
+        // Condition: Does this specific year y have ANY data for the student?
+        if (!hasDataForYear(currentStudent, y)) continue;
 
-    const labels = ["1年", "2年", "3年", "4年", "5年"];
-
-    // --- Helpers ---
-
-    // Helper: Filter subjects based on UI settings (Course, etc.)
-    // --- GPA Calculation Part ---
-
-
-    // 2. Get Stats for "Term A"
-    const getTermA = (studentName, year) => {
-        let sum = 0;
-        let count = 0;
-        let wSum = 0;
-        let creds = 0;
-        let gpWSum = 0;
-        let gpCreds = 0;
-
-        const subjects = getTargetSubjects(s => {
-            if (s.year === year) return true;
-            if (s.year === 0) {
-                const scoreObj = (state.scores[studentName] || {})[s.name];
-                return scoreObj && scoreObj.obtainedYear === year;
-            }
-            return false;
-        });
-
-        subjects.forEach(sub => {
-            // ... rest of function logic ...
-            const keys = ["学年末", "後期中間", "前期末", "前期中間"];
-            let subValSum = 0;
-            let subValCount = 0;
-
-            keys.forEach(k => {
-                const v = getScore(studentName, sub.name, k);
-                if (v !== undefined && v !== null && v !== '' && !isNaN(parseFloat(v))) {
-                    subValSum += parseFloat(v);
-                    subValCount++;
-                }
+        // Determine the latest test point for the "current" year snapshot
+        let targetTest = '学年末';
+        // For each year, we try to find the best representative data point.
+        // Priority: 学年末 -> 後期中間 -> 前期末 -> 前期中間
+        for (const tk of testKeys) {
+            const hasTestScores = state.subjects.filter(s => s.year === y).some(s => {
+                const sc = getScore(currentStudent, s.name, tk);
+                return sc !== undefined && sc !== null && sc !== '';
             });
-
-            if (subValCount > 0) {
-                const subAvg = subValSum / subValCount;
-                sum += subAvg;
-                count++;
-                const c = sub.credits || 0;
-                wSum += subAvg * c;
-                creds += c;
-                let gp = 0;
-                if (subAvg >= 90) gp = 4.0;
-                else if (subAvg >= 80) gp = 3.0;
-                else if (subAvg >= 70) gp = 2.0;
-                else if (subAvg >= 60) gp = 1.0;
-                else gp = 0.0;
-                gpWSum += gp * c;
-                gpCreds += c;
-            }
-        });
-
-        if (count === 0) return null;
-
-        return {
-            simple: sum / count,
-            weighted: creds > 0 ? (wSum / creds) : 0,
-            gpa: gpCreds > 0 ? (gpWSum / gpCreds) : 0
-        };
-    };
-
-    // 3. Get Stats for "Term B"
-    const getTermB = (studentName, limitYear) => {
-        let sum = 0;
-        let count = 0;
-        let wSum = 0;
-        let creds = 0;
-        let gpWSum = 0;
-        let gpCreds = 0;
-
-        const subjects = getTargetSubjects(s => {
-            if (s.year > 0 && s.year <= limitYear) return true;
-            if (s.year === 0) {
-                const scoreObj = (state.scores[studentName] || {})[s.name];
-                return scoreObj && scoreObj.obtainedYear > 0 && scoreObj.obtainedYear <= limitYear;
-            }
-            return false;
-        });
-
-        subjects.forEach(sub => {
-            // ... rest ...
-            const v = getScore(studentName, sub.name, '学年末');
-            if (v !== undefined && v !== null && v !== '' && !isNaN(parseFloat(v))) {
-                const val = parseFloat(v);
-                sum += val;
-                count++;
-                const c = sub.credits || 0;
-                wSum += val * c;
-                creds += c;
-                let gp = 0;
-                if (val >= 90) gp = 4.0;
-                else if (val >= 80) gp = 3.0;
-                else if (val >= 70) gp = 2.0;
-                else if (val >= 60) gp = 1.0;
-                else gp = 0.0;
-                gpWSum += gp * c;
-                gpCreds += c;
-            }
-        });
-
-        if (count === 0) return null;
-        return {
-            simple: sum / count,
-            weighted: creds > 0 ? (wSum / creds) : 0,
-            gpa: gpCreds > 0 ? (gpWSum / gpCreds) : 0
-        };
-    };
-
-    // Combined Stats Calculation
-    const getStudentFinalStats = (studentName, year) => {
-        const subjects = getTargetSubjects(s => {
-            if (s.year === year) return true;
-            if (s.year === 0) {
-                const scoreObj = (state.scores[studentName] || {})[s.name];
-                return scoreObj && scoreObj.obtainedYear === year;
-            }
-            return false;
-        });
-        // ... rest ...
-        let hasAnyData = false;
-        for (const sub of subjects) {
-            const keys = ["学年末", "後期中間", "前期末", "前期中間"];
-            for (const k of keys) {
-                const v = getScore(studentName, sub.name, k);
-                if (v !== undefined && v !== null && v !== '') { hasAnyData = true; break; }
-            }
-            if (hasAnyData) break;
-        }
-
-        if (!hasAnyData) return { hasData: false };
-
-        const finished = isYearFinished(studentName, year);
-
-        if (finished) {
-            const res = getTermB(studentName, year);
-            return { hasData: res !== null, ...res };
-        } else {
-            const termA = getTermA(studentName, year);
-            let termB = null;
-            if (year > 1) {
-                termB = getTermB(studentName, year - 1);
-            }
-
-            if (!termA) return { hasData: false };
-
-            if (!termB) {
-                return { hasData: true, ...termA };
-            } else {
-                return {
-                    hasData: true,
-                    simple: (termA.simple + termB.simple) / 2,
-                    weighted: (termA.weighted + termB.weighted) / 2,
-                    gpa: (termA.gpa + termB.gpa) / 2
-                };
+            if (hasTestScores) {
+                targetTest = tk;
+                break;
             }
         }
-    };
 
-
-    // --- Main Loop ---
-    for (let targetYear = 1; targetYear <= 5; targetYear++) {
-
-        // 1. Calculate for ALL students (for Ranking)
-        const allStats = state.students.map(s => {
-            const stats = getStudentFinalStats(s, targetYear);
-            return { name: s, ...stats };
+        const studentsStats = state.students.map(name => {
+            const stats = getStudentStats(name, y, targetTest);
+            return { name, ...stats.stats2 };
         });
 
-        // 2. Current Student
-        const myStats = allStats.find(s => s.name === currentStudent);
+        const getRank = (list, key, name) => {
+            const filtered = list.filter(s => s.count > 0);
+            const sorted = [...filtered].sort((a, b) => (b[key] || 0) - (a[key] || 0));
+            const idx = sorted.findIndex(s => s.name === name);
+            if (idx === -1) return null;
 
-        // 3. Ranks
-        let rSimple = null, rWeighted = null, rGpa = null;
-        if (myStats && myStats.hasData) {
-            // Simple
-            const vSimple = allStats.filter(s => s.hasData && s.simple !== undefined).sort((a, b) => b.simple - a.simple);
-            const iSimple = vSimple.findIndex(s => s.name === currentStudent);
-            if (iSimple !== -1) rSimple = iSimple + 1;
-
-            // Weighted
-            const vWeighted = allStats.filter(s => s.hasData && s.weighted !== undefined).sort((a, b) => b.weighted - a.weighted);
-            const iWeighted = vWeighted.findIndex(s => s.name === currentStudent);
-            if (iWeighted !== -1) rWeighted = iWeighted + 1;
-
-            // GPA
-            const vGpa = allStats.filter(s => s.hasData && s.gpa !== undefined).sort((a, b) => b.gpa - a.gpa);
-            const iGpa = vGpa.findIndex(s => s.name === currentStudent);
-            if (iGpa !== -1) rGpa = iGpa + 1;
-        }
-
-        // 4. Push Chart Data
-        // Policy 3: If no data, do not display (push null)
-        if (myStats && myStats.hasData) {
-            simpleAvgData.push(myStats.simple);
-            weightedAvgData.push(myStats.weighted);
-            gpaData.push(myStats.gpa);
-            rankSimpleData.push(rSimple);
-            rankWeightedData.push(rWeighted);
-            rankGpaData.push(rGpa);
-        } else {
-            simpleAvgData.push(null);
-            weightedAvgData.push(null);
-            gpaData.push(null);
-            rankSimpleData.push(null);
-            rankWeightedData.push(null);
-            rankGpaData.push(null);
-        }
-
-        // 5. Render Table (If data exists)
-        if (myStats && myStats.hasData) {
-            // Count helper (just for display)
-            // Show count of subjects involved in Term A (Current Year)
-            // Or Total Cumulative Subjects?
-            // "Subject Count" implies total subjects counted.
-            // If In Progress: Subjects in Term A + Subjects in Term B?
-            // Let's count subjects in Year <= targetYear that have any valid score used.
-            let subCount = 0;
-            const subjects = state.subjects.filter(s => s.year <= targetYear && !s.exclude);
-            subjects.forEach(sub => {
-                const k = ["学年末", "後期中間", "前期末", "前期中間"];
-                for (const key of k) {
-                    if (getScore(currentStudent, sub.name, key) !== null) { subCount++; break; }
+            // Tie-handling
+            let rank = 1;
+            for (let i = 0; i < sorted.length; i++) {
+                if (i > 0 && Math.abs((sorted[i][key] || 0) - (sorted[i - 1][key] || 0)) > 0.0001) {
+                    rank = i + 1;
                 }
-            });
+                if (sorted[i].name === name) return rank;
+            }
+            return idx + 1;
+        };
 
-            const totalStudents = state.students.length;
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td style="text-align:center;">${targetYear}年</td>
-                <td style="text-align:center;">${subCount}</td>
-                <td style="text-align:center;">${myStats.simple.toFixed(2)}</td>
-                <td style="text-align:center;">${rSimple ? rSimple + ' / ' + totalStudents : '-'}</td>
-                <td style="text-align:center;">${myStats.weighted.toFixed(2)}</td>
-                <td style="text-align:center;">${rWeighted ? rWeighted + ' / ' + totalStudents : '-'}</td>
-                <td style="text-align:center; font-weight:bold; color:#2563eb;">${myStats.gpa.toFixed(2)}</td>
-                <td style="text-align:center;">${rGpa ? rGpa + ' / ' + totalStudents : '-'}</td>
-            `;
-            tbody.appendChild(tr);
+        const myStats = studentsStats.find(s => s.name === currentStudent);
+        if (myStats) {
+            rowData.push({
+                year: y,
+                count: myStats.count,
+                avg_sim: myStats.avg_sim,
+                avg_wgt: myStats.avg_wgt,
+                gpa: myStats.gpa,
+                rank_sim: getRank(studentsStats, 'avg_sim', currentStudent),
+                rank_wgt: getRank(studentsStats, 'avg_wgt', currentStudent),
+                rank_gpa: getRank(studentsStats, 'gpa', currentStudent)
+            });
         }
     }
 
-    // --- Helper to create a dual-axis chart for Stats2 ---
-    const createStats2Chart = (canvasId, label, valueData, rankData, instanceVar, valueMax, valueTitle) => {
-        const ctx = document.getElementById(canvasId)?.getContext('2d');
-        if (!ctx) return null;
+    // 2. Render Table
+    rowData.forEach(row => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td style="text-align:center;">${row.year}年</td>
+            <td style="text-align:center;">${row.count}</td>
+            <td style="text-align:center;">${row.avg_sim.toFixed(2)}</td>
+            <td style="text-align:center;">${row.rank_sim ? row.rank_sim + ' / ' + totalStudents : '-'}</td>
+            <td style="text-align:center;">${row.avg_wgt.toFixed(2)}</td>
+            <td style="text-align:center;">${row.rank_wgt ? row.rank_wgt + ' / ' + totalStudents : '-'}</td>
+            <td style="text-align:center; font-weight:bold; color:#2563eb;">${row.gpa.toFixed(2)}</td>
+            <td style="text-align:center;">${row.rank_gpa ? row.rank_gpa + ' / ' + totalStudents : '-'}</td>
+        `;
+        tbody.appendChild(tr);
+    });
 
-        // Destroy old instance if it exists
-        if (instanceVar && typeof instanceVar.destroy === 'function') {
-            instanceVar.destroy();
+    // 3. Update Charts
+    updateStats2Charts(rowData);
+}
+
+function updateStats2Charts(activeData) {
+    const labels = ["1年", "2年", "3年", "4年", "5年"];
+    const simpleAvgData = [null, null, null, null, null];
+    const weightedAvgData = [null, null, null, null, null];
+    const gpaData = [null, null, null, null, null];
+    const rankSimData = [null, null, null, null, null];
+    const rankWgtData = [null, null, null, null, null];
+    const rankGpaData = [null, null, null, null, null];
+
+    activeData.forEach(r => {
+        const idx = r.year - 1;
+        if (idx >= 0 && idx < 5) {
+            simpleAvgData[idx] = r.avg_sim;
+            weightedAvgData[idx] = r.avg_wgt;
+            gpaData[idx] = r.gpa;
+            rankSimData[idx] = r.rank_sim;
+            rankWgtData[idx] = r.rank_wgt;
+            rankGpaData[idx] = r.rank_gpa;
         }
+    });
 
-        return new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: labels,
-                datasets: [
-                    {
-                        label: label,
-                        data: valueData,
-                        borderColor: '#2563eb', // Blue
-                        backgroundColor: '#2563eb',
-                        yAxisID: 'y',
-                        tension: 0.1,
-                        borderWidth: 3,
-                        pointRadius: 5
-                    },
-                    {
-                        label: '順位',
-                        data: rankData,
-                        borderColor: '#ef4444', // Red
-                        backgroundColor: '#ef4444',
-                        yAxisID: 'y1',
-                        tension: 0.1,
-                        borderWidth: 2,
-                        borderDash: [5, 5],
-                        pointRadius: 4,
-                        pointStyle: 'rectRot'
-                    }
-                ]
-            },
-            plugins: [{
-                id: 'plotAreaBorder',
-                beforeDraw(chart) {
-                    const { ctx, chartArea: { top, bottom, left, right } } = chart;
-                    ctx.save();
-                    ctx.strokeStyle = '#000000'; // Black border
-                    ctx.lineWidth = 1.5;
-                    ctx.strokeRect(left, top, right - left, bottom - top);
-                    ctx.restore();
-                }
-            }],
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                layout: { padding: { top: 30, bottom: 10 } },
-                interaction: { mode: 'index', intersect: false },
-                plugins: {
-                    title: { display: true, text: label + ' 推移', font: { weight: 'bold', size: 16 } },
-                    legend: { display: true, position: 'top' },
-                    tooltip: {
-                        callbacks: {
-                            label: function (context) {
-                                if (context.datasetIndex === 1) {
-                                    return `順位: ${context.parsed.y}位 / ${state.students.length}人`;
-                                }
-                                return `${label}: ${context.parsed.y.toFixed(2)}`;
-                            }
-                        }
-                    }
+    const maxRank = Math.max(state.students.length, 1);
+
+    stats2SimpleChartInstance = createStats2Chart('stats2SimpleChart', '平均点 (単純)', labels, simpleAvgData, rankSimData, stats2SimpleChartInstance, 100, '点数', maxRank);
+    stats2WeightedChartInstance = createStats2Chart('stats2WeightedChart', '平均点 (加重)', labels, weightedAvgData, rankWgtData, stats2WeightedChartInstance, 100, '点数', maxRank);
+    stats2GpaChartInstance = createStats2Chart('stats2GpaChart', 'GPA', labels, gpaData, rankGpaData, stats2GpaChartInstance, 4.0, 'GPA', maxRank);
+}
+
+function createStats2Chart(canvasId, label, labels, valueData, rankData, instanceVar, valueMax, valueTitle, maxRank) {
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    if (instanceVar) instanceVar.destroy();
+
+    return new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: label,
+                    data: valueData,
+                    borderColor: '#2563eb',
+                    backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                    yAxisID: 'y',
+                    tension: 0.1,
+                    fill: true
                 },
-                scales: {
-                    x: {
-                        grid: { display: true, color: 'rgba(0,0,0,0.1)' },
-                        border: { display: true, color: '#000', width: 1.5 },
-                        ticks: { color: '#000' }
-                    },
-                    y: {
-                        type: 'linear',
-                        position: 'left',
-                        min: 0,
-                        max: valueMax,
-                        title: { display: true, text: valueTitle, font: { weight: 'bold' } },
-                        grid: { color: 'rgba(0,0,0,0.1)' },
-                        border: { display: true, color: '#000', width: 1.5 },
-                        ticks: { color: '#000' }
-                    },
-                    y1: {
-                        type: 'linear',
-                        position: 'right',
-                        reverse: true,
-                        min: 1,
-                        max: Math.max(state.students.length, 1),
-                        title: { display: true, text: '順位', font: { weight: 'bold' } },
-                        grid: { drawOnChartArea: false },
-                        border: { display: true, color: '#000', width: 1.5 },
-                        ticks: { color: '#000', stepSize: 1, callback: (v) => Math.floor(v) === v ? v : '' }
-                    }
+                {
+                    label: '順位',
+                    data: rankData,
+                    borderColor: '#94a3b8',
+                    borderDash: [5, 5],
+                    yAxisID: 'y1',
+                    tension: 0,
+                    pointStyle: 'circle',
+                    pointRadius: 4
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: {
+                    grid: { display: true, color: 'rgba(0,0,0,0.1)' },
+                    border: { display: true, color: '#000', width: 1.5 },
+                    ticks: { color: '#000' }
+                },
+                y: {
+                    type: 'linear',
+                    position: 'left',
+                    min: 0,
+                    max: valueMax,
+                    title: { display: true, text: valueTitle },
+                    grid: { color: 'rgba(0,0,0,0.1)' },
+                    border: { display: true, color: '#000', width: 1.5 },
+                    ticks: { color: '#000' }
+                },
+                y1: {
+                    type: 'linear',
+                    position: 'right',
+                    reverse: true,
+                    min: 1,
+                    max: Math.max(state.students.length, 1),
+                    title: { display: true, text: '順位', font: { weight: 'bold' } },
+                    grid: { drawOnChartArea: false },
+                    border: { display: true, color: '#000', width: 1.5 },
+                    ticks: { color: '#000', stepSize: 1, callback: (v) => Math.floor(v) === v ? v : '' }
                 }
             }
-        });
-    };
+        }
+    });
+};
 
-    stats2SimpleChartInstance = createStats2Chart('stats2SimpleChart', '平均点 (単純)', simpleAvgData, rankSimpleData, stats2SimpleChartInstance, 100, '点数');
-    stats2WeightedChartInstance = createStats2Chart('stats2WeightedChart', '平均点 (加重)', weightedAvgData, rankWeightedData, stats2WeightedChartInstance, 100, '点数');
-    stats2GpaChartInstance = createStats2Chart('stats2GpaChart', 'GPA', gpaData, rankGpaData, stats2GpaChartInstance, 4.0, 'GPA');
-}
+
 
 // Event listener for toggle
 
@@ -2681,26 +3473,41 @@ function renderGradesTable() {
         if (s.year === state.currentYear) return true;
 
         // B. Floater / Special Subjects (Year = 0)
-        if (s.year === 0) {
-            const scoreObj = (state.scores[state.currentStudent] || {})[s.name];
+        if (parseInt(s.year) === 0) {
+            const studentScores = state.scores[state.currentStudent] || {};
+            // Dot-agnostic lookup for filter
+            let scoreObj = studentScores[s.name];
+            if (!scoreObj) {
+                const alt = s.name.includes('・') ? s.name.replace('・', '･') : s.name.replace('･', '・');
+                scoreObj = studentScores[alt];
+            }
+
+            const oy = scoreObj ? parseInt(scoreObj.obtainedYear) : 0;
 
             // SPECIAL FIX: For "Special Activities 1-3", they correspond roughly to Year 1-3.
-            // If they are strictly named "特・特別活動N", map them to Year N.
-            const match = s.name.match(/特・特別活動(\d+)/);
+            const match = s.name.match(/特[・･]特別活動(\d+)/);
             if (match) {
                 const targetYear = parseInt(match[1]);
-                if (targetYear === state.currentYear) return true;
-                return false;
+                return targetYear == state.currentYear;
             }
 
             // Other Special Subjects:
-            // If obtainedYear is recorded, Strict Check
-            if (scoreObj && scoreObj.obtainedYear) {
-                if (scoreObj.obtainedYear === state.currentYear) return true;
-                return false; // Belongs to another year
+            if (oy > 0) {
+                return oy == state.currentYear;
             }
 
-            // If NO obtainedYear, default to SHOW (for new inputs)
+            // Check if it already has ANY score data
+            const hasData = scoreObj && SCORE_KEYS.some(k => {
+                const val = scoreObj[k];
+                return val !== undefined && val !== null && val !== '' && val !== '-';
+            });
+
+            if (hasData) {
+                // Anchor to Year 1 if data exists but no obtainedYear
+                return state.currentYear == 1;
+            }
+
+            // If NO data, show everywhere so the user can start entry
             return true;
         }
 
@@ -2730,7 +3537,7 @@ function renderGradesTable() {
                 if (hasSummaryBaseData) {
                     // Show ONLY if Summary Base Data exists (Year End of normal subjects is done)
                 } else {
-                    return; // Hide if Summary logic not met (even if it has data?) 
+                    return; // Hide if Summary logic not met (even if it has data?)
                     // User said: "学年末が終わっていない学年すなわち、成績集計 (Summary)の学年末が空欄の学年も表示されます" -> implies they want it HIDDEN if year not done.
                 }
             } else {
@@ -2756,9 +3563,12 @@ function renderGradesTable() {
         let targetTbody = tbody;
         let isSpecialRow = false;
 
-        if (sub.name.startsWith('特・')) {
+        const isSpecialStart = sub.name.startsWith('特・') || sub.name.startsWith('特･');
+        const isSpecialActMatch = sub.name.match(/特[・･]特別活動(\d+)/);
+
+        if (isSpecialStart) {
             // "特・特別活動1/2/3" are explicitly requested to be in Others table
-            if (sub.name === '特・特別活動1' || sub.name === '特・特別活動2' || sub.name === '特・特別活動3') {
+            if (isSpecialActMatch) {
                 targetTbody = otherTbody;
             } else {
                 targetTbody = specialTbody;
@@ -2782,7 +3592,12 @@ function renderGradesTable() {
             else if (sub.type1 === '選必') typeBadgeClass = 'badge-success';
 
             // Get actual value from data (prefer '学年末' - Final, or any existing)
-            const scoreObj = studentScores[sub.name] || {};
+            let scoreObj = studentScores[sub.name];
+            if (!scoreObj) {
+                const alt = sub.name.includes('・') ? sub.name.replace('・', '･') : sub.name.replace('･', '・');
+                scoreObj = studentScores[alt];
+            }
+            scoreObj = scoreObj || {};
             let currentVal = scoreObj['学年末'] || '';
 
             // If Year End is empty, look for ANY other value (e.g. Early Mid, Late Mid, etc.)
@@ -2956,7 +3771,10 @@ function renderGradesTable() {
 // Helper to identify subjects that are numeric (0-100 scores)
 function isNumericSubject(name) {
     if (!name) return false;
-    // Exclude experiments, practical training, graduation research, and disaster literacy
+    // Exclude special activities and floater subjects that are non-numeric
+    if (name.includes('特別活動')) return false;
+    if (name.startsWith('特・') || name.startsWith('特･')) return false;
+    // Exclude experiments, practical training, graduation research
     return !name.match(/(実験|実習|卒業研究|防災リテラシー)/);
 }
 
@@ -3019,10 +3837,13 @@ function syncSpecialActivitiesForAll() {
             });
 
             if (hasYearEndData) {
-                const spActName = `特・特別活動${year}`;
-                if (state.subjects.some(s => s.name === spActName)) {
-                    if (!studentScores[spActName]) studentScores[spActName] = {};
-                    studentScores[spActName]['学年末'] = '履';
+                const spActName1 = `特・特別活動${year}`;
+                const spActName2 = `特･特別活動${year}`;
+                const spAct = state.subjects.find(s => s.name === spActName1 || s.name === spActName2);
+                if (spAct) {
+                    const actualName = spAct.name;
+                    if (!studentScores[actualName]) studentScores[actualName] = {};
+                    studentScores[actualName]['学年末'] = '履';
                 }
             }
         });
@@ -3032,7 +3853,18 @@ function syncSpecialActivitiesForAll() {
 
 function updateScore(student, subject, key, value) {
     if (!state.scores[student]) state.scores[student] = {};
-    if (!state.scores[student][subject]) state.scores[student][subject] = {};
+    // Dot-agnostic subject lookup to prevent duplicates
+    let scoreObj = state.scores[student][subject];
+    if (!scoreObj) {
+        const alt = subject.includes('・') ? subject.replace('・', '･') : subject.replace('･', '・');
+        if (state.scores[student][alt]) {
+            scoreObj = state.scores[student][alt];
+            subject = alt; // Redirect to existing key
+        } else {
+            state.scores[student][subject] = {};
+            scoreObj = state.scores[student][subject];
+        }
+    }
 
     // For year-0 subjects (Floaters), pin them to the year they were first entered
     const courseFilter = state.currentCourse;
@@ -3043,9 +3875,9 @@ function updateScore(student, subject, key, value) {
         return true;
     }) || state.subjects.find(s => s.name === subject);
 
-    if (subDef && subDef.year === 0) {
-        if (!state.scores[student][subject].obtainedYear) {
-            state.scores[student][subject].obtainedYear = state.currentYear;
+    if (subDef && parseInt(subDef.year) === 0) {
+        if (!scoreObj.obtainedYear) {
+            scoreObj.obtainedYear = state.currentYear;
         }
     }
 
@@ -3244,22 +4076,16 @@ function renderStats() {
         // Apply filters: Course Filter & Hide Empty
         const courseFilter = state.currentCourse;
 
-        const subjects = state.subjects.filter(s => {
-            // 1. Year Match (Standard or Floater)
-            let yearMatches = (s.year === year);
+        const subjects = getTargetSubjects(s => {
+            // Year Match (Standard or Floater)
+            if (s.year === year) return true;
             if (s.year === 0) {
                 const scoreObj = (state.scores[state.currentStudent] || {})[s.name];
-                yearMatches = (scoreObj && scoreObj.obtainedYear === year);
+                return scoreObj && scoreObj.obtainedYear === year;
             }
-            if (!yearMatches) return false;
-
-            // 2. Course Filter
-            if (courseFilter) {
-                const t4 = s.type4 || 'コース共通';
-                if (t4 !== 'コース共通' && t4 !== courseFilter) return false;
-            }
-
-            // 3. Hide Empty (No Credit / No Score)
+            return false;
+        }).filter(s => {
+            // Hide Empty (No Credit / No Score)
             if (state.hideEmptySubjects) {
                 const scoreObj = state.scores[state.currentStudent] && state.scores[state.currentStudent][s.name];
                 if (!scoreObj) return false;
@@ -3270,7 +4096,6 @@ function renderStats() {
                 });
                 if (!hasValue) return false;
             }
-
             return true;
         });
 
@@ -3282,100 +4107,40 @@ function renderStats() {
         // 1. Year
         tr.innerHTML = `<td style="font-weight:bold; position:sticky; left:0; background:white; z-index:1; border-right:1px solid #e2e8f0;">${year}年</td>`;
 
+        // All scores, ranks, and credits are now driven by the centralized getStudentStats
+        const sStats = getStudentStats(state.currentStudent, year, '学年末');
+
         // 2-9. Scores & Ranks for 4 tests
         SCORE_KEYS.forEach(key => {
-            let studentTotal = 0;
-            let count = 0;
-            subjects.forEach(sub => {
-                if (sub.name.startsWith('特・')) return;
-                // Exclude non-numeric subjects from Average/Rank calc
-                if (!isNumericSubject(sub.name)) return;
-
-                const s = getScore(state.currentStudent, sub.name, key);
-                if (typeof s === 'number') {
-                    studentTotal += s;
-                    count++;
-                }
-            });
-
-            const avg = count > 0 ? (studentTotal / count).toFixed(1) : "";
-            const rank = count > 0 ? calculateRank(year, key, state.currentStudent) : "";
+            const periodStats = getStudentStats(state.currentStudent, year, key);
+            const avg = periodStats.stats1.count > 0 ? periodStats.stats1.avg.toFixed(1) : "";
+            const rank = calculateRank(year, key, state.currentStudent);
 
             const avgClass = (avg !== "" && parseFloat(avg) < 60) ? 'color:red;' : '';
-
-            // Create cells without click functionality
             const avgTd = document.createElement('td');
-            avgTd.style.textAlign = 'center';
-            avgTd.style.borderLeft = '1px solid #e2e8f0';
-            avgTd.style.cssText += avgClass;
+            avgTd.style.textAlign = 'center'; avgTd.style.borderLeft = '1px solid #e2e8f0'; avgTd.style.cssText += avgClass;
             avgTd.textContent = avg;
 
             const rankTd = document.createElement('td');
-            rankTd.style.textAlign = 'center';
-            rankTd.textContent = rank;
-
+            rankTd.style.textAlign = 'center'; rankTd.textContent = rank;
             tr.appendChild(avgTd);
             tr.appendChild(rankTd);
         });
 
         // 10-12. Cumulative Credits
-        // Calculate credits for THIS year first
-        let currentYearGeneral = 0;
-        let currentYearSpecial = 0;
-
-        subjects.forEach(sub => {
-            const scoreObj = (state.scores[state.currentStudent] || {})[sub.name];
-            if (!scoreObj) return;
-
-            let passed = false;
-            if (sub.name.includes('特別活動')) {
-                const finalVal = scoreObj['学年末'];
-                const hasFinalData = (finalVal !== undefined && finalVal !== null && finalVal !== '' && finalVal !== '-');
-                const hasAttended = SCORE_KEYS.some(k => scoreObj[k] === '履');
-                passed = hasFinalData || hasAttended;
-            } else {
-                const f = scoreObj['学年末'];
-                const n = parseFloat(f);
-                if (!isNaN(n) && n >= 60) {
-                    passed = true;
-                } else {
-                    const passingStatuses = ['合', '合格', '認', '認定', 'A', 'B', 'C', '履', '修'];
-                    passed = SCORE_KEYS.some(k => {
-                        const val = scoreObj[k];
-                        return val !== undefined && val !== null && typeof val === 'string' && passingStatuses.includes(val.trim());
-                    });
-                }
-
-                // Keep the existence-based pass for other "特・" subjects for compatibility
-                if (!passed && sub.name.startsWith('特・')) {
-                    passed = true;
-                }
-            }
-
-            if (passed) {
-                if (sub.type2 === '専門') currentYearSpecial += sub.credits;
-                else currentYearGeneral += sub.credits;
-            }
-        });
-
-        cumGeneral += currentYearGeneral;
-        cumSpecial += currentYearSpecial;
-        cumTotal = cumGeneral + cumSpecial;
-
-        tr.innerHTML += `<td style="text-align:center; border-left:1px solid #e2e8f0;">${cumGeneral}</td>`;
-        tr.innerHTML += `<td style="text-align:center;">${cumSpecial}</td>`;
-        tr.innerHTML += `<td style="text-align:center; font-weight:bold;">${cumTotal}</td>`;
+        tr.innerHTML += `<td style="text-align:center; border-left:1px solid #e2e8f0;">${sStats.stats2.credGen}</td>`;
+        tr.innerHTML += `<td style="text-align:center;">${sStats.stats2.credSpec}</td>`;
+        tr.innerHTML += `<td style="text-align:center; font-weight:bold;">${sStats.stats2.credits}</td>`;
 
         // 13-14. Promotion
         const required = promotionUnits[year] || 0;
-        const shortfall = cumTotal - required;
+        const shortfall = sStats.stats2.credits - required;
         const shortFallClass = shortfall < 0 ? 'color:red; font-weight:bold;' : '';
 
         tr.innerHTML += `<td style="text-align:center; border-left:1px solid #e2e8f0;">${required}</td>`;
         tr.innerHTML += `<td style="text-align:center; ${shortFallClass}">${shortfall}</td>`;
 
-        // 15. Overall Rank (based on Total Score of Final Exam for current year)
-        // Python: cum_total_scores = sum(学年末) for current year
+        // 15. Overall Rank (Yearly Total Score)
         const overallRank = calculateOverallRank(year, state.currentStudent);
         tr.innerHTML += `<td style="text-align:center; border-left:1px solid #e2e8f0;">${overallRank}</td>`;
 
@@ -3387,65 +4152,85 @@ function renderStats() {
 }
 
 function calculateOverallRank(year, targetStudent) {
-    // Only numeric, normal subjects count for Overall Rank
-    const subjects = state.subjects.filter(s => s.year === year && isNumericSubject(s.name) && !s.name.startsWith('特・'));
-    if (subjects.length === 0) return "";
+    const course = state.currentCourse;
+
+    // Fix: Use cohort year for classmate lookup
+    let cohortYear = year;
+    const m = getStudentMetadataSafe(targetStudent);
+    if (m) {
+        cohortYear = parseInt(m['年'] || m['year'] || year);
+    } else if (targetStudent === state.currentStudent) {
+        cohortYear = state.currentYear;
+    }
+
+    const classStudents = getClassStudents(cohortYear, course);
 
     const sums = [];
-    state.students.forEach(s => {
-        let total = 0;
-        let count = 0;
-        subjects.forEach(sub => {
-            const sc = getScore(s, sub.name, '学年末');
-            if (typeof sc === 'number') {
-                total += sc;
-                count++;
-            }
-        });
-        if (count > 0) {
-            sums.push({ name: s, total });
+    classStudents.forEach(s => {
+        const sStats = getStudentStats(s, year, '学年末');
+        if (sStats.stats1.count > 0) {
+            sums.push({ name: s, total: sStats.stats1.sum });
         }
     });
 
     sums.sort((a, b) => b.total - a.total);
-    const idx = sums.findIndex(x => x.name === targetStudent);
-    return idx !== -1 ? `${idx + 1} / ${sums.length}` : "";
-}
 
-function getScore(student, subject, key) {
-    if (state.scores[student] && state.scores[student][subject]) {
-        return state.scores[student][subject][key];
+    // Tie-handling
+    let rank = 1;
+    for (let i = 0; i < sums.length; i++) {
+        if (i > 0 && Math.abs(sums[i].total - sums[i - 1].total) > 0.0001) {
+            rank = i + 1;
+        }
+        if (sums[i].name === targetStudent) return `${rank} / ${sums.length}`;
     }
-    return null;
+    return "";
 }
 
 function calculateRank(year, key, targetStudent) {
-    // Only normal subjects
-    const subs = state.subjects.filter(sub => sub.year === year && !sub.name.startsWith('特・'));
+    const course = state.currentCourse;
 
-    // Calc avg for each student
+    // Fix: Use the student's CURRENT enrollment year (cohort) to find classmates, 
+    // instead of the historical data year 'year'.
+    // e.g. When calculating rank for 1st year grades of a current 2nd year student, 
+    // we want to compare with other current 2nd year students.
+    let cohortYear = year;
+    const m = getStudentMetadataSafe(targetStudent);
+    if (m) {
+        cohortYear = parseInt(m['年'] || m['year'] || year);
+    } else if (targetStudent === state.currentStudent) {
+        cohortYear = state.currentYear;
+    }
+
+    const classStudents = getClassStudents(cohortYear, course);
+
     const avgs = [];
-    state.students.forEach(s => {
-        let total = 0;
-        let count = 0;
-        subs.forEach(sub => {
-            const val = getScore(s, sub.name, key);
-            if (typeof val === 'number') {
-                total += val;
-                count++;
-            }
-        });
-        if (count > 0) avgs.push({ name: s, val: total / count });
+    classStudents.forEach(s => {
+        const sStats = getStudentStats(s, year, key);
+        if (sStats.stats1.count > 0) {
+            avgs.push({ name: s, val: sStats.stats1.avg });
+        }
     });
 
     avgs.sort((a, b) => b.val - a.val);
-    const idx = avgs.findIndex(x => x.name === targetStudent);
-    if (idx !== -1) return idx + 1;
+
+
+    // Tie-handling
+    let rank = 1;
+    for (let i = 0; i < avgs.length; i++) {
+        if (i > 0 && Math.abs(avgs[i].val - avgs[i - 1].val) > 0.0001) {
+            rank = i + 1;
+        }
+        if (avgs[i].name === targetStudent) {
+            const result = `${rank} / ${avgs.length}`;
+            return result;
+        }
+    }
+
     return "";
 }
 
 function calculateCredits(student, year) {
-    // Keep definition as it might be used elsewhere or remove if unused, 
+    // Keep definition as it might be used elsewhere or remove if unused,
     // but better to keep for safety if referenced by old code.
     // Logic is now duplicated inside renderStats for loop.
     return {};
@@ -3602,7 +4387,8 @@ function renderBoxPlot() {
             plugins: [{
                 id: 'plotAreaBorder',
                 beforeDraw(chart) {
-                    const { ctx, chartArea: { top, bottom, left, right } } = chart;
+                    const { ctx, chartArea: { top, bottom, left, right } = {} } = chart;
+                    if (top === undefined) return; // Ensure chartArea is defined
                     ctx.save();
                     ctx.strokeStyle = '#000000'; // Black border
                     ctx.lineWidth = 1.5;
@@ -3679,7 +4465,8 @@ function renderBoxPlot() {
             plugins: [{
                 id: 'plotAreaBorder',
                 beforeDraw(chart) {
-                    const { ctx, chartArea: { top, bottom, left, right } } = chart;
+                    const { ctx, chartArea: { top, bottom, left, right } = {} } = chart;
+                    if (top === undefined) return; // Ensure chartArea is defined
                     ctx.save();
                     ctx.strokeStyle = '#64748b';
                     ctx.lineWidth = 1;
@@ -3899,7 +4686,8 @@ function renderTrendChart() {
         plugins: [{
             id: 'plotAreaBorder',
             beforeDraw(chart) {
-                const { ctx, chartArea: { top, bottom, left, right } } = chart;
+                const { ctx, chartArea: { top, bottom, left, right } = {} } = chart;
+                if (top === undefined) return; // Ensure chartArea is defined
                 ctx.save();
                 ctx.strokeStyle = '#000000'; // Clear black border
                 ctx.lineWidth = 1.5;
@@ -3973,180 +4761,217 @@ function renderTrendChart() {
 // ==================== CLASS STATS ====================
 
 function initClassStats() {
-    // Initial render or clear?
-    // User needs to click 'Generate' to see stats usually, or we can auto-generate.
-    // Let's auto-generate using default '学年末' if container is empty.
-    const container = document.getElementById('classStatsContainer');
-    if (container && container.innerHTML.trim() === '') {
-        document.getElementById('classStatsTest').value = '学年末'; // Default
-        generateClassStats();
+    const yearEl = document.getElementById('classStatsYear');
+    const testEl = document.getElementById('classStatsTest');
+    if (!yearEl || !testEl) return;
+
+    // 1. Sync Year
+    if (!yearEl.value || yearEl.value == "1") {
+        yearEl.value = state.currentYear || "1";
     }
+
+    // 2. Determine best default test based on ANY student's data in that year
+    const targetYear = parseInt(yearEl.value);
+    const priorities = ["前期中間", "前期末", "後期中間", "学年末"];
+    let maxFoundIdx = -1;
+
+    // Fast check for default
+    outerLoop:
+    for (const s of state.students) {
+        for (let idx = priorities.length - 1; idx >= 0; idx--) {
+            if (idx <= maxFoundIdx) break; // No point checking lower priorities
+            const testKey = priorities[idx];
+            // Check if student has at least one numeric score in this test/year
+            const hasData = state.subjects.filter(sub => sub.year === targetYear && !sub.exclude).some(sub => {
+                const v = getScore(s, sub.name, testKey);
+                return typeof v === 'number';
+            });
+            if (hasData) {
+                maxFoundIdx = idx;
+                if (maxFoundIdx === 3) break outerLoop;
+            }
+        }
+    }
+    if (maxFoundIdx !== -1) {
+        testEl.value = priorities[maxFoundIdx];
+    }
+
+    generateClassStats();
+}
+
+function sortClassStats(col) {
+    if (state.classStatsSortCol === col) {
+        state.classStatsSortOrder = state.classStatsSortOrder === 'asc' ? 'desc' : 'asc';
+    } else {
+        state.classStatsSortCol = col;
+        state.classStatsSortOrder = (col === 'name') ? 'asc' : 'desc'; // Default Desc for numeric
+    }
+    generateClassStats();
 }
 
 function generateClassStats() {
-    const testKey = document.getElementById('classStatsTest').value;
+    const yearEl = document.getElementById('classStatsYear');
+    const testEl = document.getElementById('classStatsTest');
+    const targetYear = yearEl ? parseInt(yearEl.value) : state.currentYear;
+    const testKey = testEl ? testEl.value : '学年末';
+
     const container = document.getElementById('classStatsContainer');
     if (!container) return;
 
-    container.innerHTML = '<p>集計中 (Calculating)...</p>';
+    container.innerHTML = '<div style="padding: 2rem; text-align: center; color: #64748b;">集計中...</div>';
 
-    // Filter Subjects based on User Settings
-    // 1. Course Filter
-    // 2. Hide Empty (personal relevance)
-    const courseFilter = state.currentCourse;
-    const hideEmpty = state.hideEmptySubjects; // "単位認定のない科目を隠す"
+    setTimeout(() => {
+        const studentData = calculateClassStatsList(targetYear, testKey);
 
-    // Group subjects by Year? Or just flat list?
-    // Class Stats usually implies "All Class Subjects".
-    // Let's list by Year then Subject.
-
-    // Filter
-    const targetSubjects = state.subjects.filter(s => {
-        if (s.exclude) return false;
-
-        // Course Filter
-        if (courseFilter) {
-            const t4 = s.type4 || 'コース共通';
-            if (t4 !== 'コース共通' && t4 !== courseFilter) return false;
-        }
-
-        // Hide Empty: Check if CURRENT STUDENT has data
-        // This makes the report "My Relevant Class Stats"
-        if (hideEmpty) {
-            const scoreObj = state.scores[state.currentStudent] && state.scores[state.currentStudent][s.name];
-            if (!scoreObj) return false;
-            const keys = ["前期中間", "前期末", "後期中間", "学年末"];
-            const hasValue = keys.some(k => {
-                const v = scoreObj[k];
-                return v !== undefined && v !== null && v !== '';
-            });
-            if (!hasValue) return false;
-        }
-
-        return true;
-    });
-
-    if (targetSubjects.length === 0) {
-        container.innerHTML = '<p>表示する科目がありません (No subjects match filter).</p>';
-        return;
-    }
-
-    // Sort by Year, then Name
-    targetSubjects.sort((a, b) => {
-        if (a.year !== b.year) return a.year - b.year;
-        return a.name.localeCompare(b.name, 'ja');
-    });
-
-    // Generate Table Data
-    let html = `
-        <table class="report-table" style="font-size: 0.9rem; width: 100%;">
-            <thead>
-                <tr>
-                    <th style="width: 50px;">学年</th>
-                    <th>科目名 (Subject)</th>
-                    <th style="width: 60px;">単位</th>
-                    <th style="width: 80px;">コース</th>
-                    <th style="width: 60px;">平均</th>
-                    <th style="width: 60px;">最高</th>
-                    <th style="width: 60px;">最低</th>
-                    <th style="width: 80px;">受験者数</th>
-                    <th style="width: 60px;">自分の点</th>
-                    <th style="width: 60px;">偏差値</th>
-                </tr>
-            </thead>
-            <tbody>
-    `;
-
-    targetSubjects.forEach(sub => {
-        // Calculate Class Stats
-        let total = 0;
-        let count = 0;
-        let min = 100;
-        let max = 0;
-        const scores = [];
-
-        state.students.forEach(std => {
-            const val = getScore(std, sub.name, testKey);
-            if (typeof val === 'number') {
-                scores.push(val);
-                total += val;
-                count++;
-                if (val < min) min = val;
-                if (val > max) max = val;
-            }
-        });
-
-        if (count === 0) {
-            // No data for this subject in the class
-            // Skip or show empty? Show empty to indicate it exists.
-            // Wait, if hideEmpty is checked, we might have skipped it if *I* didn't take it.
-            // If I took it but nobody has scores yet (e.g. future test), show dash.
-            html += `
-                <tr>
-                    <td style="text-align: center;">${sub.year}</td>
-                    <td>${sub.name}</td>
-                    <td style="text-align: center;">${sub.credits}</td>
-                    <td style="text-align: center;"><span class="badge badge-purple">${sub.type4 || '-'}</span></td>
-                    <td style="text-align: center;">-</td>
-                    <td style="text-align: center;">-</td>
-                    <td style="text-align: center;">-</td>
-                    <td style="text-align: center;">0</td>
-                    <td style="text-align: center;">-</td>
-                    <td style="text-align: center;">-</td>
-                </tr>
-            `;
+        if (studentData.length === 0) {
+            container.innerHTML = '<div style="padding: 2.5rem; text-align: center; color: #64748b; background: #f8fafc; border-radius: 0.5rem; border: 1px dashed #e2e8f0;">対象となる学生が見つかりません</div>';
             return;
         }
 
-        const avg = total / count;
+        const getSortIndicator = (col) => {
+            if (state.classStatsSortCol !== col) return '<span style="opacity:0.2">?</span>';
+            return state.classStatsSortOrder === 'asc' ? '▲' : '▼';
+        };
 
-        // Std Dev
-        let sumSqDiff = 0;
-        scores.forEach(s => sumSqDiff += Math.pow(s - avg, 2));
-        const variance = sumSqDiff / count; // Population or Sample? Usually population for class stats
-        const stdDev = Math.sqrt(variance);
+        const thBase = "padding: 0.8rem 0.5rem; cursor: pointer; user-select: none; border-bottom: 2px solid #e2e8f0; transition: background 0.2s;";
 
-        // My Score
-        const myScore = getScore(state.currentStudent, sub.name, testKey);
-        let myScoreDisplay = '-';
-        let myDevDisplay = '-';
+        let html = `
+            <div style="background: white; border: 1px solid #e2e8f0; border-radius: 0.5rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); overflow: hidden;">
+                <div style="overflow-x: auto;">
+                    <table class="report-table" style="font-size: 0.82rem; width: 100%; white-space: nowrap; border-collapse: separate; border-spacing: 0;">
+                        <thead>
+                            <tr style="background: #f8fafc;">
+                                <th style="padding: 1rem 0.8rem; border-bottom: 2px solid #e2e8f0; position: sticky; left: 0; background: #f8fafc; z-index: 10; width: 180px; text-align: left;">学生氏名 (Name)</th>
+                                <th colspan="3" style="text-align: center; border-left: 2px solid #e2e8f0; border-bottom: 2px solid #e2e8f0; background: #f0f9ff; color: #1e40af; font-weight: 700;">統計1 (${testKey})</th>
+                                <th colspan="7" style="text-align: center; border-left: 2px solid #e2e8f0; border-bottom: 2px solid #e2e8f0; background: #f0fdf4; color: #166534; font-weight: 700;">統計2 (累積)</th>
+                            </tr>
+                            <tr style="background: #f1f5f9; font-size: 0.72rem; color: #475569;">
+                                <th onclick="sortClassStats('name')" style="${thBase} position: sticky; left: 0; background: #f1f5f9; z-index: 10; padding-left: 0.8rem; text-align:left;">氏名 ${getSortIndicator('name')}</th>
+                                <th style="width: 50px; text-align: center; border-left: 2px solid #e2e8f0; border-bottom: 1px solid #e2e8f0;">科目</th>
+                                <th onclick="sortClassStats('stats1_avg')" style="${thBase} width: 70px; text-align: center;">平均 ${getSortIndicator('stats1_avg')}</th>
+                                <th onclick="sortClassStats('stats1_rank')" style="${thBase} width: 50px; text-align: center;">順位 ${getSortIndicator('stats1_rank')}</th>
+                                <th style="width: 50px; text-align: center; border-left: 2px solid #e2e8f0; border-bottom: 1px solid #e2e8f0;">単位</th>
+                                <th onclick="sortClassStats('stats2_avg_sim')" style="${thBase} width: 75px; text-align: center;">単純平均 ${getSortIndicator('stats2_avg_sim')}</th>
+                                <th onclick="sortClassStats('stats2_rank_sim')" style="${thBase} width: 50px; text-align: center;">順位 ${getSortIndicator('stats2_rank_sim')}</th>
+                                <th onclick="sortClassStats('stats2_avg_wgt')" style="${thBase} width: 75px; text-align: center;">加重平均 ${getSortIndicator('stats2_avg_wgt')}</th>
+                                <th onclick="sortClassStats('stats2_rank_wgt')" style="${thBase} width: 50px; text-align: center;">順位 ${getSortIndicator('stats2_rank_wgt')}</th>
+                                <th onclick="sortClassStats('stats2_gpa')" style="${thBase} width: 60px; text-align: center; color:#1e40af; font-weight:700;">GPA ${getSortIndicator('stats2_gpa')}</th>
+                                <th onclick="sortClassStats('stats2_rank_gpa')" style="${thBase} width: 50px; text-align: center;">順位 ${getSortIndicator('stats2_rank_gpa')}</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
 
-        if (typeof myScore === 'number') {
-            myScoreDisplay = myScore;
-            if (stdDev > 0) {
-                const dev = 50 + 10 * ((myScore - avg) / stdDev);
-                myDevDisplay = dev.toFixed(1);
-            } else {
-                myDevDisplay = '50.0';
-            }
-        } else if (myScore) {
-            myScoreDisplay = myScore; // String value (Pass, etc)
-        }
+        studentData.forEach((row, idx) => {
+            const rowStyle = idx % 2 === 1 ? 'background: #f8fafc;' : 'background: white;';
+            html += `
+                <tr style="${rowStyle}">
+                    <td style="font-weight: 600; padding: 0.6rem 0.8rem; position: sticky; left: 0; background: inherit; z-index: 5; border-right: 1px solid #f1f5f9; border-bottom: 1px solid #f1f5f9; color: #334155;">${getDisplayName(row.name)}</td>
+                    <td style="text-align: center; border-left: 2px solid #f1f5f9; border-bottom: 1px solid #f1f5f9; color: #475569;">${row.stats1_count}</td>
+                    <td style="text-align: center; border-bottom: 1px solid #f1f5f9; color: #1e293b;">${row.stats1_avg.toFixed(2)}</td>
+                    <td style="text-align: center; border-bottom: 1px solid #f1f5f9; font-size: 0.8rem; color: #64748b;">${row.stats1_rank}</td>
+                    <td style="text-align: center; border-left: 2px solid #f1f5f9; border-bottom: 1px solid #f1f5f9; color: #475569;">${row.stats2_credits}</td>
+                    <td style="text-align: center; border-bottom: 1px solid #f1f5f9; color: #1e293b;">${row.stats2_avg_sim.toFixed(2)}</td>
+                    <td style="text-align: center; border-bottom: 1px solid #f1f5f9; font-size: 0.8rem; color: #64748b;">${row.stats2_rank_sim}</td>
+                    <td style="text-align: center; border-bottom: 1px solid #f1f5f9; color: #1e293b;">${row.stats2_avg_wgt.toFixed(2)}</td>
+                    <td style="text-align: center; border-bottom: 1px solid #f1f5f9; font-size: 0.8rem; color: #64748b;">${row.stats2_rank_wgt}</td>
+                    <td style="text-align: center; font-weight: 700; color: #1d4ed8; border-bottom: 1px solid #f1f5f9;">${row.stats2_gpa.toFixed(2)}</td>
+                    <td style="text-align: center; border-bottom: 1px solid #f1f5f9; font-size: 0.8rem; color: #64748b;">${row.stats2_rank_gpa}</td>
+                </tr>
+            `;
+        });
 
-        html += `
-            <tr>
-                <td style="text-align: center;">${sub.year === 0 ? ((state.scores[state.currentStudent]?.[sub.name]?.obtainedYear) || '特別') : sub.year}</td>
-                <td><div style="font-weight: 600;">${sub.name}</div></td>
-                <td style="text-align: center;">${sub.credits}</td>
-                <td style="text-align: center;"><span class="badge ${sub.type4 ? 'badge-purple' : 'badge-gray'}" style="${sub.type4 ? 'background:#faf5ff; color:#6b21a8; border-color:#e9d5ff;' : ''}">${sub.type4 || '-'}</span></td>
-                <td style="text-align: center;">${avg.toFixed(1)}</td>
-                <td style="text-align: center;">${max}</td>
-                <td style="text-align: center;">${min}</td>
-                <td style="text-align: center;">${count}</td>
-                <td style="text-align: center; font-weight: bold; ${typeof myScore === 'number' && myScore < 60 ? 'color: red;' : ''}">${myScoreDisplay}</td>
-                <td style="text-align: center;">${myDevDisplay}</td>
-            </tr>
-        `;
-    });
-
-    html += `</tbody></table>`;
-
-    // Add Summary
-    html += `<div style="margin-top: 1rem; text-align: right; color: #64748b; font-size: 0.85rem;">対象科目数: ${targetSubjects.length}</div>`;
-
-    container.innerHTML = html;
+        html += `</tbody></table></div></div>
+            <div style="margin-top: 1rem; text-align: right; color: #64748b; font-size: 0.75rem;">
+                ※ 統計1は ${targetYear}年・${testKey} の集計。統計2は累積。<br>
+                ※ GPA = S:4, A:3, B:2, C:1, D/F:0
+            </div>`;
+        container.innerHTML = html;
+        updatePrintHeader();
+    }, 10);
 }
 
+function exportClassStatsCsv() {
+    const yearEl = document.getElementById('classStatsYear');
+    const testEl = document.getElementById('classStatsTest');
+    const targetYear = yearEl ? parseInt(yearEl.value) : state.currentYear;
+    const testKey = testEl ? testEl.value : '学年末';
+
+    const data = calculateClassStatsList(targetYear, testKey);
+    if (data.length === 0) { alert('データなし'); return; }
+
+    let csvContent = "\uFEFF氏名,統計1科目数,統計1平均,統計1順位,統計2単位,統計2単純平均,統計2単純順位,統計2加重平均,統計2加重順位,統計2GPA,統計2GPA順位\n";
+    data.forEach(row => {
+        csvContent += [
+            getDisplayName(row.name), row.stats1_count, row.stats1_avg.toFixed(2), row.stats1_rank,
+            row.stats2_credits, row.stats2_avg_sim.toFixed(2), row.stats2_rank_sim,
+            row.stats2_avg_wgt.toFixed(2), row.stats2_rank_wgt, row.stats2_gpa.toFixed(2), row.stats2_rank_gpa
+        ].join(',') + "\n";
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `ClassStats_${targetYear}年_${testKey}.csv`;
+    link.click();
+}
+
+function assignRank(data, scoreKey, rankKey) {
+    if (!data || data.length === 0) return;
+    data.sort((a, b) => (b[scoreKey] || 0) - (a[scoreKey] || 0));
+    data.forEach((row, idx) => {
+        if (idx > 0 && Math.abs((row[scoreKey] || 0) - (data[idx - 1][scoreKey] || 0)) < 0.0001) {
+            row[rankKey] = data[idx - 1][rankKey];
+        } else {
+            row[rankKey] = idx + 1;
+        }
+    });
+}
+
+function calculateClassStatsList(targetYear, targetTest) {
+    const course = state.currentCourse;
+    const students = getClassStudents(targetYear, course);
+
+    const list = students.map(name => {
+        const stats = getStudentStats(name, targetYear, targetTest);
+        return {
+            name,
+            stats1_count: stats.stats1.count,
+            stats1_avg: stats.stats1.avg,
+            stats2_credits: stats.stats2.credits,
+            stats2_avg_sim: stats.stats2.avg_sim,
+            stats2_avg_wgt: stats.stats2.avg_wgt,
+            stats2_gpa: stats.stats2.gpa,
+            count_check: stats.stats2.count // for ranking filter
+        };
+    });
+
+    assignRank(list, 'stats1_avg', 'stats1_rank');
+    assignRank(list, 'stats2_avg_sim', 'stats2_rank_sim');
+    assignRank(list, 'stats2_avg_wgt', 'stats2_rank_wgt');
+    assignRank(list, 'stats2_gpa', 'stats2_rank_gpa');
+
+    // SORTING LOGIC
+    const col = state.classStatsSortCol;
+    const order = state.classStatsSortOrder;
+
+    return list.sort((a, b) => {
+        let valA = a[col];
+        let valB = b[col];
+
+        // Handle case where we click Rank (Lower is better usually, but here we treat it as numeric)
+        // If sorting by name
+        if (col === 'name') {
+            return order === 'asc' ? valA.localeCompare(valB, 'ja') : valB.localeCompare(valA, 'ja');
+        }
+
+        // Numeric Sort
+        valA = valA || 0;
+        valB = valB || 0;
+        if (order === 'asc') return valA - valB;
+        return valB - valA;
+    });
+}
 // Helpers
 function getYearColor(year) {
     const colors = {
@@ -4166,12 +4991,21 @@ document.addEventListener('DOMContentLoaded', init);
 function toggleAtRiskInputs() {
     const type = document.getElementById('atRiskTypeSelect')?.value;
     const testWrapper = document.getElementById('atRiskTestWrapper');
+    const attWrapper = document.getElementById('atRiskAttendanceWrapper');
     const instrTest = document.getElementById('instr-test');
     const instrYear = document.getElementById('instr-year_avg');
+    const instrAttAbs = document.getElementById('instr-attendance_abs');
+    const instrAttLat = document.getElementById('instr-attendance_lat');
+    const instrAttPat = document.getElementById('instr-attendance_pattern');
 
     if (testWrapper) testWrapper.style.display = (type === 'test') ? 'flex' : 'none';
+    if (attWrapper) attWrapper.style.display = 'none'; // Replaced by fixed precision logic
+
     if (instrTest) instrTest.classList.toggle('hidden', type !== 'test');
     if (instrYear) instrYear.classList.toggle('hidden', type !== 'year_avg');
+    if (instrAttAbs) instrAttAbs.classList.toggle('hidden', type !== 'attendance_abs');
+    if (instrAttLat) instrAttLat.classList.toggle('hidden', type !== 'attendance_lat');
+    if (instrAttPat) instrAttPat.classList.toggle('hidden', type !== 'attendance_pattern');
 }
 
 function initAtRiskDefaults() {
@@ -4220,162 +5054,342 @@ function initAtRiskDefaults() {
 }
 
 function renderAtRiskReport() {
-    const type = document.getElementById('atRiskTypeSelect')?.value;
-    const yearSelect = document.getElementById('atRiskYearSelect');
-    const testSelect = document.getElementById('atRiskTestSelect');
-    if (!yearSelect || !testSelect) return;
+    try {
+        const typeSelect = document.getElementById('atRiskTypeSelect');
+        const yearSelect = document.getElementById('atRiskYearSelect');
+        const testSelect = document.getElementById('atRiskTestSelect');
+        if (!typeSelect || !yearSelect || !testSelect) {
+            console.error('At Risk UI elements not found');
+            return;
+        }
 
-    const year = yearSelect.value;
-    const test = testSelect.value;
-    const reportArea = document.getElementById('atRiskReportArea');
-    if (!reportArea) return;
+        const type = typeSelect.value;
+        const year = yearSelect.value;
+        const test = testSelect.value;
+        const reportArea = document.getElementById('atRiskReportArea');
+        if (!reportArea) return;
 
-    const yearSubjects = state.subjects.filter(s => s.year == year && !s.exclude);
-    const results = [];
+        // Defensive check for state structure
+        if (!state.subjects || !state.students) {
+            reportArea.innerHTML = '<div style="color:red; padding:1rem;">データが読み込まれていません。</div>';
+            return;
+        }
 
-    state.students.forEach(studentName => {
-        let count59 = 0;
-        let count49 = 0;
-        let count39 = 0;
-        const lowScores = [];
+        const yearSubjects = state.subjects.filter(s => s.year == year && !s.exclude);
+        const results = [];
 
-        yearSubjects.forEach(sub => {
-            let scoreValue = NaN;
+        // Attendance limits from UI
+        const absLimitTotal = parseInt(document.getElementById('atRiskAbsLimit')?.value || 10);
+        const latLimitTotal = parseInt(document.getElementById('atRiskLatLimit')?.value || 15);
 
-            if (type === 'test') {
-                scoreValue = parseFloat(getScore(studentName, sub.name, test));
-            } else {
-                // Year Average
-                const tests = ["前期中間", "前期末", "後期中間", "学年末"];
-                let sum = 0;
-                let count = 0;
-                tests.forEach(t => {
-                    const s = parseFloat(getScore(studentName, sub.name, t));
-                    if (!isNaN(s)) {
-                        sum += s;
-                        count++;
+        state.students.forEach(studentName => {
+            try {
+                if (type === 'attendance_abs' || type === 'attendance_lat' || type === 'attendance_pattern') {
+                    // --- NEW PRECISION ATTENDANCE MODE (3-WAY SPLIT) ---
+                    const attObj = state.attendance || {};
+                    const records = attObj.records || {};
+                    const studentAttendance = records[studentName] || {};
+                    const datesSorted = Object.keys(studentAttendance).sort((a, b) => new Date(a) - new Date(b));
+
+                    const subStats = {}; // subj -> { abs, lat, total }
+                    const dowStats = {}; // dow -> { abs, lat }
+                    const periodStats = {}; // period -> { abs, lat, total }
+                    let totalAbs = 0, totalLat = 0, totalSessions = 0;
+
+                    // 1. Consecutive Check (Bad days vs Late days)
+                    let maxStreak = 0, currentStreak = 0;
+                    let streakStart = null, maxStreakRange = { start: "", end: "" };
+
+                    let maxLatStreak = 0, currentLatStreak = 0;
+                    let latStreakStart = null, maxLatStreakRange = { start: "", end: "" };
+
+                    datesSorted.forEach(dStr => {
+                        const dayEvents = studentAttendance[dStr] || [];
+                        const isBadDay = dayEvents.some(ev => ev.status === "欠" || ev.status === "遅");
+                        const isLateDay = dayEvents.some(ev => ev.status === "遅");
+
+                        if (isBadDay) {
+                            if (currentStreak === 0) streakStart = dStr;
+                            currentStreak++;
+                            if (currentStreak >= maxStreak) {
+                                maxStreak = currentStreak;
+                                maxStreakRange = { start: streakStart, end: dStr };
+                            }
+                        } else {
+                            currentStreak = 0;
+                        }
+
+                        if (isLateDay) {
+                            if (currentLatStreak === 0) latStreakStart = dStr;
+                            currentLatStreak++;
+                            if (currentLatStreak >= maxLatStreak) {
+                                maxLatStreak = currentLatStreak;
+                                maxLatStreakRange = { start: latStreakStart, end: dStr };
+                            }
+                        } else {
+                            currentLatStreak = 0;
+                        }
+
+                        dayEvents.forEach(ev => {
+                            if (!ev.subj) return;
+                            totalSessions++;
+                            if (!subStats[ev.subj]) subStats[ev.subj] = { abs: 0, lat: 0, total: 0 };
+                            subStats[ev.subj].total++;
+
+                            if (ev.status === "欠") { subStats[ev.subj].abs++; totalAbs++; }
+                            else if (ev.status === "遅") { subStats[ev.subj].lat++; totalLat++; }
+
+                            const pKey = ev.p || "?";
+                            if (!periodStats[pKey]) periodStats[pKey] = { abs: 0, lat: 0, total: 0 };
+                            periodStats[pKey].total++;
+                            if (ev.status === "欠") periodStats[pKey].abs++;
+                            else if (ev.status === "遅") periodStats[pKey].lat++;
+
+                            const di = new Date(dStr).getDay();
+                            const dl = ["日", "月", "火", "水", "木", "金", "土"][di];
+                            if (!dowStats[dl]) dowStats[dl] = { abs: 0, lat: 0, total: 0 };
+                            dowStats[dl].total++;
+                            if (ev.status === "欠") dowStats[dl].abs++;
+                            else if (ev.status === "遅") dowStats[dl].lat++;
+                        });
+                    });
+
+                    const reasons = [];
+
+                    if (type === 'attendance_pattern') {
+                        // Filter 1: Consecutive Abs (3:Yellow, 5:Orange, 7:Red, 8+:Black)
+                        if (maxStreak >= 3) {
+                            let level = 'yellow';
+                            if (maxStreak >= 8) level = 'black';
+                            else if (maxStreak >= 7) level = 'red';
+                            else if (maxStreak >= 5) level = 'orange';
+                            reasons.push({ type: 'consecutive', value: maxStreak, level, range: maxStreakRange });
+                        }
+                        // Filter 3: Day of Week Pattern (3+ points)
+                        Object.entries(dowStats).forEach(([dow, s]) => {
+                            const points = s.abs + s.lat * 0.5;
+                            if (points >= 3) {
+                                reasons.push({ type: 'dow', day: dow, value: points, total: s.total, level: 'yellow' });
+                            }
+                        });
                     }
-                });
-                if (count > 0) scoreValue = sum / count;
-            }
 
-            if (!isNaN(scoreValue)) {
-                if (scoreValue <= 59.9) { // Using 59.9 to capture below 60
-                    count59++;
-                    if (scoreValue <= 49.9) count49++;
-                    if (scoreValue <= 39.9) count39++;
-                    lowScores.push({ name: sub.name, score: scoreValue });
+                    if (type === 'attendance_lat') {
+                        // Simple high-count thresholds for "incidental" lateness
+                        Object.entries(subStats).forEach(([subj, s]) => {
+                            if (s.lat >= 2) {
+                                let level = 'yellow';
+                                if (s.lat >= 4) level = 'red';
+                                else if (s.lat >= 3) level = 'orange';
+                                reasons.push({ type: 'subject_lat', subject: subj, value: s.lat, level });
+                            }
+                        });
+                        // Day of Week Pattern (Pure Lateness)
+                        Object.entries(dowStats).forEach(([dow, s]) => {
+                            if (s.lat >= 3) {
+                                reasons.push({ type: 'dow_lat', day: dow, value: s.lat, level: 'yellow' });
+                            }
+                        });
+                        // Relaxed: Cumulative Late Count
+                        if (totalLat >= 5) {
+                            let level = 'yellow';
+                            if (totalLat >= 10) level = 'orange';
+                            reasons.push({ type: 'total_lat_count', value: totalLat, level });
+                        }
+                    }
+
+                    if (type === 'attendance_abs') {
+                        // Filter 2: Subject Density (3/6:Yellow, 4/6:Orange, 5/6:Red, 6/6:Black)
+                        Object.entries(subStats).forEach(([subj, s]) => {
+                            const points = s.abs + s.lat * 0.5;
+                            const ratio = s.total > 0 ? points / s.total : 0;
+                            if (ratio >= 0.10) {
+                                let level = 'yellow';
+                                if (ratio >= 1 / 3) level = 'black'; // 33.33%
+                                else if (ratio >= 0.30) level = 'red';
+                                else if (ratio >= 0.20) level = 'orange';
+                                reasons.push({ type: 'subject', subject: subj, value: points, total: s.total, level, ratioStr: `${(ratio * 100).toFixed(0)}%` });
+                            }
+                        });
+                        // Filter 4: Period Density
+                        Object.entries(periodStats).forEach(([p, s]) => {
+                            const points = s.abs + s.lat * 0.5;
+                            const ratio = s.total > 0 ? points / s.total : 0;
+                            if (ratio >= 0.10) {
+                                let level = 'yellow';
+                                if (ratio >= 1 / 3) level = 'black';
+                                else if (ratio >= 0.30) level = 'red';
+                                else if (ratio >= 0.20) level = 'orange';
+                                reasons.push({ type: 'period', period: p, value: points, total: s.total, level, ratioStr: `${(ratio * 100).toFixed(0)}%` });
+                            }
+                        });
+                        // Filter 5: Cumulative Density
+                        const totalPoints = totalAbs + totalLat * 0.5;
+                        const totalRatio = totalSessions > 0 ? totalPoints / totalSessions : 0;
+                        if (totalRatio >= 0.10) {
+                            let level = 'yellow';
+                            if (totalRatio >= 1 / 3) level = 'black';
+                            else if (totalRatio >= 0.30) level = 'red';
+                            else if (totalRatio >= 0.20) level = 'orange';
+                            reasons.push({ type: 'total', value: totalPoints, total: totalSessions, level });
+                        }
+                    }
+
+                    if (reasons.length > 0) {
+                        results.push({
+                            name: studentName,
+                            type: 'attendance_new',
+                            reasons: reasons,
+                            totalAbs, totalLat
+                        });
+                    }
+                } else {
+                    // --- GRADE MODE (test or year_avg) ---
+                    let count59 = 0, count49 = 0, count39 = 0;
+                    const lowScores = [];
+
+                    yearSubjects.forEach(sub => {
+                        let scoreValue = NaN;
+                        if (type === 'test') {
+                            scoreValue = parseFloat(getScore(studentName, sub.name, test));
+                        } else {
+                            const tests = ["前期中間", "前期末", "後期中間", "学年末"];
+                            let sum = 0, count = 0;
+                            tests.forEach(t => {
+                                const s = parseFloat(getScore(studentName, sub.name, t));
+                                if (!isNaN(s)) { sum += s; count++; }
+                            });
+                            if (count > 0) scoreValue = sum / count;
+                        }
+
+                        if (!isNaN(scoreValue) && scoreValue <= 59.9) {
+                            count59++;
+                            if (scoreValue <= 49.9) count49++;
+                            if (scoreValue <= 39.9) count39++;
+                            lowScores.push({ name: sub.name, score: scoreValue });
+                        }
+                    });
+
+                    // Restore original conditions for grades
+                    let isAtRisk = (type === 'test')
+                        ? (count59 >= 4 || count49 >= 3 || count39 >= 2)
+                        : (count59 >= 3 || count49 >= 2 || count39 >= 1);
+
+                    if (isAtRisk) {
+                        const reasons = [];
+                        if (type === 'test') {
+                            if (count59 >= 4) reasons.push(`60点未満 × ${count59}`);
+                            if (count49 >= 3) reasons.push(`50点未満 × ${count49}`);
+                            if (count39 >= 2) reasons.push(`40点未満 × ${count39}`);
+                        } else {
+                            if (count59 >= 3) reasons.push(`平均60点未満 × ${count59}`);
+                            if (count49 >= 2) reasons.push(`平均50点未満 × ${count49}`);
+                            if (count39 >= 1) reasons.push(`平均40点未満 × ${count39}`);
+                        }
+                        results.push({
+                            name: studentName,
+                            type: 'grade',
+                            reasons: reasons,
+                            lowScores: lowScores.sort((a, b) => a.score - b.score)
+                        });
+                    }
                 }
+            } catch (studentErr) {
+                console.warn(`Error processing student ${studentName}:`, studentErr);
             }
         });
 
-        // Condition Test: (<=59) >= 4 OR (<=49) >= 3 OR (<=39) >= 2
-        // Condition Year Avg: (<=59) >= 3 OR (<=49) >= 2 OR (<=39) >= 1
-        let isAtRisk = false;
-        if (type === 'test') {
-            isAtRisk = (count59 >= 4 || count49 >= 3 || count39 >= 2);
-        } else {
-            isAtRisk = (count59 >= 3 || count49 >= 2 || count39 >= 1);
+        if (results.length === 0) {
+            reportArea.innerHTML = `<div style="text-align: center; padding: 3rem; color: #10b981; font-weight: bold; background: #f0fdf4; border-radius: 0.5rem; border: 1px solid #bbf7d0;">
+                該当する要注意学生は見つかりませんでした。
+            </div>`;
+            return;
         }
 
-        if (isAtRisk) {
-            results.push({
-                name: studentName,
-                count59,
-                count49,
-                count39,
-                lowScores: lowScores
-            });
-        }
-    });
-
-    if (results.length === 0) {
-        reportArea.innerHTML = `
-            <div style="text-align: center; padding: 4rem; background: #f8fafc; border-radius: 1rem; border: 2px dashed #e2e8f0;">
-                <div style="font-size: 3rem; margin-bottom: 1rem;">✅</div>
-                <div style="font-size: 1.1rem; font-weight: 600; color: #1e293b;">該当する学生はいません</div>
-                <div style="color: #64748b; margin-top: 0.5rem;">${year}年 ${type === 'test' ? test : '通年平均'} において、抽出条件に合致する学生は見つかりませんでした。</div>
-            </div>
-        `;
-        return;
-    }
-
-    let html = `
-        <div class="card" style="border: 2px solid #fee2e2; background: #fff;">
-            <div style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                    <div style="font-weight: 700; font-size: 1.25rem; color: #b91c1c;">抽出結果: ${results.length} 名</div>
-                    <div style="font-size: 0.85rem; color: #64748b; margin-top: 2px;">対象: ${year}年 ${type === 'test' ? test : '科目別通年平均'}</div>
-                </div>
-                <div class="no-print">
-                    <button class="btn btn-secondary" onclick="window.print()" style="gap: 0.5rem; display: flex; align-items: center; border: 1px solid #cbd5e1;">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="18" height="18">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                        </svg>
-                        帳票として印刷 (Print)
-                    </button>
-                </div>
+        let html = `
+            <div style="margin-bottom: 1rem; font-weight: bold; color: #ef4444; font-size: 1.1rem; display: flex; justify-content: space-between; align-items: center;">
+                <span>抽出結果: ${results.length} 名</span>
+                <span style="font-size:0.8rem; color:#64748b; font-weight:normal;">対象学年: ${year}年 / 判定基準: ${type === 'attendance' ? '出欠状況' : (type === 'test' ? test : '科目別通年平均')}</span>
             </div>
             <div class="table-container">
-                <table>
+                <table style="width: 100%; border-collapse: collapse;">
                     <thead>
-                        <tr style="background: #fef2f2;">
-                            <th style="width: 150px;">学生名</th>
-                            <th style="width: 250px;">アラート条件</th>
-                            <th>対象科目と${type === 'test' ? '点数' : '平均点'}</th>
+                        <tr style="background: #fee2e2;">
+                            <th style="padding: 10px; text-align: left; width: 160px;">氏名</th>
+                            <th style="padding: 10px; text-align: left; width: 220px;">抽出理由 (アラート)</th>
+                            <th style="padding: 10px; text-align: left;">詳細情報</th>
                         </tr>
                     </thead>
                     <tbody>
-    `;
-
-    results.forEach(res => {
-        const reasons = [];
-        if (type === 'test') {
-            if (res.count59 >= 4) reasons.push(`59点以下 × ${res.count59}`);
-            if (res.count49 >= 3) reasons.push(`49点以下 × ${res.count49}`);
-            if (res.count39 >= 2) reasons.push(`39点以下 × ${res.count39}`);
-        } else {
-            if (res.count59 >= 3) reasons.push(`平均59点以下 × ${res.count59}`);
-            if (res.count49 >= 2) reasons.push(`平均49点以下 × ${res.count49}`);
-            if (res.count39 >= 1) reasons.push(`平均39点以下 × ${res.count39}`);
-        }
-
-        const scoreBadges = res.lowScores
-            .sort((a, b) => a.score - b.score)
-            .map(s => {
-                let colorClass = 'background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca;';
-                if (s.score <= 39.9) colorClass = 'background: #450a0a; color: #fff;';
-                else if (s.score <= 49.9) colorClass = 'background: #7f1d1d; color: #fff;';
-
-                const valDisplay = type === 'test' ? s.score : s.score.toFixed(1);
-                return `<span style="display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; ${colorClass} margin-right: 4px; margin-bottom: 4px;">
-                    ${s.name}: ${valDisplay}
-                </span>`;
-            }).join('');
-
-        html += `
-            <tr>
-                <td style="font-weight: 700; color: #1e293b; font-size: 1.1rem;">${res.name}</td>
-                <td>
-                    <div style="display: flex; flex-direction: column; gap: 4px;">
-                        ${reasons.map(r => `<span style="color: #dc2626; font-weight: 600; font-size: 0.85rem;">⚠️ ${r}</span>`).join('')}
-                    </div>
-                </td>
-                <td style="padding: 1rem;">
-                    ${scoreBadges}
-                </td>
-            </tr>
         `;
-    });
 
-    html += `
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    `;
+        results.forEach(res => {
+            let detailHtml = '';
+            let reasonHtml = '';
+            if (res.type === 'attendance_new') {
+                reasonHtml = '<span style="color:#ef4444; font-weight:bold;">?? 出欠注意</span>';
+                detailHtml = `<div style="display:flex; flex-wrap:wrap; gap:0.4rem;">`;
+                res.reasons.forEach(r => {
+                    let bg = '#fde047', tc = '#854d0e', border = '#eab308', label = '';
+                    if (r.level === 'black') { bg = '#000'; tc = '#fff'; border = '#000'; }
+                    else if (r.level === 'red') { bg = '#ef4444'; tc = '#fff'; border = '#b91c1c'; }
+                    else if (r.level === 'orange') { bg = '#fb923c'; tc = '#fff'; border = '#ea580c'; }
 
-    reportArea.innerHTML = html;
+                    const formatDate = (s) => s ? s.split('/').slice(1).join('/') : '';
+                    if (r.type === 'consecutive') {
+                        label = `連続${r.value}日 (${formatDate(r.range.start)}~${formatDate(r.range.end)})`;
+                    }
+                    else if (r.type === 'consecutive_lat') {
+                        label = `連続遅刻${r.value}日 (${formatDate(r.range.start)}~${formatDate(r.range.end)})`;
+                    }
+                    else if (r.type === 'subject') label = `${r.subject}: 欠席率 ${r.ratioStr}`;
+                    else if (r.type === 'subject_lat') label = `${r.subject}: 遅刻${r.value}回`;
+                    else if (r.type === 'period') label = `${r.period}限: 欠席率 ${r.ratioStr}`;
+                    else if (r.type === 'dow') label = `${r.day}曜日: 欠席率 ${(r.value / r.total * 100).toFixed(0)}%`; // Need total
+                    else if (r.type === 'dow_lat') label = `${r.day}曜日に遅刻集中(${r.value}回)`;
+                    else if (r.type === 'total') label = `累積欠席率: ${(r.value / r.total * 100).toFixed(1)}%`;
+                    else if (r.type === 'total_lat_count') label = `累計遅刻:${r.value}回`;
+
+                    detailHtml += `<span style="background:${bg}; color:${tc}; padding:2px 10px; border-radius:999px; font-size:0.8rem; font-weight:600; border:1px solid ${border};">${label}</span>`;
+                });
+                detailHtml += `</div>`;
+            } else if (res.type === 'attendance') {
+                // Legacy fallback (should rarely be used now)
+                reasonHtml = '<span style="color:#ef4444; font-weight:bold;">?? 出席不良</span>';
+                detailHtml = `<div style="display:flex; flex-wrap:wrap; gap:0.4rem;">
+                    <div style="width:100%; font-size:0.8rem; color:#64748b; margin-bottom:0.2rem;">累計: 欠${res.totalAbs}・遅${res.totalLat}</div>
+                    ${res.reasons.map(r => {
+                    if (typeof r === 'string') return `<span style="background:#fee2e2; color:#b91c1c; padding:2px 10px; border-radius:999px; font-size:0.8rem; font-weight:600; border:1px solid #fecaca;">${r}</span>`;
+                    return `<span style="background:#fee2e2; color:#b91c1c; padding:2px 10px; border-radius:999px; font-size:0.8rem; font-weight:600; border:1px solid #fecaca;">${r.subject}:${r.count.toFixed(1)}回</span>`;
+                }).join('')}
+                </div>`;
+            } else {
+                reasonHtml = res.reasons.join('<br>');
+                detailHtml = `
+                    <div style="display: flex; flex-wrap: wrap; gap: 5px;">
+                        ${res.lowScores.map(s => {
+                    const color = s.score < 40 ? 'background:#450a0a; color:#fff;' : 'background:#fff1f2; color:#b91c1c; border:1px solid #fca5a5;';
+                    return `<span style="padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; ${color}">${s.name}: ${Math.round(s.score)}点</span>`;
+                }).join('')}
+                    </div>
+                `;
+            }
+
+            html += `
+                <tr style="border-bottom: 1px solid #fecaca;">
+                    <td style="padding: 12px 10px; font-weight: bold; background: #fff;">${getDisplayName(res.name)}</td>
+                    <td style="padding: 12px 10px; background: #fff;">${reasonHtml}</td>
+                    <td style="padding: 12px 10px; background: #fff;">${detailHtml}</td>
+                </tr>
+            `;
+        });
+
+        html += `</tbody></table></div>`;
+        reportArea.innerHTML = html;
+    } catch (globalErr) {
+        console.error('renderAtRiskReport Failed:', globalErr);
+        alert('抽出実行中にエラーが発生しました。コンソールを確認してください。');
+    }
 }
 
 function renderMandatoryGanttChart(studentName, subjects, isPassed) {
@@ -4521,20 +5535,41 @@ function initSeating() {
             disabled: []
         };
     }
+    // Safety check for nested properties (in case of partial load)
+    if (!state.seating.assignments) state.seating.assignments = {};
+    if (!state.seating.fixed) state.seating.fixed = [];
+    if (!state.seating.disabled) state.seating.disabled = [];
 
     // Sync UI with state
     const colInput = document.getElementById('seatingCols');
     const rowInput = document.getElementById('seatingRows');
     const perspectiveInput = document.getElementById('seatingPerspective');
-    const colorByGradeInput = document.getElementById('seatingColorByGrade');
+    const colorModeInput = document.getElementById('seatingColorMode');
     const gradeMethodInput = document.getElementById('seatingGradeMethod');
     if (colInput) colInput.value = state.seating.cols;
     if (rowInput) rowInput.value = state.seating.rows;
     if (perspectiveInput) perspectiveInput.value = state.seating.perspective || 'teacher';
-    if (colorByGradeInput) colorByGradeInput.checked = state.seating.colorByGrade || false;
+    if (colorModeInput) colorModeInput.value = state.seating.colorMode || 'none';
     if (gradeMethodInput) gradeMethodInput.value = state.seating.gradeMethod || 'cumulative';
 
+    const methodWrapper = document.getElementById('seatingGradeMethodWrapper');
+    if (methodWrapper) methodWrapper.style.display = (state.seating.colorMode === 'grade') ? 'flex' : 'none';
+
+    updateGradeMethodInfo();
+
+    // Add Event Listeners for Presets
+    const savePresetBtn = document.getElementById('savePresetBtn');
+    const deletePresetBtn = document.getElementById('deletePresetBtn');
+    const presetSelect = document.getElementById('seatingPresetSelect');
+
+    if (savePresetBtn) savePresetBtn.onclick = saveSeatingPreset;
+    if (deletePresetBtn) deletePresetBtn.onclick = deleteSeatingPreset;
+    if (presetSelect) presetSelect.onchange = loadSeatingPreset;
+
+
     renderPresetList();
+    const autoAssignBtn = document.getElementById('autoAssignBtn'); if (autoAssignBtn) autoAssignBtn.onclick = autoAssignSeating;
+
     renderSeatingRoster();
     renderSeatingGrid();
 }
@@ -4542,10 +5577,65 @@ function initSeating() {
 function renderSeatingRoster() {
     const list = document.getElementById('seatingRosterList');
     if (!list) return;
+
+    // Reliability Fix: If students list is empty, try to reload from storage or defaults
+    if (!state.students || state.students.length === 0) {
+        const stored = localStorage.getItem('grade_manager_students');
+        if (stored) {
+            try {
+                const parsed = JSON.parse(stored);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    state.students = parsed;
+                }
+            } catch (e) {
+                console.error('Json parse error in roster render', e);
+            }
+        }
+
+        // If still empty, load defaults (prevents empty sidebar)
+        if (!state.students || state.students.length === 0) {
+            state.students = DEFAULT_STUDENTS_RAW.replace(/\n/g, '').split(',').map(s => s.trim()).filter(s => s);
+        }
+    }
+
     list.innerHTML = '';
+
+    // Safety check for assignments
+    if (!state.seating) state.seating = { assignments: {} };
+    if (!state.seating.assignments) state.seating.assignments = {};
 
     // Students currently assigned to any seat
     const assignedStudents = new Set(Object.values(state.seating.assignments));
+
+    // Calculate seat statistics
+    const totalStudents = state.students.length;
+    const assignedCount = assignedStudents.size;
+    const { cols, rows, disabled } = state.seating;
+    const totalSeats = cols * rows;
+    const availableSeats = totalSeats - (disabled ? disabled.length : 0);
+
+    // Update count info display
+    const countInfo = document.getElementById('seatingCountInfo');
+    if (countInfo) {
+        const seatStatus = availableSeats >= totalStudents ?
+            `<span style="color: #10b981;">? 十分</span>` :
+            `<span style="color: #ef4444;">? 不足</span>`;
+
+        countInfo.innerHTML = `
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.3rem;">
+                <span>学生数:</span>
+                <strong>${totalStudents}名</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.3rem;">
+                <span>有効席数:</span>
+                <strong>${availableSeats}席 ${seatStatus}</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+                <span>配置済み:</span>
+                <strong style="color: #3b82f6;">${assignedCount}名</strong>
+            </div>
+        `;
+    }
 
     state.students.forEach(student => {
         const item = document.createElement('div');
@@ -4566,35 +5656,90 @@ function renderSeatingRoster() {
 
 function renderSeatingGrid() {
     const grid = document.getElementById('seatingGrid');
-    const desk = document.getElementById('seatingDesk');
+    const oldDesk = document.getElementById('seatingDesk');
+    if (oldDesk) oldDesk.remove();
+
     if (!grid) return;
 
     const { cols, rows, perspective } = state.seating;
     const isTeacher = perspective === 'teacher';
 
-    // Move desk
-    if (desk) {
-        if (isTeacher) {
-            desk.parentElement.appendChild(desk); // Move to bottom
-        } else {
-            desk.parentElement.insertBefore(desk, desk.parentElement.firstChild); // Move to top
-        }
+    // Calculate dynamic sizing based on grid size
+    const totalCells = cols * rows;
+    let cellSize, fontSize, labelFontSize;
+
+    // Adjust sizes based on number of columns (most important for width)
+    if (cols <= 5) {
+        cellSize = '80px';
+        fontSize = '0.95rem';
+        labelFontSize = '0.75rem';
+    } else if (cols <= 7) {
+        cellSize = '70px';
+        fontSize = '0.85rem';
+        labelFontSize = '0.7rem';
+    } else if (cols <= 10) {
+        cellSize = '60px';
+        fontSize = '0.75rem';
+        labelFontSize = '0.65rem';
+    } else if (cols <= 15) {
+        cellSize = '50px';
+        fontSize = '0.65rem';
+        labelFontSize = '0.6rem';
+    } else {
+        cellSize = '40px';
+        fontSize = '0.55rem';
+        labelFontSize = '0.55rem';
     }
 
-    grid.style.gridTemplateColumns = `repeat(${cols}, 80px)`;
+    // Set grid template with calculated size and dynamic gap
+    const gap = cols > 10 ? '4px' : '8px';
+    grid.style.gridTemplateColumns = `repeat(${cols}, ${cellSize})`;
+    grid.style.gap = gap;
+
+    // Store sizes as data attributes for CSS access
+    grid.dataset.cellSize = cellSize;
+    grid.dataset.fontSize = fontSize;
+    grid.dataset.labelFontSize = labelFontSize;
+
     grid.innerHTML = '';
+
+    // Create Layout Desk Element
+    const desk = document.createElement('div');
+    desk.className = 'teacher-desk-grid';
+    desk.innerText = '教 卓 (前方)';
+    desk.style.gridColumn = '1 / -1';
+
+    // CENTER ALIGNMENT
+    desk.style.justifySelf = 'center';
+    desk.style.width = 'auto';
+    desk.style.minWidth = '200px';
+
+    desk.style.textAlign = 'center';
+    desk.style.background = '#e2e8f0';
+    desk.style.padding = '0.4rem 1.5rem';
+    desk.style.borderRadius = '0.3rem';
+    desk.style.fontWeight = 'bold';
+    desk.style.color = '#475569';
+    desk.style.fontSize = labelFontSize;
+    // Visual spacing
+    desk.style.marginBottom = !isTeacher ? '15px' : '0';
+    desk.style.marginTop = isTeacher ? '15px' : '0';
+
+    if (!isTeacher) {
+        grid.appendChild(desk);
+    }
 
     for (let currentR = 0; currentR < rows; currentR++) {
         for (let currentC = 0; currentC < cols; currentC++) {
             // Coordinate mapping based on perspective
-            const r = isTeacher ? rows - 1 - currentR : currentR;
-            const c = isTeacher ? cols - 1 - currentC : currentC;
+            const rowIdx = isTeacher ? rows - 1 - currentR : currentR;
+            const colIdx = isTeacher ? cols - 1 - currentC : currentC;
 
-            const pos = `${r}-${c}`;
+            const pos = `${rowIdx}-${colIdx}`;
             const student = state.seating.assignments[pos];
             const isFixed = state.seating.fixed.includes(pos);
             const isDisabled = state.seating.disabled.includes(pos);
-            const label = String.fromCharCode(65 + c) + (r + 1);
+            const label = String.fromCharCode(65 + colIdx) + (rowIdx + 1);
 
             const cell = document.createElement('div');
             cell.className = 'seat-item' +
@@ -4603,101 +5748,106 @@ function renderSeatingGrid() {
                 (isDisabled ? ' disabled' : '');
             cell.dataset.pos = pos;
 
-            // Calculate average grade for color coding
-            let avgGrade = null;
-            if (student && state.seating.colorByGrade) {
-                const scoreData = state.scores[student];
-                if (scoreData) {
-                    const method = state.seating.gradeMethod || 'cumulative';
+            // Look for attendance number in metadata
+            let attendanceNo = '';
+            if (student && state.studentMetadata && state.studentMetadata[student]) {
+                const meta = state.studentMetadata[student];
+                attendanceNo = meta['出席番号'] || meta['番号'] || meta['No.'] || meta['No'] || '';
+            }
 
-                    if (method === 'latest') {
-                        // Latest test average: get the last score key with data
-                        const latestScores = [];
-                        const lastKey = SCORE_KEYS[SCORE_KEYS.length - 1];
+            // Display base labels and name
+            cell.innerHTML = `
+                <div class="seat-label" style="font-size: ${labelFontSize};">${label}</div>
+                ${attendanceNo ? `<div class="attendance-no" style="position: absolute; top: 2px; right: 4px; font-size: ${labelFontSize}; color: #64748b; font-weight: bold;">${attendanceNo}</div>` : ''}
+                <div class="student-name" style="font-size: ${fontSize};">${student || ''}</div>
+            `;
 
-                        Object.values(scoreData).forEach(subjectScores => {
-                            if (typeof subjectScores === 'object') {
-                                const val = subjectScores[lastKey];
-                                if (val !== undefined && val !== null && val !== '' && !isNaN(val)) {
-                                    latestScores.push(parseFloat(val));
-                                }
-                            }
-                        });
+            // Calculate color coding
+            let r_col, g_col, b_col, displayVal = '';
+            let hasColor = false;
+            const colorMode = state.seating.colorMode || 'none';
 
-                        if (latestScores.length > 0) {
-                            avgGrade = latestScores.reduce((a, b) => a + b, 0) / latestScores.length;
-                        }
+            if (student && colorMode === 'grade') {
+                const avg = getStudentAverage(student);
+                if (avg !== null) {
+                    hasColor = true;
+                    displayVal = avg.toFixed(1);
+                    if (avg < 50) { r_col = 255; g_col = 100; b_col = 100; }
+                    else if (avg < 75) {
+                        const p = (avg - 50) / 25;
+                        r_col = 255; g_col = Math.round(100 + (155 * p)); b_col = Math.round(100 * (1 - p));
                     } else {
-                        // Cumulative average: all scores
-                        const allScores = [];
-                        Object.values(scoreData).forEach(subjectScores => {
-                            if (typeof subjectScores === 'object') {
-                                SCORE_KEYS.forEach(key => {
-                                    const val = subjectScores[key];
-                                    if (val !== undefined && val !== null && val !== '' && !isNaN(val)) {
-                                        allScores.push(parseFloat(val));
-                                    }
-                                });
-                            }
-                        });
+                        const p = (avg - 75) / 25;
+                        r_col = Math.round(255 * (1 - p)); g_col = 255; b_col = 0;
+                    }
+                }
+            } else if (student && colorMode === 'attendance') {
+                const attendance = state.attendance.records[student] || {};
+                let totalAbs = 0, totalLat = 0;
+                Object.values(attendance).forEach(dayEvents => {
+                    dayEvents.forEach(ev => {
+                        if (ev.status === "欠") totalAbs++;
+                        else if (ev.status === "遅") totalLat++;
+                    });
+                });
 
-                        if (allScores.length > 0) {
-                            avgGrade = allScores.reduce((a, b) => a + b, 0) / allScores.length;
+                if (totalAbs > 0 || totalLat > 0) {
+                    hasColor = true;
+                    // Milestones: 5(Yellow), 10(Orange), 15(Red), 20(Black)
+                    const score = totalAbs + (totalLat * 0.5);
+                    displayVal = `欠${totalAbs}・遅${totalLat} (${score.toFixed(1)}pt)`;
+
+                    // RGB Values for milestones
+                    const m = [
+                        { p: 0, r: 255, g: 255, b: 255 }, // White
+                        { p: 5, r: 253, g: 224, b: 71 },  // Yellow (fde047)
+                        { p: 10, r: 251, g: 146, b: 60 }, // Orange (fb923c)
+                        { p: 15, r: 239, g: 68, b: 68 },  // Red (ef4444)
+                        { p: 20, r: 0, g: 0, b: 0 }       // Black
+                    ];
+
+                    let r, g, b;
+                    if (score <= m[0].p) {
+                        hasColor = false;
+                    } else if (score >= m[m.length - 1].p) {
+                        r = m[m.length - 1].r; g = m[m.length - 1].g; b = m[m.length - 1].b;
+                    } else {
+                        for (let i = 0; i < m.length - 1; i++) {
+                            if (score >= m[i].p && score < m[i + 1].p) {
+                                const ratio = (score - m[i].p) / (m[i + 1].p - m[i].p);
+                                r = Math.round(m[i].r + (m[i + 1].r - m[i].r) * ratio);
+                                g = Math.round(m[i].g + (m[i + 1].g - m[i].g) * ratio);
+                                b = Math.round(m[i].b + (m[i + 1].b - m[i].b) * ratio);
+                                break;
+                            }
                         }
                     }
+                    r_col = r; g_col = g; b_col = b;
                 }
             }
 
-            cell.innerHTML = `
-                <div class="seat-label">${label}</div>
-                <div class="student-name">${student || ''}</div>
-            `;
+            if (hasColor) {
+                cell.style.background = `rgba(${r_col}, ${g_col}, ${b_col}, 0.2)`;
+                cell.style.borderColor = `rgba(${r_col}, ${g_col}, ${b_col}, 0.6)`;
 
-            // Apply color coding with gradient
-            if (avgGrade !== null && state.seating.colorByGrade) {
-                // Gradient from red (50) -> yellow (75) -> green (100)
-                let r, g, b;
-
-                if (avgGrade < 50) {
-                    // Below 50: Solid Red
-                    r = 255;
-                    g = 0;
-                    b = 0;
-                } else if (avgGrade <= 75) {
-                    // Red to Yellow (50-75)
-                    const ratio = (avgGrade - 50) / 25;
-                    r = 255;
-                    g = Math.round(255 * ratio);
-                    b = 0;
-                } else {
-                    // Yellow to Green (75-100)
-                    const ratio = (avgGrade - 75) / 25;
-                    r = Math.round(255 * (1 - ratio));
-                    g = 255;
-                    b = 0;
+                // Adjust text color for dark backgrounds
+                const brightness = (r_col * 299 + g_col * 587 + b_col * 114) / 1000;
+                if (brightness < 100) {
+                    cell.querySelector('.student-name').style.color = '#fff';
+                    cell.querySelector('.seat-label').style.color = 'rgba(255,255,255,0.7)';
+                    if (cell.querySelector('.attendance-no')) cell.querySelector('.attendance-no').style.color = 'rgba(255,255,255,0.9)';
                 }
 
-                // Apply with more visible background and darker border
-                const bgColor = `rgba(${r}, ${g}, ${b}, 0.4)`;
-                const borderColor = `rgb(${Math.round(r * 0.7)}, ${Math.round(g * 0.7)}, ${Math.round(b * 0.7)})`;
-
-                cell.style.background = bgColor;
-                cell.style.borderColor = borderColor;
-                cell.style.borderWidth = '2px';
-
-                // Add grade display
-                const gradeDisplay = document.createElement('div');
-                gradeDisplay.className = 'no-print';
-                gradeDisplay.style.cssText = `
-                    position: absolute;
-                    bottom: 2px;
-                    right: 4px;
-                    font-size: 0.65rem;
-                    font-weight: 600;
-                    color: rgb(${r}, ${g}, ${b});
+                const badge = document.createElement('div');
+                badge.className = 'no-print';
+                badge.style.cssText = `
+                    position: absolute; bottom: 2px; right: 4px;
+                    font-size: 0.65rem; font-weight: 700;
+                    color: ${brightness < 128 ? '#fff' : '#000'};
+                    text-shadow: ${brightness >= 128 ? 'none' : '0 0 2px #000'};
                 `;
-                gradeDisplay.textContent = avgGrade.toFixed(1);
-                cell.appendChild(gradeDisplay);
+                badge.textContent = displayVal;
+                cell.appendChild(badge);
             }
 
             // Drag & Drop events
@@ -4724,8 +5874,7 @@ function renderSeatingGrid() {
 
             // Right click menu for fixed/disabled
             cell.addEventListener('contextmenu', (e) => {
-                e.preventDefault();
-                showSeatingContextMenu(e, pos);
+                showSeatContextMenu(e, pos); // Correct function name
             });
 
             // Allow dragging student OUT of seat
@@ -4739,6 +5888,11 @@ function renderSeatingGrid() {
 
             grid.appendChild(cell);
         }
+    }
+
+    // Teacher View: Desk is at BOTTOM
+    if (isTeacher) {
+        grid.appendChild(desk);
     }
 }
 
@@ -4772,55 +5926,7 @@ function assignStudentToSeat(studentName, targetPos, sourcePos) {
     renderSeatingGrid();
 }
 
-function showSeatingContextMenu(e, pos) {
-    const isFixed = state.seating.fixed.includes(pos);
-    const isDisabled = state.seating.disabled.includes(pos);
-    const hasStudent = !!state.seating.assignments[pos];
 
-    const menu = document.createElement('div');
-    menu.style.cssText = `
-        position: fixed;
-        left: ${e.clientX}px;
-        top: ${e.clientY}px;
-        background: white;
-        border: 1px solid #e2e8f0;
-        box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
-        border-radius: 0.5rem;
-        z-index: 10000;
-        padding: 0.5rem 0;
-        min-width: 150px;
-    `;
-
-    const options = [
-        { label: isFixed ? '📌 固定解除' : '📌 位置を固定', action: () => toggleFixed(pos), active: hasStudent },
-        { label: isDisabled ? '✅ 有効化' : '🚫 無効化 (壁など)', action: () => toggleDisabled(pos), active: !hasStudent },
-        { label: '🗑️ 割当解除', action: () => unassignSeat(pos), active: hasStudent }
-    ];
-
-    options.forEach(opt => {
-        if (!opt.active) return;
-        const item = document.createElement('div');
-        item.textContent = opt.label;
-        item.style.cssText = 'padding: 0.5rem 1rem; cursor: pointer; font-size: 0.9rem; color: #475569;';
-        item.onmouseover = () => item.style.background = '#f1f5f9';
-        item.onmouseout = () => item.style.background = 'transparent';
-        item.onclick = () => {
-            opt.action();
-            if (menu.parentElement) document.body.removeChild(menu);
-        };
-        menu.appendChild(item);
-    });
-
-    const closeMenu = (ev) => {
-        if (menu.parentElement && !menu.contains(ev.target)) {
-            document.body.removeChild(menu);
-            window.removeEventListener('mousedown', closeMenu);
-        }
-    };
-
-    window.addEventListener('mousedown', closeMenu);
-    document.body.appendChild(menu);
-}
 
 function toggleFixed(pos) {
     const idx = state.seating.fixed.indexOf(pos);
@@ -4985,92 +6091,2985 @@ function loadSeatingLayout() {
     };
     input.click();
 }
- 
- f u n c t i o n   r e n d e r P r e s e t L i s t ( )   {  
-         c o n s t   s e l e c t   =   d o c u m e n t . g e t E l e m e n t B y I d ( ' s e a t i n g P r e s e t S e l e c t ' ) ;  
-         i f   ( ! s e l e c t )   r e t u r n ;  
-  
-         / /   S a v e   c u r r e n t   s e l e c t i o n  
-         c o n s t   c u r r e n t V a l u e   =   s e l e c t . v a l u e ;  
-  
-         / /   C l e a r   a n d   r e b u i l d  
-         s e l e c t . i n n e r H T M L   =   ' < o p t i o n   v a l u e = " " > - -   U�x���0- - < / o p t i o n > ' ;  
-  
-         s t a t e . s e a t i n g P r e s e t s . f o r E a c h ( ( p r e s e t ,   i n d e x )   = >   {  
-                 c o n s t   o p t i o n   =   d o c u m e n t . c r e a t e E l e m e n t ( ' o p t i o n ' ) ;  
-                 o p t i o n . v a l u e   =   i n d e x ;  
-                 o p t i o n . t e x t C o n t e n t   =   p r e s e t . n a m e ;  
-                 s e l e c t . a p p e n d C h i l d ( o p t i o n ) ;  
-         } ) ;  
-  
-         / /   R e s t o r e   s e l e c t i o n   i f   s t i l l   v a l i d  
-         i f   ( c u r r e n t V a l u e   & &   s t a t e . s e a t i n g P r e s e t s [ c u r r e n t V a l u e ] )   {  
-                 s e l e c t . v a l u e   =   c u r r e n t V a l u e ;  
-         }  
- }  
-  
- f u n c t i o n   s a v e S e a t i n g P r e s e t ( )   {  
-         c o n s t   n a m e   =   p r o m p t ( ' ]~�R�g~{�]~�0�07�*�R��e�	�^ �:~f�:~
-N�%:~��: ' ,   ` ]~l�g~d�g~b�g~f�]~�0$ { s t a t e . s e a t i n g P r e s e t s . l e n g t h   +   1 } ` ) ;  
-         i f   ( ! n a m e )   r e t u r n ;  
-  
-         c o n s t   p r e s e t   =   {  
-                 n a m e :   n a m e ,  
-                 c o l s :   s t a t e . s e a t i n g . c o l s ,  
-                 r o w s :   s t a t e . s e a t i n g . r o w s ,  
-                 d i s a b l e d :   [ . . . s t a t e . s e a t i n g . d i s a b l e d ] ,  
-                 t i m e s t a m p :   n e w   D a t e ( ) . t o I S O S t r i n g ( )  
-         } ;  
-  
-         s t a t e . s e a t i n g P r e s e t s . p u s h ( p r e s e t ) ;  
-         s a v e S e s s i o n S t a t e ( ) ;  
-         r e n d e r P r e s e t L i s t ( ) ;  
-  
-         / /   S e l e c t   t h e   n e w l y   c r e a t e d   p r e s e t  
-         c o n s t   s e l e c t   =   d o c u m e n t . g e t E l e m e n t B y I d ( ' s e a t i n g P r e s e t S e l e c t ' ) ;  
-         i f   ( s e l e c t )   s e l e c t . v a l u e   =   s t a t e . s e a t i n g P r e s e t s . l e n g t h   -   1 ;  
-  
-         a l e r t ( ` ]~�R�g~{�]~�0�02~�0{ n a m e } 2~*�R��Ofm�%P �:~~�:~�R�%2~!�) ;  
- }  
-  
- f u n c t i o n   l o a d S e a t i n g P r e s e t ( e )   {  
-         c o n s t   i n d e x   =   e ? . t a r g e t ? . v a l u e   | |   d o c u m e n t . g e t E l e m e n t B y I d ( ' s e a t i n g P r e s e t S e l e c t ' ) ? . v a l u e ;  
-         i f   ( i n d e x   = = =   ' '   | |   i n d e x   = = =   u n d e f i n e d )   r e t u r n ;  
-  
-         c o n s t   p r e s e t   =   s t a t e . s e a t i n g P r e s e t s [ p a r s e I n t ( i n d e x ) ] ;  
-         i f   ( ! p r e s e t )   r e t u r n ;  
-  
-         / /   A p p l y   p r e s e t   ( o n l y   l a y o u t ,   n o t   a s s i g n m e n t s )  
-         s t a t e . s e a t i n g . c o l s   =   p r e s e t . c o l s ;  
-         s t a t e . s e a t i n g . r o w s   =   p r e s e t . r o w s ;  
-         s t a t e . s e a t i n g . d i s a b l e d   =   [ . . . p r e s e t . d i s a b l e d ] ;  
-  
-         / /   U p d a t e   U I  
-         d o c u m e n t . g e t E l e m e n t B y I d ( ' s e a t i n g C o l s ' ) . v a l u e   =   p r e s e t . c o l s ;  
-         d o c u m e n t . g e t E l e m e n t B y I d ( ' s e a t i n g R o w s ' ) . v a l u e   =   p r e s e t . r o w s ;  
-  
-         s a v e S e s s i o n S t a t e ( ) ;  
-         r e n d e r S e a t i n g G r i d ( ) ;  
- }  
-  
- f u n c t i o n   d e l e t e S e a t i n g P r e s e t ( )   {  
-         c o n s t   s e l e c t   =   d o c u m e n t . g e t E l e m e n t B y I d ( ' s e a t i n g P r e s e t S e l e c t ' ) ;  
-         i f   ( ! s e l e c t )   r e t u r n ;  
-  
-         c o n s t   i n d e x   =   p a r s e I n t ( s e l e c t . v a l u e ) ;  
-         i f   ( i s N a N ( i n d e x )   | |   ! s t a t e . s e a t i n g P r e s e t s [ i n d e x ] )   {  
-                 a l e r t ( ' �O�R:~6TK�]~�R�g~{�]~�0�0g~^"��i �:~f�:~
-N�%:~��2~�0) ;  
-                 r e t u r n ;  
-         }  
-  
-         c o n s t   p r e s e t   =   s t a t e . s e a t i n g P r e s e t s [ i n d e x ] ;  
-         i f   ( ! c o n f i r m ( ` ]~�R�g~{�]~�0�02~�0{ p r e s e t . n a m e } 2~*�R��O�R:~�R*":~6T� �0Tk) )   r e t u r n ;  
-  
-         s t a t e . s e a t i n g P r e s e t s . s p l i c e ( i n d e x ,   1 ) ;  
-         s a v e S e s s i o n S t a t e ( ) ;  
-         r e n d e r P r e s e t L i s t ( ) ;  
-  
-         a l e r t ( ' ]~�R�g~{�]~�0�0g~���p�d�:~�R*":~�R�%2~�0) ;  
- }  
- 
+
+function updateGradeMethodInfo() {
+    const infoDiv = document.getElementById('seatingGradeMethodInfo');
+    if (!infoDiv) return;
+
+    const method = state.seating.gradeMethod || 'cumulative';
+
+    if (method === 'latest') {
+        const targetYear = state.currentYear || 5;
+        let latestTest = null;
+
+        // Find latest test with data for the target year
+        for (let i = SCORE_KEYS.length - 1; i >= 0; i--) {
+            const testKey = SCORE_KEYS[i];
+
+            // Check if any student has data for this test in the target year
+            // Optimization: check first few students
+            const subjects = state.subjects.filter(sub => sub.year === targetYear && !sub.exclude);
+            if (subjects.length > 0) {
+                const hasData = state.students.some(student => {
+                    return subjects.some(sub => {
+                        const val = getScore(student, sub.name, testKey);
+                        return val !== undefined && val !== null && val !== '';
+                    });
+                });
+
+                if (hasData) {
+                    latestTest = testKey;
+                    break;
+                }
+            }
+        }
+
+        if (latestTest) {
+            infoDiv.textContent = `（${targetYear}年 ${latestTest}を使用）`;
+        } else {
+            const lastKey = SCORE_KEYS[SCORE_KEYS.length - 1];
+            infoDiv.textContent = `（${targetYear}年 ${lastKey}を使用）`;
+        }
+    } else {
+        infoDiv.textContent = '';
+    }
+}
+
+function renderPresetList() {
+    const select = document.getElementById('seatingPresetSelect');
+    if (!select) return;
+
+    // Save current selection if possible
+    const currentVal = select.value;
+
+    select.innerHTML = '<option value="">-- 選択 --</option>';
+
+    // Ensure it's an array
+    if (!Array.isArray(state.seatingPresets)) {
+        state.seatingPresets = [];
+    }
+
+    // Separate presets into two groups
+    const layoutOnly = [];
+    const withStudents = [];
+
+    state.seatingPresets.forEach((preset, index) => {
+        const hasAssignments = preset.assignments && Object.keys(preset.assignments).length > 0;
+        if (hasAssignments) {
+            withStudents.push({ preset, index });
+        } else {
+            layoutOnly.push({ preset, index });
+        }
+    });
+
+    // Create optgroup for layout-only presets
+    if (layoutOnly.length > 0) {
+        const layoutGroup = document.createElement('optgroup');
+        layoutGroup.label = '席配置のみ';
+        layoutOnly.forEach(({ preset, index }) => {
+            const option = document.createElement('option');
+            option.value = index;
+            option.textContent = preset.name;
+            layoutGroup.appendChild(option);
+        });
+        select.appendChild(layoutGroup);
+    }
+
+    // Create optgroup for presets with student assignments
+    if (withStudents.length > 0) {
+        const studentsGroup = document.createElement('optgroup');
+        studentsGroup.label = '学生配置あり';
+        withStudents.forEach(({ preset, index }) => {
+            const option = document.createElement('option');
+            option.value = index;
+            option.textContent = preset.name;
+            studentsGroup.appendChild(option);
+        });
+        select.appendChild(studentsGroup);
+    }
+
+    // Restore selection if index still exists
+    if (currentVal && state.seatingPresets[currentVal]) {
+        select.value = currentVal;
+    }
+}
+
+
+function saveSeatingPreset() {
+    const name = prompt('保存するプリセット名を入力してください:', 'レイアウト ' + (state.seatingPresets.length + 1));
+    if (!name) return;
+
+    // Save current layout configuration (only structure, not students)
+    const preset = {
+        name: name,
+        cols: state.seating.cols,
+        rows: state.seating.rows,
+        disabled: [...(state.seating.disabled || [])],
+        assignments: { ...state.seating.assignments }, // Save student positions
+        fixed: [...(state.seating.fixed || [])],       // Save fixed seats
+        timestamp: new Date().toISOString()
+    };
+
+    state.seatingPresets.push(preset);
+    savePresetsOnly(); // Isolated Save
+    saveSessionState();
+    renderPresetList();
+    const autoAssignBtn = document.getElementById('autoAssignBtn'); if (autoAssignBtn) autoAssignBtn.onclick = autoAssignSeating;
+
+
+    // Select the new preset
+    const select = document.getElementById('seatingPresetSelect');
+    if (select) select.value = state.seatingPresets.length - 1;
+
+    alert('プリセット「' + name + '」を保存しました。');
+}
+
+
+function loadSeatingPreset(e) {
+    const index = e.target.value;
+    if (index === '') return;
+
+    const preset = state.seatingPresets[index];
+    if (!preset) return;
+
+    // Confirm if layout is different and assignments exist
+    if (Object.keys(state.seating.assignments).length > 0 &&
+        (state.seating.cols !== preset.cols || state.seating.rows !== preset.rows)) {
+        if (!confirm('座席のサイズが変更されます。配置済みの学生がリセットされる可能性がありますがよろしいですか？')) {
+            e.target.value = ''; // Reset selection
+            return;
+        }
+    }
+
+    state.seating.cols = preset.cols;
+    state.seating.rows = preset.rows;
+    state.seating.disabled = [...(preset.disabled || [])];
+    state.seating.assignments = { ...(preset.assignments || {}) }; // Restore assignments
+    state.seating.fixed = [...(preset.fixed || [])];               // Restore fixed
+
+    // Update UI inputs
+    document.getElementById('seatingCols').value = preset.cols;
+    document.getElementById('seatingRows').value = preset.rows;
+
+    saveSessionState();
+    renderSeatingRoster(); // Update roster list to show checked statuses
+    renderSeatingGrid();
+}
+
+
+function deleteSeatingPreset() {
+    const select = document.getElementById('seatingPresetSelect');
+    if (!select || select.value === '') {
+        alert('削除するプリセットを選択してください。');
+        return;
+    }
+
+    const index = parseInt(select.value);
+    const preset = state.seatingPresets[index];
+
+    if (confirm('プリセット「' + preset.name + '」を削除しますか？')) {
+        state.seatingPresets.splice(index, 1);
+        saveSessionState();
+        renderPresetList();
+        const autoAssignBtn = document.getElementById('autoAssignBtn'); if (autoAssignBtn) autoAssignBtn.onclick = autoAssignSeating;
+
+    }
+}
+
+
+function getStudentAverage(student) {
+    if (!student || !state.scores[student]) return 0;
+
+    const method = state.seating.gradeMethod || 'cumulative';
+    let avg = 0;
+
+    if (method === 'latest') {
+        const targetYear = state.currentYear || 5;
+        let latestScores = [];
+
+        for (let i = SCORE_KEYS.length - 1; i >= 0; i--) {
+            const testKey = SCORE_KEYS[i];
+            const subjects = state.subjects.filter(sub => sub.year === targetYear && !sub.exclude);
+            const testScores = [];
+
+            subjects.forEach(sub => {
+                const val = getScore(student, sub.name, testKey);
+                if (val !== undefined && val !== null && val !== '' && !isNaN(parseFloat(val))) {
+                    testScores.push(parseFloat(val));
+                }
+            });
+
+            if (testScores.length > 0) {
+                latestScores = testScores;
+                break;
+            }
+        }
+
+        if (latestScores.length > 0) {
+            avg = latestScores.reduce((a, b) => a + b, 0) / latestScores.length;
+        }
+    } else {
+        // Cumulative
+        const scoreData = state.scores[student];
+        const allScores = [];
+        Object.values(scoreData).forEach(subjectScores => {
+            if (typeof subjectScores === 'object') {
+                SCORE_KEYS.forEach(key => {
+                    const val = subjectScores[key];
+                    if (val !== undefined && val !== null && val !== '' && !isNaN(parseFloat(val))) {
+                        allScores.push(parseFloat(val));
+                    }
+                });
+            }
+        });
+        if (allScores.length > 0) {
+            avg = allScores.reduce((a, b) => a + b, 0) / allScores.length;
+        }
+    }
+    return avg;
+}
+
+function autoAssignSeating() {
+    try {
+        const methodSelect = document.getElementById('seatingAssignMethod');
+        if (!methodSelect) return;
+        const method = methodSelect.value;
+        if (!method) return;
+
+        // Preserve assignments for fixed seats
+        const fixedStudents = new Set();
+        const currentAssignments = state.seating.assignments || {};
+        const newAssignments = {};
+
+        if (state.seating.fixed) {
+            state.seating.fixed.forEach(pos => {
+                if (currentAssignments[pos]) {
+                    newAssignments[pos] = currentAssignments[pos];
+                    fixedStudents.add(currentAssignments[pos]);
+                }
+            });
+        }
+
+        // Set assignments to only the fixed ones (effectively clearing non-fixed)
+        state.seating.assignments = newAssignments;
+
+        // Determine available seats (excluding disabled AND fixed)
+        // Order: Top-Left (Teacher's Right-Front) origin
+
+        const seats = [];
+        const rows = state.seating.rows;
+        const cols = state.seating.cols;
+
+        const isExcluded = (pos) => {
+            return (state.seating.disabled && state.seating.disabled.includes(pos)) || (state.seating.fixed && state.seating.fixed.includes(pos));
+        };
+
+        if (method === 'roster_v') {
+            // Vertical from Screen Left (Student Right)
+            for (let c = 0; c < cols; c++) {
+                for (let r = 0; r < rows; r++) {
+                    const pos = r + '-' + c;
+                    if (!isExcluded(pos)) {
+                        seats.push(pos);
+                    }
+                }
+            }
+        } else {
+            // Horizontal (Screen Left -> Right, Top -> Bottom)
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    const pos = r + '-' + c;
+                    if (!isExcluded(pos)) {
+                        seats.push(pos);
+                    }
+                }
+            }
+        }
+
+        // Prepare students list (Exclude fixed students)
+        let studentsToAssign = state.students.filter(s => !fixedStudents.has(s));
+
+        if (method === 'grades_asc' || method === 'attendance_desc') {
+            // Sort students based on selected metric
+            if (method === 'grades_asc') {
+                // Ascending Grade (Lower grades come first)
+                studentsToAssign.sort((a, b) => getStudentAverage(a) - getStudentAverage(b));
+            } else {
+                // Descending Attendance Score (Higher risks come first)
+                const getAttScore = (name) => {
+                    const att = state.attendance.records[name] || {};
+                    let score = 0;
+                    Object.values(att).forEach(day => {
+                        day.forEach(ev => {
+                            if (ev.status === "欠") score += 1.0;
+                            else if (ev.status === "遅") score += 0.5;
+                        });
+                    });
+                    return score;
+                };
+                studentsToAssign.sort((a, b) => getAttScore(b) - getAttScore(a));
+            }
+
+            // Fill rows from Front to Back, but randomize WITHIN each row
+            let studentIndex = 0;
+            for (let r = 0; r < rows; r++) {
+                const seatsInRow = [];
+                for (let c = 0; c < cols; c++) {
+                    const pos = r + '-' + c;
+                    if (!isExcluded(pos)) seatsInRow.push(pos);
+                }
+                if (seatsInRow.length === 0) continue;
+
+                const chunk = studentsToAssign.slice(studentIndex, studentIndex + seatsInRow.length);
+                studentIndex += seatsInRow.length;
+
+                // Shuffle WITHIN this row group
+                for (let i = chunk.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [chunk[i], chunk[j]] = [chunk[j], chunk[i]];
+                }
+
+                seatsInRow.forEach((pos, idx) => {
+                    if (idx < chunk.length) state.seating.assignments[pos] = chunk[idx];
+                });
+
+                if (studentIndex >= studentsToAssign.length) break;
+            }
+        } else {
+            // Standard Assignment for other methods
+            // Sort students
+            if (method === 'random') {
+                for (let i = studentsToAssign.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [studentsToAssign[i], studentsToAssign[j]] = [studentsToAssign[j], studentsToAssign[i]];
+                }
+            }
+
+            // Assign
+            for (let i = 0; i < seats.length && i < studentsToAssign.length; i++) {
+                state.seating.assignments[seats[i]] = studentsToAssign[i];
+            }
+        }
+
+        saveSessionState();
+        renderSeatingRoster();
+        renderSeatingGrid();
+    } catch (e) {
+        alert('自動配置エラー: ' + e.message);
+        console.error(e);
+    }
+}
+
+function savePresetsOnly() {
+    try {
+        if (!state.seatingPresets) state.seatingPresets = [];
+        localStorage.setItem('gm_state_seatingPresets_v2', JSON.stringify(state.seatingPresets));
+    } catch (e) {
+        alert('プリセット保存エラー: ' + e.message);
+    }
+}
+
+function loadPresetsOnly() {
+    try {
+        const raw = localStorage.getItem('gm_state_seatingPresets_v2');
+        if (raw) {
+            state.seatingPresets = JSON.parse(raw);
+        }
+    } catch (e) {
+        console.error('Preset load error', e);
+    }
+}
+
+// Context Menu Logic
+let currentContextMenuSeat = null;
+
+function initContextMenu() {
+    let menu = document.getElementById('seatContextMenu');
+    if (menu) return; // Only create once
+
+    menu = document.createElement('div');
+    menu.id = 'seatContextMenu';
+    menu.style.cssText = `
+        position: fixed;
+        background: white;
+        border: 1px solid #cbd5e1;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 99999;
+        display: none;
+        min-width: 180px;
+        border-radius: 0.5rem;
+        padding: 0.5rem 0;
+        font-family: sans-serif;
+    `;
+
+    menu.innerHTML = `
+        <div class="context-menu-item" data-action="clear-seat" style="padding: 0.6rem 1rem; cursor: pointer; color: #ef4444; font-weight: bold; font-size: 0.9rem;">席をクリア</div>
+        <div class="context-menu-item" data-action="toggle-fix" style="padding: 0.6rem 1rem; cursor: pointer; color: #475569; font-size: 0.9rem;">?? 位置を固定/解除</div>
+        <div id="sep-clear" style="height: 1px; background: #e2e8f0; margin: 0.4rem 0;"></div>
+        <div class="context-menu-item" data-action="toggle-disable" style="padding: 0.6rem 1rem; cursor: pointer; color: #475569; font-size: 0.9rem;">無効化/有効化 (Toggle)</div>
+        <div style="height: 1px; background: #e2e8f0; margin: 0.4rem 0;"></div>
+        <div class="context-menu-item" data-action="disable-col" style="padding: 0.6rem 1rem; cursor: pointer; color: #475569; font-size: 0.9rem;">縦一列を無効化</div>
+        <div class="context-menu-item" data-action="disable-row" style="padding: 0.6rem 1rem; cursor: pointer; color: #475569; font-size: 0.9rem;">横一列を無効化</div>
+        <div style="height: 1px; background: #e2e8f0; margin: 0.4rem 0;"></div>
+        <div class="context-menu-item" data-action="enable-col" style="padding: 0.6rem 1rem; cursor: pointer; color: #475569; font-size: 0.9rem;">縦一列を有効化</div>
+        <div class="context-menu-item" data-action="enable-row" style="padding: 0.6rem 1rem; cursor: pointer; color: #475569; font-size: 0.9rem;">横一列を有効化</div>
+    `;
+    document.body.appendChild(menu);
+
+    // Hover effect for items (since we are inlining)
+    menu.querySelectorAll('.context-menu-item').forEach(item => {
+        item.onmouseover = () => item.style.background = '#f1f5f9';
+        item.onmouseout = () => item.style.background = 'transparent';
+    });
+
+    // Close on any click outside
+    document.addEventListener('mousedown', (e) => {
+        if (!menu.contains(e.target)) {
+            menu.style.display = 'none';
+        }
+    });
+
+    menu.addEventListener('click', (e) => {
+        const item = e.target.closest('.context-menu-item');
+        if (item) {
+            const action = item.getAttribute('data-action');
+            if (action && currentContextMenuSeat) {
+                handleSeatMenuAction(action, currentContextMenuSeat);
+                menu.style.display = 'none';
+            }
+        }
+    });
+
+    // Prevent default context menu on our custom menu
+    menu.oncontextmenu = (e) => e.preventDefault();
+}
+
+function showSeatContextMenu(e, pos) {
+    e.preventDefault();
+    e.stopPropagation();
+    currentContextMenuSeat = pos;
+    const menu = document.getElementById('seatContextMenu');
+    if (menu) {
+        // Show/Hide "Clear Seat" depending on assignment
+        const hasStudent = !!state.seating.assignments[pos];
+        const isFixed = state.seating.fixed.includes(pos);
+
+        const clearItem = menu.querySelector('[data-action="clear-seat"]');
+        const fixItem = menu.querySelector('[data-action="toggle-fix"]');
+        const sep = document.getElementById('sep-clear');
+
+        if (clearItem) clearItem.style.display = hasStudent ? 'block' : 'none';
+        if (fixItem) {
+            fixItem.style.display = hasStudent ? 'block' : 'none';
+            fixItem.textContent = isFixed ? '?? 固定解除' : '?? 位置を固定';
+        }
+        if (sep) sep.style.display = hasStudent ? 'block' : 'none';
+
+        menu.style.left = e.clientX + 'px';
+        menu.style.top = e.clientY + 'px';
+        menu.style.display = 'block';
+    }
+}
+
+function handleSeatMenuAction(action, pos) {
+    const parts = pos.split('-');
+    const r = parseInt(parts[0]);
+    const c = parseInt(parts[1]);
+    const rows = state.seating.rows;
+    const cols = state.seating.cols;
+
+    const setDisable = (p, disable) => {
+        if (disable) {
+            if (!state.seating.disabled.includes(p)) state.seating.disabled.push(p);
+            // Remove from fixed
+            state.seating.fixed = state.seating.fixed.filter(x => x !== p);
+            // Remove assignment
+            if (state.seating.assignments[p]) delete state.seating.assignments[p];
+        } else {
+            state.seating.disabled = state.seating.disabled.filter(x => x !== p);
+        }
+    };
+
+    if (action === 'clear-seat') {
+        if (state.seating.assignments[pos]) {
+            delete state.seating.assignments[pos];
+        }
+    } else if (action === 'toggle-fix') {
+        toggleFixed(pos);
+        return; // toggleFixed already saves and renders
+    } else if (action === 'toggle-disable') {
+        const isDisabled = state.seating.disabled.includes(pos);
+        setDisable(pos, !isDisabled);
+    } else if (action === 'disable-col') {
+        for (let i = 0; i < rows; i++) setDisable(i + '-' + c, true);
+    } else if (action === 'disable-row') {
+        for (let i = 0; i < cols; i++) setDisable(r + '-' + i, true);
+    } else if (action === 'enable-col') {
+        for (let i = 0; i < rows; i++) setDisable(i + '-' + c, false);
+    } else if (action === 'enable-row') {
+        for (let i = 0; i < cols; i++) setDisable(r + '-' + i, false);
+    }
+
+    // Reset preset selection if layout (disabled/enabled) changed
+    if (action !== 'clear-seat') {
+        const presetSelect = document.getElementById('seatingPresetSelect');
+        if (presetSelect) presetSelect.value = '';
+    }
+
+    saveSessionState();
+    renderSeatingRoster();
+    renderSeatingGrid();
+}
+
+// ==================== ROSTER BOARD LOGIC ====================
+// Replaces old Import Preview Modal
+
+function initRosterBoard() {
+    // Check if we have pending import state or active students
+    if (importState.candidates.length === 0 && state.students.length > 0) {
+        // If empty candidates but we have students, populate candidates FROM current students?
+        // No, Roster Board is specifically for IMPORTING NEW or UPDATING.
+        // But maybe we should show current status? 
+        // For now, let's keep it clean: "No file loaded".
+    }
+}
+
+// Event Listeners for Roster Board
+// Event Listeners for Roster Board moved to setupEventListeners()
+// to ensure DOM readiness.
+
+// rosterSelectAll listener moved to setupEventListeners
+
+
+// Logic called after CSV parsing
+function openRosterBoard(candidates) {
+    importState.candidates = candidates;
+    importState.selected = new Set(); // Start with NONE selected to avoid accidental full import
+    importState.filters = {};
+    importState.searchText = '';
+    importState.sortKey = 'original';
+    importState.sortOrder = 'asc';
+
+    // Reset UI
+    // document.getElementById('rosterSortSelect').value = 'original'; // remove if select removed
+
+    // Switch Tab
+    switchTab('roster_board');
+
+    // Render Sidebar Filters
+    renderRosterBoardFilters();
+
+    // Render Status
+    document.getElementById('rosterBoardStatus').textContent = `読み込み完了 (${candidates.length}名)`;
+    document.getElementById('rosterBoardStatus').style.color = '#10b981';
+
+    // Render Table
+    renderRosterBoardTable();
+    setupRosterHeaderSort(); // Attach listeners
+
+    // PERSIST
+    saveSessionState();
+}
+
+function renderRosterBoardFilters() {
+    const filterContainer = document.getElementById('rosterFilterContainer');
+    filterContainer.innerHTML = '';
+
+    const candidates = importState.candidates || [];
+
+    // Extract unique values
+    const years = [...new Set(candidates.map(c => { const m = c.metadata || {}; return m['年'] || c.year; }).filter(Boolean))].sort();
+    const classes = [...new Set(candidates.map(c => { const m = c.metadata || {}; return m['組'] || c.class; }).filter(Boolean))].sort();
+    const courses = [...new Set(candidates.map(c => { const m = c.metadata || {}; return m['コース'] || m['応用専門分野・領域']; }).filter(Boolean))].sort();
+
+    const genders = [...new Set(candidates.map(c => { const m = c.metadata || {}; return m['性別']; }).filter(Boolean))].sort();
+
+    // Helper
+    const createSelect = (label, key, options, staticOptions = null) => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'control-group';
+        wrapper.style.display = 'flex';
+        wrapper.style.flexDirection = 'column';
+        wrapper.style.gap = '0.3rem';
+
+        wrapper.innerHTML = `<label style="font-size:0.85rem; font-weight:600; color:#64748b;">${label}</label>`;
+        const sel = document.createElement('select');
+        sel.style.cssText = "width:100%; padding: 0.4rem; border: 1px solid #cbd5e1; border-radius: 0.4rem; font-size: 0.85rem; background: #fff;";
+
+        if (staticOptions) {
+            sel.innerHTML = '<option value="">すべて</option>' + staticOptions.map(o => `<option value="${o.val}">${o.label}</option>`).join('');
+        } else {
+            sel.innerHTML = '<option value="">すべて</option>' + options.map(o => `<option value="${o}">${o}</option>`).join('');
+        }
+
+        sel.onchange = (e) => {
+            importState.filters[key] = e.target.value;
+            renderRosterBoardTable();
+            document.getElementById('rosterSelectAll').checked = false;
+        };
+        wrapper.appendChild(sel);
+        filterContainer.appendChild(wrapper);
+    };
+
+    if (years.length > 0) createSelect('学年', 'year', years);
+    if (classes.length > 0) createSelect('組', 'class', classes);
+    if (genders.length > 0) createSelect('性別', 'gender', genders);
+    if (courses.length > 0) createSelect('応用専門分野', 'course', courses);
+
+    // Status Filter (Static)
+    createSelect('登録状況', 'status', [], [
+        { val: 'new', label: '新規 (New)' },
+        { val: 'update', label: '更新 (Update)' }
+    ]);
+
+    if (filterContainer.children.length === 0) {
+        filterContainer.innerHTML = '<div style="color:#94a3b8; font-size:0.85rem;">絞り込み可能な項目がありません</div>';
+    }
+}
+
+function getFilteredAndSortedCandidates() {
+    // 1. Filter
+    let list = importState.candidates.filter(c => {
+        const meta = c.metadata || {};
+        if (importState.filters.year && (meta['年'] || String(c.year)) != importState.filters.year) return false;
+        if (importState.filters.class && (meta['組'] || c.class) != importState.filters.class) return false;
+        if (importState.filters.gender && meta['性別'] != importState.filters.gender) return false;
+        if (importState.filters.course && (meta['コース'] || meta['応用専門分野・領域']) != importState.filters.course) return false;
+        if (importState.filters.status) {
+            const isNew = !new Set(state.students).has(c.name);
+            if (importState.filters.status === 'new' && !isNew) return false;
+            if (importState.filters.status === 'update' && isNew) return false;
+        }
+
+        // Search Text Filter
+        if (importState.searchText) {
+            const query = importState.searchText.toLowerCase();
+            const searchTargets = [
+                c.name,
+                c.metadata['暗号化氏名1'],
+                c.metadata['暗号化氏名'],
+                c.no,
+                c.metadata['出席番号'],
+                c.studentId,
+                c.metadata['学籍番号']
+            ].map(v => (v || '').toString().toLowerCase());
+
+            if (!searchTargets.some(t => t.includes(query))) return false;
+        }
+
+        return true;
+    });
+
+    // 2. Sort
+    const key = importState.sortKey;
+    const order = importState.sortOrder === 'asc' ? 1 : -1;
+    const existingSet = new Set(state.students);
+
+    const compare = (a, b, k) => {
+        let valA = '', valB = '';
+        if (k === 'year') { valA = a.year || ''; valB = b.year || ''; }
+        else if (k === 'class') { valA = a.class || ''; valB = b.class || ''; }
+        else if (k === 'no') { valA = String(a.no || 999).padStart(3, '0'); valB = String(b.no || 999).padStart(3, '0'); }
+        else if (k === 'name') { valA = a.name; valB = b.name; }
+        else if (k === 'gender') { valA = a.metadata['性別'] || ''; valB = b.metadata['性別'] || ''; }
+        else if (k === 'selection') { valA = a.metadata['選択'] || ''; valB = b.metadata['選択'] || ''; }
+        else if (k === 'course') { valA = a.metadata['応用専門分野・領域'] || ''; valB = b.metadata['応用専門分野・領域'] || ''; }
+        else if (k === 'status') {
+            // New (= true) vs Update (= false)
+            const isNewA = !existingSet.has(a.name);
+            const isNewB = !existingSet.has(b.name);
+            // Sort: New first? True > False
+            if (isNewA === isNewB) return 0;
+            return isNewA ? -1 : 1;
+        }
+        else {
+            // Original / key
+            return a.sortKey.localeCompare(b.sortKey);
+        }
+
+        // Use numeric sort for numbers if needed, else string localeCompare
+        if (k === 'no' || k === 'year') {
+            return valA.localeCompare(valB, undefined, { numeric: true });
+        }
+        return valA.localeCompare(valB, 'ja');
+    };
+
+    if (key !== 'original') {
+        list.sort((a, b) => compare(a, b, key) * order);
+    } else {
+        list.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+    }
+
+    return list;
+}
+
+function setupRosterHeaderSort() {
+    const headers = document.querySelectorAll('.sortable-th');
+    headers.forEach(th => {
+        // Use addEventListener instead of onclick to avoid overwrites
+        th.addEventListener('click', () => {
+            const sortKey = th.dataset.sort;
+            if (importState.sortKey === sortKey) {
+                // Toggle order
+                importState.sortOrder = importState.sortOrder === 'asc' ? 'desc' : 'asc';
+            } else {
+                importState.sortKey = sortKey;
+                importState.sortOrder = 'asc';
+            }
+            console.log(`Sorting by ${sortKey} (${importState.sortOrder})`);
+            renderRosterBoardTable();
+        });
+
+        // Add visual cue logic
+        th.addEventListener('mouseover', () => th.style.backgroundColor = '#e2e8f0');
+        th.addEventListener('mouseout', () => th.style.backgroundColor = '');
+    });
+}
+
+
+function renderRosterBoardTable() {
+    const tbody = document.getElementById('rosterBoardBody');
+    if (!tbody) return;
+
+    // If no candidates (pending import), show Current Students instead
+    if (!importState.candidates || importState.candidates.length === 0) {
+        if (state.students && state.students.length > 0) {
+            // Load current students into candidates for view/edit
+            // This allows the Roster Board to act as a viewer for current data
+            importState.candidates = state.students.map(name => {
+                const meta = state.studentMetadata[name] || {};
+                // Reconstruct a candidate object
+                return {
+                    name: name,
+                    sortKey: meta['sortKey'] || name,
+                    metadata: meta,
+                    year: meta['年'] || meta['year'] || '',
+                    class: meta['組'] || meta['class'] || '',
+                    no: meta['出席番号'] || meta['no'] || '',
+                    studentId: meta['学籍番号'] || meta['studentId'] || ''
+                };
+            });
+            importState.selected = new Set(); // Default none selected
+
+            // Update Status
+            const statusDiv = document.getElementById('rosterBoardStatus');
+            if (statusDiv) {
+                statusDiv.textContent = `現在登録済みのデータ (${state.students.length}名)`;
+                statusDiv.style.color = '#475569';
+            }
+
+            // If filters are empty, render filters based on this data
+            if (Object.keys(importState.filters).length === 0) {
+                renderRosterBoardFilters();
+            }
+        }
+    }
+
+    const visible = getFilteredAndSortedCandidates();
+    document.querySelectorAll('.sortable-th .sort-icon').forEach(icon => icon.textContent = '');
+    const activeHeader = document.querySelector(`.sortable-th[data-sort="${importState.sortKey}"] .sort-icon`);
+    if (activeHeader) {
+        activeHeader.textContent = importState.sortOrder === 'asc' ? ' ▲' : ' ▼';
+    }
+
+    tbody.innerHTML = '';
+
+    // const visible = getFilteredAndSortedCandidates(); // Already defined
+    const existingStudentsSet = new Set(state.students);
+
+    // Update Select All Checkbox State
+    const selectAllCb = document.getElementById('rosterSelectAll');
+    if (selectAllCb) {
+        // Reuse 'visible' which respects filters
+        const allSelected = visible.length > 0 && visible.every(c => importState.selected.has(c.name));
+        selectAllCb.checked = allSelected;
+    }
+
+    if (visible.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="11" style="text-align: center; padding: 2rem; color: #94a3b8;">
+            条件に一致する学生がいません
+        </td></tr>`;
+        return;
+    }
+
+    visible.forEach(c => {
+        const tr = document.createElement('tr');
+        const isChecked = importState.selected.has(c.name);
+        const isNew = !existingStudentsSet.has(c.name);
+
+        tr.style.background = isChecked ? '#fff' : '#f8fafc';
+        if (isChecked) {
+            tr.style.background = isNew ? '#ecfdf5' : '#fff'; // Green tint if new, White if update
+        }
+
+        const statusBadge = isNew
+            ? '<span class="status-pass" style="background:#dcfce7; color:#166534; padding:2px 8px; border-radius:4px; font-size:0.75rem;">新規</span>'
+            : '<span style="background:#f1f5f9; color:#64748b; padding:2px 8px; border-radius:4px; font-size:0.75rem;">更新</span>';
+
+        const displayName = c.name;
+
+        tr.innerHTML = `
+            <td style="text-align: center;">
+                <input type="checkbox" class="roster-checkbox" data-name="${c.name}" ${isChecked ? 'checked' : ''}>
+            </td>
+            <td>${c.metadata['年'] || c.year || '-'}</td>
+            <td>${c.metadata['組'] || c.class || '-'}</td>
+            <td>${c.metadata['出席\n番号'] || c.metadata['出席番号'] || c.no || '-'}</td>
+            <td><div style="font-weight:500;">${displayName}</div></td>
+            <td style="color:#cbd5e1; font-size:0.8rem; font-family:monospace;">${c.metadata['暗号化氏名1'] || c.metadata['暗号化氏名'] || ''}</td>
+            <td style="font-family:monospace; font-size:0.85rem;">${c.metadata['OMUID'] || c.metadata['omuid'] || '-'}</td>
+            <td>${c.metadata['性別'] || '-'}</td>
+            <td>${c.metadata['選択'] || c.metadata['選択科目'] || '-'}</td>
+            <td>${c.metadata['応用専門分野・領域'] || c.metadata['コース'] || '-'}</td>
+            <td style="text-align:center;">${statusBadge}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    // Count Update (Optional: could add a status bar text somewhere)
+    // document.getElementById('rosterCountInfo').textContent = ...
+
+    // Listeners and Row Interactions
+    const rows = tbody.querySelectorAll('tr');
+    rows.forEach((tr, index) => {
+        const checkbox = tr.querySelector('.roster-checkbox');
+        const studentName = checkbox.dataset.name;
+
+        // 1. Click Handler (Selection)
+        tr.addEventListener('click', (e) => {
+            // If clicked directly on the checkbox, let the change event handle it (but update lastClicked)
+            if (e.target.type === 'checkbox') {
+                importState.lastClickedIndex = index;
+                return;
+            }
+
+            // Prevent text selection double-click behavior usually
+            // e.preventDefault(); // Might block input focus if any? No inputs in row other than checkbox.
+
+            if (e.shiftKey && importState.lastClickedIndex !== undefined) {
+                // Range Selection
+                const start = Math.min(importState.lastClickedIndex, index);
+                const end = Math.max(importState.lastClickedIndex, index);
+                const rangeNames = visible.slice(start, end + 1).map(c => c.name);
+
+                // If Ctrl is NOT pressed, clear others first? 
+                // Standard behavior: Shift+Click extends selection. 
+                // Usually keeps existing 'anchor' selection.
+                // Simplified: Add range to current selection.
+                // Or: If Ctrl not pressed, range becomes the ONLY selection? 
+                // Let's go with: Shift always adds range, but if Ctrl not pressed, we might want to clear others?
+                // Windows Explorer: Shift+Click selects range between anchor and current. Clears others unless Ctrl held? No.
+                // Let's stick to "Add Range" logic for simplicity, or "Select Range exclusively" if no Ctrl.
+
+                if (!e.ctrlKey) {
+                    importState.selected.clear();
+                }
+
+                rangeNames.forEach(n => importState.selected.add(n));
+
+            } else if (e.ctrlKey || e.metaKey) {
+                // Toggle
+                if (importState.selected.has(studentName)) {
+                    importState.selected.delete(studentName);
+                } else {
+                    importState.selected.add(studentName);
+                }
+            } else {
+                // Single Select (Clear others)
+                importState.selected.clear();
+                importState.selected.add(studentName);
+            }
+
+            importState.lastClickedIndex = index;
+            renderRosterBoardTable();
+        });
+
+        // 2. Right Click (Context Menu)
+        tr.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+
+            // If row is not part of selection, select it (exclusive)
+            if (!importState.selected.has(studentName)) {
+                importState.selected.clear();
+                importState.selected.add(studentName);
+                renderRosterBoardTable();
+            }
+
+            showRosterContextMenu(e.clientX, e.clientY);
+        });
+
+        // Checkbox Change (keep existing logic for simple checkbox clicks)
+        checkbox.addEventListener('change', (e) => {
+            if (e.target.checked) importState.selected.add(e.target.dataset.name);
+            else importState.selected.delete(e.target.dataset.name);
+            // Don't re-render entire table here to avoid losing focus/scroll? 
+            // Checkbox state is already visually updated by browser.
+            // But we need to update row background.
+            // renderRosterBoardTable(); -> This rebuilds DOM, might lose checkbox focus if keyboard used.
+            // Better to just update parent row style.
+            const row = e.target.closest('tr');
+            if (e.target.checked) row.style.backgroundColor = '#fff'; // Simplification, lost 'New' tint logic? 
+            // Re-render is safer for consistency.
+            renderRosterBoardTable();
+        });
+    });
+}
+
+// Roster Context Menu
+function showRosterContextMenu(x, y) {
+    let menu = document.getElementById('rosterContextMenu');
+    if (!menu) {
+        menu = document.createElement('div');
+        menu.id = 'rosterContextMenu';
+        menu.style.cssText = `
+            position: fixed;
+            background: white;
+            border: 1px solid #cbd5e1;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 99999;
+            min-width: 160px;
+            border-radius: 0.5rem;
+            padding: 0.5rem 0;
+            font-family: sans-serif;
+            font-size: 0.9rem;
+        `;
+        menu.innerHTML = `
+            <div class="ctx-item" data-action="teams">
+                <span class="ctx-icon">??</span> Teamsチャット
+            </div>
+            <div class="ctx-item" data-action="mail">
+                <span class="ctx-icon">??</span> メール送信
+            </div>
+        `;
+        document.body.appendChild(menu);
+
+        // Styling
+        const style = document.createElement('style');
+        style.textContent = `
+            #rosterContextMenu .ctx-item { padding: 0.6rem 1rem; cursor: pointer; color: #475569; display: flex; align-items: center; gap: 0.5rem; }
+            #rosterContextMenu .ctx-item:hover { background: #f1f5f9; color: #1e293b; }
+            #rosterContextMenu .ctx-icon { width: 16px; text-align: center; }
+        `;
+        document.head.appendChild(style);
+
+        // Logic
+        menu.addEventListener('click', (e) => {
+            const item = e.target.closest('.ctx-item');
+            if (!item) return;
+            const action = item.dataset.action;
+            if (action === 'teams') openTeamsChatForSelected();
+            if (action === 'mail') openMailForSelected();
+            menu.style.display = 'none';
+        });
+
+        // Close
+        document.addEventListener('mousedown', (e) => {
+            if (!menu.contains(e.target)) menu.style.display = 'none';
+        });
+    }
+
+    menu.style.display = 'block';
+    // Boundary check
+    const rect = menu.getBoundingClientRect();
+    if (x + rect.width > window.innerWidth) x -= rect.width;
+    if (y + rect.height > window.innerHeight) y -= rect.height;
+
+    menu.style.left = x + 'px';
+    menu.style.top = y + 'px';
+}
+
+
+function confirmImportFromBoard() {
+    const selectedNames = Array.from(importState.selected);
+
+    if (selectedNames.length === 0) {
+        alert('学生が選択されていません。');
+        return;
+    }
+
+    if (!confirm(`${selectedNames.length} 名の学生を成績管理に取り込みますか？\n(既存の学生情報は更新・上書きされます)`)) return;
+
+    // Filter candidates
+    const finalCandidates = importState.candidates.filter(c => importState.selected.has(c.name));
+
+    // Sort again just to be sure (or use current sort?)
+    // Usually user wants the order they see on screen.
+    const sortedFinal = getFilteredAndSortedCandidates().filter(c => importState.selected.has(c.name));
+
+    // If user has filtered, we might miss selected but invisible ones in `sortedFinal`.
+    // Strategy: Use screen sort for visible, and append invisible ones at end? 
+    // Or just use importState.candidates original sort for consistency?
+    // Let's use Screen Sort logic for consistency with what user sees.
+
+    // But getFilteredAndSortedCandidates ONLY returns filtered.
+    // If I selected someone then changed filter, they are still in `selected` set but not in `sortedFinal`.
+    // We should probably just use the `importState.candidates` sorted by `importState.sortMethod`.
+
+    let allCandidates = [...importState.candidates];
+    // Sort allCandidates by current sort method
+    // Reuse logic (duplicated for brevity or refactor helper)
+    const method = importState.sortMethod;
+    if (method === 'name') {
+        allCandidates.sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+    } else if (method === 'studentId') {
+        allCandidates.sort((a, b) => (a.studentId || '').localeCompare(b.studentId || '', undefined, { numeric: true }));
+    } else if (method === 'year') {
+        allCandidates.sort((a, b) => (a.year || '').localeCompare(b.year || '', undefined, { numeric: true }) || a.sortKey.localeCompare(b.sortKey));
+    } else if (method === 'class') {
+        allCandidates.sort((a, b) => (a.class || '').localeCompare(b.class || '') || a.sortKey.localeCompare(b.sortKey));
+    } else {
+        allCandidates.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+    }
+
+    const newStudents = [];
+    const newMetadata = {};
+
+    allCandidates.forEach(c => {
+        if (importState.selected.has(c.name)) {
+            newStudents.push(c.name);
+            newMetadata[c.name] = c.metadata;
+        }
+    });
+
+    // MERGE logic: Keep current students IF they are still relevant OR just replace?
+    // User said "絞り込んだものを流すイメージ". 
+    // Usually this means "Update the master list to MATCH the selected ones".
+
+    state.students = newStudents;
+    // For metadata, we merge into existing to preserve any manually added fields not in roster?
+    // Actually, roster is usually the source of truth for 'Year/Class/No'.
+    // Let's replace metadata for THOSE students, but keep others if we were appending.
+    // Since we are replacing state.students, we just use newMetadata.
+    state.studentMetadata = newMetadata;
+
+    if (!state.students.includes(state.currentStudent)) {
+        state.currentStudent = state.students[0];
+    }
+
+    saveSessionState();
+    populateControls();
+
+    alert(`取り込みが完了しました。\n(${state.students.length} 名登録)`);
+
+    // Maybe switch to Settings or Roster? Stay on Roster Board.
+    renderRosterBoardTable();
+}
+
+function openTeamsChatForSelected() {
+    const selectedNames = Array.from(importState.selected);
+    if (selectedNames.length === 0) {
+        alert('学生が選択されていません。');
+        return;
+    }
+
+    const emails = getEmailsForSelected(true); // Helper with alert
+    if (!emails) return;
+
+    const usersParam = emails.join(',');
+    // Teams Deep Link
+    // format: https://teams.microsoft.com/l/chat/0/0?users=alice@example.com,bob@example.com
+    const url = `https://teams.microsoft.com/l/chat/0/0?users=${encodeURIComponent(usersParam)}`;
+
+    window.open(url, '_blank');
+}
+
+function openMailForSelected() {
+    const selectedNames = Array.from(importState.selected);
+    if (selectedNames.length === 0) {
+        alert('学生が選択されていません。');
+        return;
+    }
+
+    const emails = getEmailsForSelected(true); // Helper with alert
+    if (!emails) return; // Alert handled in helper
+
+    // Mailto
+    // Outlook often prefers semicolon, others comma. RFC says comma.
+    // Let's try comma. If user wants semicolon, they can replace?
+    // Some envs (Windows Default Mail) handle comma fine.
+    const to = emails.join(',');
+    window.location.href = `mailto:${to}`;
+}
+
+function getEmailsForSelected(showAlerts = false) {
+    const students = importState.candidates.filter(c => importState.selected.has(c.name));
+    const emails = [];
+    const missing = [];
+
+    students.forEach(s => {
+        const meta = s.metadata;
+        const email = meta['Email'] || meta['email'] || meta['メール'] || meta['メールアドレス'] || meta['e-mail'];
+        if (email) {
+            emails.push(email);
+        } else {
+            missing.push(s.name);
+        }
+    });
+
+    if (emails.length === 0) {
+        if (showAlerts) alert('選択された学生のメールアドレス情報が見つかりません。\n(CSVに「Email」などの列を追加してください)');
+        return null;
+    }
+
+    if (missing.length > 0 && showAlerts) {
+        if (!confirm(`${missing.length} 名のメールアドレスが見つかりませんでした。\n(見つかった ${emails.length} 名のみで作成しますか？)`)) {
+            return null;
+        }
+    }
+    return emails;
+}
+
+
+// ==================== METADATA EDITOR ====================
+
+function editStudentMetadata(studentName) {
+    const modal = document.getElementById('metadataEditorModal');
+    const container = document.getElementById('metaEditFieldsContainer');
+    const nameInput = document.getElementById('metaEditName');
+    const originalNameInput = document.getElementById('metaEditOriginalName');
+
+    // Get current metadata
+    const meta = state.studentMetadata[studentName] || {};
+
+    nameInput.value = studentName;
+    originalNameInput.value = studentName;
+    container.innerHTML = '';
+
+    // Default keys to always show (customize as needed)
+    // Merge existing keys with common keys
+    const commonKeys = ['年', '組', '出席番号', '性別', '選択', '応用専門分野・領域', '暗号化氏名1'];
+    const allKeys = new Set([...commonKeys, ...Object.keys(meta)]);
+
+    allKeys.forEach(key => {
+        const val = meta[key] || '';
+        const wrapper = document.createElement('div');
+        wrapper.className = 'control-group';
+        wrapper.innerHTML = `
+            <label style="font-size: 0.8rem; color: #64748b;">${key}</label>
+            <input type="text" class="meta-field-input" data-key="${key}" value="${val}" style="width: 100%; padding: 0.4rem; border: 1px solid #cbd5e1; border-radius: 0.3rem;">
+        `;
+        container.appendChild(wrapper);
+    });
+
+    modal.classList.add('open');
+}
+
+function addCustomMetadataField() {
+    const key = prompt("新しい項目名を入力してください (例: 部活):");
+    if (!key) return;
+
+    const container = document.getElementById('metaEditFieldsContainer');
+    const wrapper = document.createElement('div');
+    wrapper.className = 'control-group';
+    wrapper.innerHTML = `
+        <label style="font-size: 0.8rem; color: #64748b;">${key}</label>
+        <input type="text" class="meta-field-input" data-key="${key}" value="" style="width: 100%; padding: 0.4rem; border: 1px solid #cbd5e1; border-radius: 0.3rem;">
+    `;
+    container.appendChild(wrapper);
+}
+
+function saveStudentMetadata() {
+    const studentName = document.getElementById('metaEditOriginalName').value;
+    const inputs = document.querySelectorAll('.meta-field-input');
+
+    const newMeta = {};
+    inputs.forEach(input => {
+        const key = input.dataset.key;
+        const val = input.value.trim();
+        if (key && val) { // Only save non-empty? Or save empty to clear? Let's save empty if needed to overwrite.
+            newMeta[key] = val;
+        }
+    });
+
+    state.studentMetadata[studentName] = newMeta;
+    saveSessionState();
+
+    // If current student, update UI might be needed if side effects exist (e.g. if we used metadata for display)
+    if (state.currentStudent === studentName) {
+        // re-render if needed
+    }
+
+    closeMetadataEditorModal();
+    // Refresh Settings List (optional, but good visual feedback not really shown there)
+    // alert('保存しました');
+}
+
+function closeMetadataEditorModal() {
+    document.getElementById('metadataEditorModal').classList.remove('open');
+}
+
+// ==================== PRIVACY / DISPLAY NAME ====================
+function getDisplayName(originalName) {
+    if (!originalName) return '-';
+    if (state.nameDisplayMode === 'name') return originalName;
+
+    // Try to find encrypted name in metadata
+    const meta = state.studentMetadata[originalName] || {};
+    const encrypted = meta['暗号化氏名1'] || meta['暗号化氏名'] || meta['EncryptedName'];
+
+    if (encrypted) return encrypted;
+
+    // Fallback if no encrypted name: Attendance No.
+    const no = meta['出席番号'] || meta['no'];
+    if (no) return `No.${no}`;
+
+    // Fallback if no encrypted name: Initial extraction (Simple)
+    if (/^[a-zA-Z\s]+$/.test(originalName)) {
+        const parts = originalName.trim().split(/\s+/);
+        if (parts.length >= 2) {
+            return parts.map(p => p[0].toUpperCase()).join('.') + '.';
+        }
+    }
+
+    // Kanji/Other: First character + ...
+    return originalName.substring(0, 1) + '...';
+}
+
+function updateNameDisplayMode(mode) {
+    state.nameDisplayMode = mode;
+    saveSessionState();
+
+    // Refresh Sidebar
+    populateControls();
+
+    // Refresh Settings if active
+    if (state.currentTab === 'settings') renderSettings();
+    // Refresh Grades if active
+    if (state.currentTab === 'grades') renderGradesTable();
+    // Refresh Graduation Requirements if active
+    if (state.currentTab === 'grad_requirements') renderGraduationRequirements();
+
+    // Refresh Class Stats if previously generated
+    const csContainer = document.getElementById('classStatsContainer');
+    if (csContainer && csContainer.innerHTML.trim() !== '') {
+        generateClassStats();
+    }
+
+    // Refresh At Risk Report if previously generated
+    const atRiskBody = document.getElementById('atRiskResultsBody');
+    if (atRiskBody && atRiskBody.innerHTML.trim() !== '') {
+        renderAtRiskReport();
+    }
+
+    updatePrintHeader();
+}
+// ==================== FACULTY ROSTER LOGIC ====================
+
+function handleFacultyRosterSelect(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function (evt) {
+        let text = evt.target.result;
+        try {
+            const rows = parseCSV(text).filter(row => row.length > 0);
+            if (rows.length < 2) throw new Error("Empty or invalid CSV");
+
+            // Header: 所属,校務分掌１,校務分掌２,氏名,OMUメール,OMU ID
+            const candidates = rows.slice(1).map((row, idx) => ({
+                dept: row[0] || '',
+                duty1: row[1] || '',
+                duty2: row[2] || '',
+                name: (row[3] || '').trim(),
+                email: (row[4] || '').trim(),
+                omuid: (row[5] || '').trim(),
+                id: 'fac_' + idx
+            })).filter(c => c.name);
+
+            facultyImportState.candidates = candidates;
+            facultyImportState.selected = new Set();
+            facultyImportState.filters = {};
+            facultyImportState.searchText = '';
+
+            switchTab('faculty_roster');
+            renderFacultyFilters();
+            renderFacultyTable();
+
+            saveSessionState();
+
+            const statusEl = document.getElementById('facultyBoardStatus');
+            if (statusEl) {
+                statusEl.innerText = `${candidates.length}名読み込み完了`;
+                statusEl.style.color = '#10b981';
+            }
+        } catch (err) {
+            alert('名簿読み込みエラー: ' + err.message);
+        } finally {
+            e.target.value = '';
+        }
+    };
+    reader.readAsText(file);
+}
+
+function renderFacultyFilters() {
+    const container = document.getElementById('facultyFilterContainer');
+    if (!container) return;
+    container.innerHTML = '';
+    const candidates = facultyImportState.candidates;
+
+    const depts = [...new Set(candidates.map(c => c.dept).filter(Boolean))].sort();
+
+    const createSelect = (label, key, options) => {
+        const div = document.createElement('div');
+        div.className = 'control-group';
+        div.style.cssText = "display:flex; flex-direction:column; gap:0.4rem;";
+        div.innerHTML = `<label style="font-size:0.8rem; font-weight:700; color:#64748b;">${label}</label>`;
+        const sel = document.createElement('select');
+        sel.style.cssText = "width:100%; padding:0.4rem; border:1px solid #e2e8f0; border-radius:0.4rem; font-size:0.85rem;";
+        sel.innerHTML = '<option value="">すべて</option>' + options.map(o => `<option value="${o}">${o}</option>`).join('');
+        sel.onchange = (e) => {
+            facultyImportState.filters[key] = e.target.value;
+            renderFacultyTable();
+        };
+        div.appendChild(sel);
+        container.appendChild(div);
+    };
+
+    if (depts.length > 0) createSelect('所属', 'dept', depts);
+}
+
+function renderFacultyTable() {
+    const tbody = document.getElementById('facultyRosterBody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    const list = facultyImportState.candidates.filter(c => {
+        if (facultyImportState.filters.dept && c.dept !== facultyImportState.filters.dept) return false;
+
+        // Search Filter
+        if (facultyImportState.searchText) {
+            const query = facultyImportState.searchText.toLowerCase();
+            const targets = [c.name, c.email, c.omuid, c.duty1, c.duty2].map(v => (v || '').toString().toLowerCase());
+            if (!targets.some(t => t.includes(query))) return false;
+        }
+
+        return true;
+    });
+
+    list.forEach(c => {
+        const tr = document.createElement('tr');
+        const isSelected = facultyImportState.selected.has(c.id);
+        const rowStyle = isSelected ? 'background-color: #f0f9ff;' : '';
+        tr.style.cssText = rowStyle + ' cursor: pointer;';
+        tr.dataset.facultyId = c.id;
+        tr.dataset.facultyEmail = c.email || '';
+        tr.dataset.facultyName = c.name || '';
+
+        tr.innerHTML = `
+            <td style="text-align:center;"><input type="checkbox" class="fac-row-check" data-id="${c.id}" ${isSelected ? 'checked' : ''}></td>
+            <td>${c.dept}</td>
+            <td>${c.duty1}</td>
+            <td>${c.duty2}</td>
+            <td style="font-weight:600; color:#334155;">${c.name}</td>
+            <td style="font-family: monospace; font-size: 0.8rem;">${c.email}</td>
+            <td style="color:#64748b;">${c.omuid}</td>
+        `;
+
+        // Add right-click context menu
+        tr.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            showFacultyContextMenu(e, c);
+        });
+
+        // Hover effect
+        tr.addEventListener('mouseenter', () => {
+            if (!isSelected) tr.style.backgroundColor = '#f8fafc';
+        });
+        tr.addEventListener('mouseleave', () => {
+            if (!isSelected) tr.style.backgroundColor = '';
+        });
+
+        tbody.appendChild(tr);
+    });
+
+    // Add listeners to checkboxes
+    tbody.querySelectorAll('.fac-row-check').forEach(cb => {
+        cb.onchange = (e) => {
+            const id = e.target.dataset.id;
+            if (e.target.checked) facultyImportState.selected.add(id);
+            else facultyImportState.selected.delete(id);
+            // Toggle highlight
+            e.target.closest('tr').style.backgroundColor = e.target.checked ? '#f0f9ff' : '';
+        };
+    });
+}
+
+function showFacultyContextMenu(event, faculty) {
+    // Remove existing context menu if any
+    const existingMenu = document.getElementById('facultyContextMenu');
+    if (existingMenu) existingMenu.remove();
+
+    if (!faculty.email) {
+        alert('この教職員にはメールアドレスが登録されていません。');
+        return;
+    }
+
+    // Create context menu
+    const menu = document.createElement('div');
+    menu.id = 'facultyContextMenu';
+    menu.style.cssText = `
+        position: fixed;
+        left: ${event.clientX}px;
+        top: ${event.clientY}px;
+        background: white;
+        border: 1px solid #cbd5e1;
+        border-radius: 0.5rem;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        z-index: 10000;
+        min-width: 200px;
+        padding: 0.5rem 0;
+    `;
+
+    const menuItems = [
+        {
+            icon: '??',
+            label: 'Teams チャット',
+            action: () => {
+                const url = `https://teams.microsoft.com/l/chat/0/0?users=${faculty.email}`;
+                window.open(url, '_blank');
+            }
+        },
+        {
+            icon: '??',
+            label: 'メール送信',
+            action: () => {
+                window.location.href = `mailto:${faculty.email}`;
+            }
+        }
+    ];
+
+    menuItems.forEach(item => {
+        const menuItem = document.createElement('div');
+        menuItem.style.cssText = `
+            padding: 0.75rem 1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 0.9rem;
+            color: #334155;
+            transition: background-color 0.15s;
+        `;
+        menuItem.innerHTML = `
+            <span style="font-size: 1.2rem;">${item.icon}</span>
+            <span>${item.label}</span>
+        `;
+
+        menuItem.addEventListener('mouseenter', () => {
+            menuItem.style.backgroundColor = '#f1f5f9';
+        });
+        menuItem.addEventListener('mouseleave', () => {
+            menuItem.style.backgroundColor = '';
+        });
+        menuItem.addEventListener('click', () => {
+            item.action();
+            menu.remove();
+        });
+
+        menu.appendChild(menuItem);
+    });
+
+    document.body.appendChild(menu);
+
+    // Close menu when clicking outside
+    const closeMenu = (e) => {
+        if (!menu.contains(e.target)) {
+            menu.remove();
+            document.removeEventListener('click', closeMenu);
+        }
+    };
+    setTimeout(() => document.addEventListener('click', closeMenu), 0);
+}
+
+function openFacultyTeamsChat() {
+    const selected = facultyImportState.candidates.filter(c => facultyImportState.selected.has(c.id));
+    if (selected.length === 0) { alert('対象者を選択してください'); return; }
+
+    const emails = selected.map(c => c.email).filter(Boolean);
+    if (emails.length === 0) { alert('メールアドレスが見つかりません'); return; }
+
+    const url = `https://teams.microsoft.com/l/chat/0/0?users=${emails.join(',')}`;
+    window.open(url, '_blank');
+}
+
+function openFacultyMail() {
+    const selected = facultyImportState.candidates.filter(c => facultyImportState.selected.has(c.id));
+    if (selected.length === 0) { alert('対象者を選択してください'); return; }
+
+    const emails = selected.map(c => c.email).filter(Boolean);
+    if (emails.length === 0) { alert('メールアドレスが見つかりません'); return; }
+
+    const url = `mailto:${emails.join(';')}`;
+    window.location.href = url;
+}
+
+
+// ==================== ATTENDANCE MANAGEMENT (出欠管理) ====================
+
+function initAttendance() {
+    const monthSelect = document.getElementById('attendanceMonthSelect');
+    if (!monthSelect) return;
+
+    // Populate Months (4月 to 3月 of current or detected year)
+    if (monthSelect.options.length === 0) {
+        const months = ["4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月", "1月", "2月", "3月"];
+        months.forEach(m => {
+            const opt = document.createElement('option');
+            opt.value = m;
+            opt.textContent = m;
+            monthSelect.appendChild(opt);
+        });
+        // Default to current month
+        const now = new Date();
+        const curM = now.getMonth() + 1; // 1-12
+        let idx = curM >= 4 ? curM - 4 : curM + 8;
+        monthSelect.selectedIndex = idx;
+    }
+
+    document.getElementById('attendanceFileInfo').textContent = `ファイル：${state.attendance.fileName || '未読込'}`;
+
+    // Populate Subject Filter
+    populateAttendanceSubjectFilter();
+
+    renderAttendanceCalendar();
+    renderAttendanceStats();
+    renderCumulativeAttendanceChart();
+    renderSubjectAttendanceChart();
+    renderDayAttendanceChart();
+    renderPeriodAttendanceChart();
+}
+
+function populateAttendanceSubjectFilter() {
+    const filter = document.getElementById('attendanceSubjectFilter');
+    if (!filter) return;
+
+    const studentName = state.currentStudent;
+    const subjects = new Set();
+
+    if (studentName && state.attendance.records[studentName]) {
+        const records = state.attendance.records[studentName];
+        Object.values(records).forEach(dayEvents => {
+            dayEvents.forEach(ev => {
+                if (ev.subj) subjects.add(ev.subj);
+            });
+        });
+    }
+
+    const sortedSubjects = Array.from(subjects).sort();
+    const currentVal = filter.value;
+
+    filter.innerHTML = '<option value="">-- 科目を選択 --</option>';
+    sortedSubjects.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s;
+        opt.textContent = s;
+        filter.appendChild(opt);
+    });
+
+    if (sortedSubjects.includes(currentVal)) {
+        filter.value = currentVal;
+    } else if (sortedSubjects.length > 0) {
+        filter.value = sortedSubjects[0];
+    }
+}
+
+function handleAttendanceFileUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        try {
+            // Use a simple CSV parser that can handle multiple header rows
+            const text = event.target.result;
+            const lines = text.split(/\r?\n/).map(l => l.split(','));
+            if (lines.length < 5) throw new Error("CSV行数が不足しています。");
+
+            // Python Logic:
+            // df = pd.read_csv(path, encoding="cp932", header=1) -> headers are line 1 (0-indexed)
+            // subject_df = skiprows 2, nrows 1 -> line 2
+            // teacher_df = skiprows 3, nrows 1 -> line 3
+            // df_data = SKIPROWS [2,3] -> line 1 is header, line 4+ is data
+
+            const headerRow = lines[1];
+            const subjectRow = lines[2];
+            const teacherRow = lines[3];
+            const dataRows = lines.slice(4);
+
+            // Find first date column (starts with YYYY/MM/DD)
+            const dateRegex = /^\d{4}\/\d{1,2}\/\d{1,2}/;
+            let firstDateIdx = -1;
+            for (let i = 0; i < headerRow.length; i++) {
+                if (dateRegex.test(headerRow[i].trim())) {
+                    firstDateIdx = i;
+                    break;
+                }
+            }
+
+            if (firstDateIdx === -1) throw new Error("日付列が見つかりません。");
+
+            const records = {};
+            let globalMinDate = null;
+            let globalMaxDate = null;
+
+            dataRows.forEach(row => {
+                if (row.length < 3) return;
+                const studentName = row[2].trim(); // Name is in col 2 (0:No, 1:ID, 2:Name)
+                if (!studentName) return;
+
+                if (!records[studentName]) records[studentName] = {};
+
+                for (let i = firstDateIdx; i < headerRow.length; i++) {
+                    const dp = headerRow[i].trim();
+                    if (!dp) continue;
+                    const parts = dp.split(/\s+/);
+                    const dateStr = parts[0];
+                    const period = (parts.length > 1) ? parseInt(parseFloat(parts[1])) : 0;
+                    const subject = (subjectRow[i] || "").trim();
+                    const teacher = (teacherRow[i] || "").trim();
+                    const status = (row[i] || "").trim();
+
+                    if (!dateRegex.test(dateStr)) continue;
+
+                    if (!records[studentName][dateStr]) records[studentName][dateStr] = [];
+                    records[studentName][dateStr].push({
+                        p: period,
+                        subj: subject,
+                        status: status,
+                        teacher: teacher
+                    });
+
+                    // Track date range
+                    const d = new Date(dateStr);
+                    if (!isNaN(d)) {
+                        if (!globalMinDate || d < globalMinDate) globalMinDate = d;
+                        if (!globalMaxDate || d > globalMaxDate) globalMaxDate = d;
+                    }
+                }
+            });
+
+            state.attendance.records = records;
+            state.attendance.fileName = file.name;
+            if (globalMinDate && globalMaxDate) {
+                state.attendance.periodInfo = {
+                    start: globalMinDate.toISOString().split('T')[0].replace(/-/g, '/'),
+                    end: globalMaxDate.toISOString().split('T')[0].replace(/-/g, '/')
+                };
+            }
+
+            // Sync with master student list
+            const foundNames = Object.keys(records);
+            let addedNew = false;
+            foundNames.forEach(name => {
+                if (!state.students.includes(name)) {
+                    state.students.push(name);
+                    addedNew = true;
+                }
+            });
+
+            if (addedNew) {
+                state.students.sort();
+                if (typeof populateControls === 'function') populateControls();
+            }
+
+            saveSessionState();
+            initAttendance();
+            alert('出欠データを読み込みました。');
+        } catch (err) {
+            console.error(err);
+            alert('CSVの解析に失敗しました: ' + err.message);
+        }
+    };
+    // Note: Python uses CP932. For web, maybe Shift-JIS or UTF-8. 
+    // Usually school systems export in Shift-JIS.
+    reader.readAsText(file, 'Shift_JIS');
+    e.target.value = '';
+}
+
+function renderAttendanceCalendar() {
+    const grid = document.getElementById('attendanceCalendarGrid');
+    if (!grid) return;
+    grid.innerHTML = '';
+
+    const studentName = state.currentStudent;
+    if (!studentName || !state.attendance.records[studentName]) {
+        grid.innerHTML = '<div style="grid-column: span 7; padding: 3rem; text-align: center; color: #94a3b8; background: white;">学生を選択するか、データを読み込んでください。</div>';
+        return;
+    }
+
+    const monthStr = document.getElementById('attendanceMonthSelect').value;
+    const monthNum = parseInt(monthStr.replace("月", ""));
+    // Detect year: look at periodInfo or use current year
+    let year = new Date().getFullYear();
+    if (state.attendance.periodInfo.start) {
+        year = parseInt(state.attendance.periodInfo.start.split('/')[0]);
+        // If month is Jan-Mar, and start is Apr, year might need adjustment
+        if (monthNum < 4 && state.attendance.periodInfo.start.includes('/04/')) {
+            year += 1;
+        }
+    }
+
+    const firstDay = new Date(year, monthNum - 1, 1);
+    const lastDay = new Date(year, monthNum, 0);
+
+    // Day offset (0:Mon, ..., 6:Sun)
+    let startOffset = firstDay.getDay();
+    startOffset = (startOffset === 0) ? 6 : startOffset - 1;
+
+    // Empty cells at start
+    for (let i = 0; i < startOffset; i++) {
+        const cell = document.createElement('div');
+        cell.style.background = '#f1f5f9';
+        cell.style.minHeight = '100px';
+        grid.appendChild(cell);
+    }
+
+    const records = state.attendance.records[studentName] || {};
+
+    for (let d = 1; d <= lastDay.getDate(); d++) {
+        const dateStr = `${year}/${monthNum.toString().padStart(2, '0')}/${d.toString().padStart(2, '0')}`;
+        const dayEvents = records[dateStr] || [];
+        const dayOfWeek = new Date(year, monthNum - 1, d).getDay(); // 0:Sun
+
+        const cell = document.createElement('div');
+        cell.style.background = 'white';
+        if (dayOfWeek === 6) cell.style.background = '#eff6ff'; // Sat
+        if (dayOfWeek === 0) cell.style.background = '#fef2f2'; // Sun
+        cell.style.minHeight = '100px';
+        cell.style.padding = '0.4rem';
+        cell.style.border = '1px solid #e2e8f0';
+        cell.style.display = 'flex';
+        cell.style.flexDirection = 'column';
+        cell.style.gap = '2px';
+        cell.style.cursor = 'pointer';
+
+        // Date Header
+        const header = document.createElement('div');
+        header.style.fontSize = '0.75rem';
+        header.style.fontWeight = 'bold';
+        header.style.marginBottom = '2px';
+        header.textContent = d;
+        if (dayOfWeek === 6) header.style.color = '#3b82f6';
+        if (dayOfWeek === 0) header.style.color = '#ef4444';
+
+        // Memo Star
+        const memoKey = `${studentName}_${dateStr}`;
+        if (state.attendance.memos[memoKey]) {
+            header.innerHTML += ` <span style="color:${state.attendance.memos[memoKey].color || 'blue'}">★</span>`;
+        }
+        cell.appendChild(header);
+
+        // Sort events by period
+        dayEvents.sort((a, b) => a.p - b.p);
+
+        dayEvents.forEach(ev => {
+            if (ev.status === "-") return; // Skip if no record (-)
+
+            const item = document.createElement('div');
+            item.style.fontSize = '0.7rem';
+            item.style.lineHeight = '1.1';
+            item.style.whiteSpace = 'nowrap';
+            item.style.overflow = 'hidden';
+            item.style.textOverflow = 'ellipsis';
+
+            let color = '#475569';
+            if (ev.status === "欠") color = '#ef4444';
+            else if (ev.status === "遅") color = '#f59e0b';
+            else if (ev.status === "早") color = '#10b981';
+            else if (ev.status === "休講") color = '#94a3b8';
+
+            item.style.color = color;
+            const statusDisp = ev.status ? `(${ev.status})` : '';
+            item.textContent = `${ev.p}:${ev.subj}${statusDisp}`;
+            cell.appendChild(item);
+        });
+
+        cell.onclick = () => openAttendanceMemoDialog(studentName, dateStr);
+        grid.appendChild(cell);
+    }
+}
+
+function openAttendanceMemoDialog(studentName, dateStr) {
+    const key = `${studentName}_${dateStr}`;
+    const existing = state.attendance.memos[key] || { text: "", color: "blue" };
+
+    const text = prompt(`${dateStr} のメモを入力してください:`, existing.text);
+    if (text === null) return;
+
+    if (text.trim() === "") {
+        delete state.attendance.memos[key];
+    } else {
+        const color = confirm('色を赤にしますか？ (キャンセルで青)') ? 'red' : 'blue';
+        state.attendance.memos[key] = { text: text, color: color };
+    }
+
+    saveSessionState();
+    renderAttendanceCalendar();
+}
+
+function renderAttendanceStats() {
+    const tbody = document.getElementById('attendanceStatsBody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    const studentName = state.currentStudent;
+    if (!studentName || !state.attendance.records[studentName]) return;
+
+    const monthStr = document.getElementById('attendanceMonthSelect').value;
+    const monthNum = parseInt(monthStr.replace("月", ""));
+    const records = state.attendance.records[studentName];
+
+    // Aggregation: Subject -> { teacher, month: { abs, lat, early, total }, cumulative: { abs, lat, early, total } }
+    const stats = {};
+
+    Object.keys(records).forEach(dStr => {
+        const isCurrentMonth = parseInt(dStr.split('/')[1]) === monthNum;
+        records[dStr].forEach(ev => {
+            if (!ev.subj) return;
+            if (!stats[ev.subj]) {
+                stats[ev.subj] = {
+                    teacher: ev.teacher || "-",
+                    month: { abs: 0, lat: 0, early: 0, total: 0 },
+                    cumulative: { abs: 0, lat: 0, early: 0, total: 0 }
+                };
+            }
+
+            const s = stats[ev.subj];
+            if (ev.status === "欠") {
+                s.cumulative.abs++;
+                s.cumulative.total++;
+                if (isCurrentMonth) {
+                    s.month.abs++;
+                    s.month.total++;
+                }
+            } else if (ev.status === "遅") {
+                s.cumulative.lat++;
+                s.cumulative.total++;
+                if (isCurrentMonth) {
+                    s.month.lat++;
+                    s.month.total++;
+                }
+            } else if (ev.status === "早") {
+                s.cumulative.early++;
+                s.cumulative.total++;
+                if (isCurrentMonth) {
+                    s.month.early++;
+                    s.month.total++;
+                }
+            }
+        });
+    });
+
+    const sortedSubjects = Object.keys(stats).sort();
+    sortedSubjects.forEach(s => {
+        const st = stats[s];
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td style="font-weight: 600;">${s}</td>
+            <td style="color: #64748b; font-size: 0.8rem;">${st.teacher}</td>
+            <!-- Monthly -->
+            <td style="text-align:center; color:#ef4444; border-left: 1px solid #e2e8f0;">${st.month.abs || ""}</td>
+            <td style="text-align:center; color:#f59e0b;">${st.month.lat || ""}</td>
+            <td style="text-align:center; color:#10b981;">${st.month.early || ""}</td>
+            <td style="text-align:center; font-weight:700; background:#f0f9ff; color:#1e40af;">${st.month.total || ""}</td>
+            <!-- Cumulative -->
+            <td style="text-align:center; color:#ef4444; border-left: 2px solid #e2e8f0;">${st.cumulative.abs}</td>
+            <td style="text-align:center; color:#f59e0b;">${st.cumulative.lat}</td>
+            <td style="text-align:center; color:#10b981;">${st.cumulative.early}</td>
+            <td style="text-align:center; font-weight:700; background:#fdfaf0; color:#92400e;">${st.cumulative.total}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    if (tbody.innerHTML === '') {
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding: 2rem; color:#94a3b8;">出欠データはありません。</td></tr>';
+    }
+}
+
+function renderCumulativeAttendanceChart() {
+    const ctxEl = document.getElementById('cumulativeAttendanceChart');
+    if (!ctxEl) return;
+    const ctx = ctxEl.getContext('2d');
+    if (attendanceChartInstance) attendanceChartInstance.destroy();
+
+    const studentName = state.currentStudent;
+    if (!studentName || !state.attendance.records[studentName]) {
+        // Clear chart if no data
+        return;
+    }
+
+    const records = state.attendance.records[studentName];
+    const sortedDates = Object.keys(records).sort();
+
+    const labels = [];
+    const cumulativeAbsents = [];
+    const cumulativeLates = [];
+
+    let totalAbsents = 0;
+    let totalLates = 0;
+
+    sortedDates.forEach(dateStr => {
+        labels.push(dateStr);
+        let dayAbs = 0;
+        let dayLat = 0;
+        (records[dateStr] || []).forEach(ev => {
+            if (ev.status === "欠") dayAbs++;
+            else if (ev.status === "遅") dayLat++;
+        });
+        totalAbsents += dayAbs;
+        totalLates += dayLat;
+        cumulativeAbsents.push(totalAbsents);
+        cumulativeLates.push(totalLates);
+    });
+
+    attendanceChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: '累積欠席 (Cumulative Absents)',
+                    data: cumulativeAbsents,
+                    borderColor: '#ef4444',
+                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                    fill: true,
+                    tension: 0.2,
+                    pointRadius: 2
+                },
+                {
+                    label: '累積遅刻 (Cumulative Lates)',
+                    data: cumulativeLates,
+                    borderColor: '#f59e0b',
+                    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                    fill: true,
+                    tension: 0.2,
+                    pointRadius: 2
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            scales: {
+                x: {
+                    display: true,
+                    title: { display: false },
+                    ticks: {
+                        autoSkip: true,
+                        maxRotation: 0,
+                        callback: function (val, index) {
+                            // Show month/day for cleaner labels
+                            const d = labels[index];
+                            return d.substring(5);
+                        }
+                    },
+                    grid: { display: false }
+                },
+                y: {
+                    beginAtZero: true,
+                    suggestedMax: 15,
+                    title: { display: true, text: '累積回数' },
+                    ticks: { stepSize: 1 }
+                }
+            },
+            plugins: {
+                legend: { position: 'top', align: 'end' },
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            return `${context.dataset.label}: ${context.parsed.y} 回`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function renderSubjectAttendanceChart() {
+    const ctxEl = document.getElementById('subjectAttendanceChart');
+    if (!ctxEl) return;
+    const ctx = ctxEl.getContext('2d');
+    if (subjectAttendanceChartInstance) subjectAttendanceChartInstance.destroy();
+
+    const studentName = state.currentStudent;
+    const subjectName = document.getElementById('attendanceSubjectFilter')?.value;
+
+    if (!studentName || !subjectName || !state.attendance.records[studentName]) {
+        // Clear if not possible to render
+        return;
+    }
+
+    const records = state.attendance.records[studentName];
+    const sortedDates = Object.keys(records).sort();
+
+    const labels = [];
+    const cumulativeAbsents = [];
+    const cumulativeLates = [];
+
+    let totalAbsents = 0;
+    let totalLates = 0;
+
+    sortedDates.forEach(dateStr => {
+        let dayAbs = 0;
+        let dayLat = 0;
+        let hasEvent = false;
+
+        (records[dateStr] || []).forEach(ev => {
+            if (ev.subj === subjectName) {
+                hasEvent = true;
+                if (ev.status === "欠") dayAbs++;
+                else if (ev.status === "遅") dayLat++;
+            }
+        });
+
+        if (hasEvent || dayAbs > 0 || dayLat > 0) {
+            labels.push(dateStr);
+            totalAbsents += dayAbs;
+            totalLates += dayLat;
+            cumulativeAbsents.push(totalAbsents);
+            cumulativeLates.push(totalLates);
+        }
+    });
+
+    if (labels.length === 0) return;
+
+    subjectAttendanceChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: `累積欠席 [${subjectName}]`,
+                    data: cumulativeAbsents,
+                    borderColor: '#ef4444',
+                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                    fill: true,
+                    tension: 0.2,
+                    pointRadius: 3
+                },
+                {
+                    label: `累積遅刻 [${subjectName}]`,
+                    data: cumulativeLates,
+                    borderColor: '#f59e0b',
+                    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                    fill: true,
+                    tension: 0.2,
+                    pointRadius: 3
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            scales: {
+                x: {
+                    display: true,
+                    ticks: {
+                        autoSkip: true,
+                        maxRotation: 0,
+                        callback: function (val, index) {
+                            return labels[index].substring(5); // MM/DD
+                        }
+                    },
+                    grid: { display: false }
+                },
+                y: {
+                    beginAtZero: true,
+                    suggestedMax: 15,
+                    title: { display: true, text: '累積回数' },
+                    ticks: { stepSize: 1 }
+                }
+            },
+            plugins: {
+                legend: { position: 'top', align: 'end' },
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            return `${context.dataset.label}: ${context.parsed.y} 回`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function renderDayAttendanceChart() {
+    const ctxEl = document.getElementById('dayAttendanceChart');
+    if (!ctxEl) return;
+    const ctx = ctxEl.getContext('2d');
+    if (dayAttendanceChartInstance) dayAttendanceChartInstance.destroy();
+
+    const studentName = state.currentStudent;
+    const targetDay = parseInt(document.getElementById('attendanceDayFilter')?.value || "1"); // 0:Sun, 1:Mon...
+
+    if (!studentName || !state.attendance.records[studentName]) return;
+
+    const records = state.attendance.records[studentName];
+    const sortedDates = Object.keys(records).sort();
+
+    const labels = [];
+    const cumulativeAbsents = [];
+    const cumulativeLates = [];
+
+    let totalAbsents = 0;
+    let totalLates = 0;
+
+    sortedDates.forEach(dateStr => {
+        const d = new Date(dateStr);
+        if (d.getDay() !== targetDay) return;
+
+        labels.push(dateStr);
+        let dayAbs = 0;
+        let dayLat = 0;
+        (records[dateStr] || []).forEach(ev => {
+            if (ev.status === "欠") dayAbs++;
+            else if (ev.status === "遅") dayLat++;
+        });
+        totalAbsents += dayAbs;
+        totalLates += dayLat;
+        cumulativeAbsents.push(totalAbsents);
+        cumulativeLates.push(totalLates);
+    });
+
+    if (labels.length === 0) return;
+
+    const dayNames = ["日曜日", "月曜日", "火曜日", "水曜日", "木曜日", "金曜日", "土曜日"];
+
+    dayAttendanceChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: `累積欠席 [${dayNames[targetDay]}]`,
+                    data: cumulativeAbsents,
+                    borderColor: '#ef4444',
+                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                    fill: true,
+                    tension: 0.2,
+                    pointRadius: 3
+                },
+                {
+                    label: `累積遅刻 [${dayNames[targetDay]}]`,
+                    data: cumulativeLates,
+                    borderColor: '#f59e0b',
+                    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                    fill: true,
+                    tension: 0.2,
+                    pointRadius: 3
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            scales: {
+                x: {
+                    display: true,
+                    ticks: {
+                        autoSkip: true,
+                        maxRotation: 0,
+                        callback: function (val, index) {
+                            return labels[index].substring(5); // MM/DD
+                        }
+                    },
+                    grid: { display: false }
+                },
+                y: {
+                    beginAtZero: true,
+                    suggestedMax: 15,
+                    title: { display: true, text: '累積回数' },
+                    ticks: { stepSize: 1 }
+                }
+            },
+            plugins: {
+                legend: { position: 'top', align: 'end' },
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            return `${context.dataset.label}: ${context.parsed.y} 回`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function renderPeriodAttendanceChart() {
+    const ctxEl = document.getElementById('periodAttendanceChart');
+    if (!ctxEl) return;
+    const ctx = ctxEl.getContext('2d');
+    if (periodAttendanceChartInstance) periodAttendanceChartInstance.destroy();
+
+    const studentName = state.currentStudent;
+    const targetPeriod = parseInt(document.getElementById('attendancePeriodFilter')?.value || "1");
+
+    if (!studentName || !state.attendance.records[studentName]) return;
+
+    const records = state.attendance.records[studentName];
+    const sortedDates = Object.keys(records).sort();
+
+    const labels = [];
+    const cumulativeAbsents = [];
+    const cumulativeLates = [];
+
+    let totalAbsents = 0;
+    let totalLates = 0;
+
+    sortedDates.forEach(dateStr => {
+        const eventsForPeriod = (records[dateStr] || []).filter(ev => ev.p === targetPeriod);
+        if (eventsForPeriod.length === 0) return;
+
+        labels.push(dateStr);
+        let dayAbs = 0;
+        let dayLat = 0;
+        eventsForPeriod.forEach(ev => {
+            if (ev.status === "欠") dayAbs++;
+            else if (ev.status === "遅") dayLat++;
+        });
+        totalAbsents += dayAbs;
+        totalLates += dayLat;
+        cumulativeAbsents.push(totalAbsents);
+        cumulativeLates.push(totalLates);
+    });
+
+    if (labels.length === 0) return;
+
+    periodAttendanceChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: `累積欠席 [${targetPeriod}限]`,
+                    data: cumulativeAbsents,
+                    borderColor: '#ef4444',
+                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                    fill: true,
+                    tension: 0.2,
+                    pointRadius: 3
+                },
+                {
+                    label: `累積遅刻 [${targetPeriod}限]`,
+                    data: cumulativeLates,
+                    borderColor: '#f59e0b',
+                    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                    fill: true,
+                    tension: 0.2,
+                    pointRadius: 3
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            scales: {
+                x: {
+                    display: true,
+                    ticks: {
+                        autoSkip: true,
+                        maxRotation: 0,
+                        callback: function (val, index) {
+                            return labels[index].substring(5); // MM/DD
+                        }
+                    },
+                    grid: { display: false }
+                },
+                y: {
+                    beginAtZero: true,
+                    suggestedMax: 15,
+                    title: { display: true, text: '累積回数' },
+                    ticks: { stepSize: 1 }
+                }
+            },
+            plugins: {
+                legend: { position: 'top', align: 'end' },
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            return `${context.dataset.label}: ${context.parsed.y} 回`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function generateClassAttendanceStats() {
+    const container = document.getElementById('classAttendanceStatsContainer');
+    if (!container) return;
+
+    container.innerHTML = '<div style="padding: 2rem; text-align: center; color: #64748b;">集計中...</div>';
+
+    setTimeout(() => {
+        const studentList = state.students;
+        const attendanceData = state.attendance.records;
+
+        if (studentList.length === 0) {
+            container.innerHTML = '<div style="padding: 2.5rem; text-align: center; color: #64748b; background: #f8fafc; border-radius: 0.5rem; border: 1px dashed #e2e8f0;">学生データが見つかりません</div>';
+            return;
+        }
+
+        const stats = studentList.map(name => {
+            const records = attendanceData[name] || {};
+            let totalAbs = 0;
+            let totalLat = 0;
+            let totalEarly = 0;
+            const subAbs = {};
+            const subLat = {}; // { subj: { count, slots: { "Day-Period": count } } }
+
+            Object.entries(records).forEach(([dStr, dayEvents]) => {
+                const dayIdx = new Date(dStr).getDay();
+                const dayLabel = ["日", "月", "火", "水", "木", "金", "土"][dayIdx];
+
+                dayEvents.forEach(ev => {
+                    if (ev.status === "欠") {
+                        totalAbs++;
+                        if (ev.subj) subAbs[ev.subj] = (subAbs[ev.subj] || 0) + 1;
+                    }
+                    else if (ev.status === "遅") {
+                        totalLat++;
+                        if (ev.subj) {
+                            if (!subLat[ev.subj]) subLat[ev.subj] = { count: 0, slots: {} };
+                            subLat[ev.subj].count++;
+                            const slotKey = `${dayLabel}/${ev.p || "?"}限`;
+                            subLat[ev.subj].slots[slotKey] = (subLat[ev.subj].slots[slotKey] || 0) + 1;
+                        }
+                    }
+                    else if (ev.status === "早") totalEarly++;
+                });
+            });
+
+            // Most Absent
+            let maxSub = "-";
+            let maxSubCount = 0;
+            Object.entries(subAbs).forEach(([sub, count]) => {
+                if (count > maxSubCount) {
+                    maxSubCount = count;
+                    maxSub = sub;
+                }
+            });
+
+            // Most Late
+            let maxLatSub = "-";
+            let maxLatSlot = "";
+            let maxLatCount = 0;
+            Object.entries(subLat).forEach(([sub, data]) => {
+                if (data.count > maxLatCount) {
+                    maxLatCount = data.count;
+                    maxLatSub = sub;
+                    // Find most frequent slot for this subject
+                    let topSlot = "";
+                    let topSlotCount = 0;
+                    Object.entries(data.slots).forEach(([slot, c]) => {
+                        if (c > topSlotCount) {
+                            topSlotCount = c;
+                            topSlot = slot;
+                        }
+                    });
+                    maxLatSlot = topSlot;
+                }
+            });
+
+            return {
+                name,
+                totalAbs,
+                totalLat,
+                totalEarly,
+                maxSub,
+                maxSubCount,
+                maxLatSub,
+                maxLatSlot,
+                maxLatCount
+            };
+        });
+
+        stats.sort((a, b) => b.totalAbs - a.totalAbs);
+
+        let minDate = null;
+        let maxDate = null;
+        Object.values(attendanceData).forEach(records => {
+            Object.keys(records).forEach(dateStr => {
+                if (!minDate || dateStr < minDate) minDate = dateStr;
+                if (!maxDate || dateStr > maxDate) maxDate = dateStr;
+            });
+        });
+        const periodStr = (minDate && maxDate) ? `${minDate} ～ ${maxDate}` : "データなし";
+
+        let html = `
+            <div style="margin-bottom: 1rem; color: #475569; font-size: 0.85rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                統計対象期間: ${periodStr}
+            </div>
+            <div style="background: white; border: 1px solid #e2e8f0; border-radius: 0.5rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); overflow: hidden;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                    <thead>
+                        <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
+                            <th style="padding: 1rem; text-align: left; width: 180px;">氏名</th>
+                            <th style="padding: 1rem; text-align: center;">合計欠席</th>
+                            <th style="padding: 1rem; text-align: center;">合計遅刻</th>
+                            <th style="padding: 1rem; text-align: center;">合計早退</th>
+                            <th style="padding: 1rem; text-align: left;">最多欠席科目</th>
+                            <th style="padding: 1rem; text-align: left;">最多遅刻科目 (曜日/時限)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+
+        stats.forEach((row, idx) => {
+            const rowStyle = idx % 2 === 1 ? 'background: #f8fafc;' : 'background: white;';
+            const absColor = row.totalAbs >= 15 ? '#ef4444' : row.totalAbs >= 10 ? '#f59e0b' : 'inherit';
+            const absWeight = row.totalAbs >= 10 ? '700' : 'normal';
+
+            html += `
+                <tr style="${rowStyle} border-bottom: 1px solid #f1f5f9;">
+                    <td style="padding: 0.8rem 1rem; font-weight: 600;">${getDisplayName(row.name)}</td>
+                    <td style="padding: 0.8rem 1rem; text-align: center; color: ${absColor}; font-weight: ${absWeight};">${row.totalAbs}</td>
+                    <td style="padding: 0.8rem 1rem; text-align: center;">${row.totalLat}</td>
+                    <td style="padding: 0.8rem 1rem; text-align: center;">${row.totalEarly}</td>
+                    <td style="padding: 0.8rem 1rem;">${row.maxSub} (${row.maxSubCount})</td>
+                    <td style="padding: 0.8rem 1rem;">${row.maxLatSub !== "-" ? `${row.maxLatSub} (${row.maxLatSlot})` : "-"}</td>
+                </tr>
+            `;
+        });
+
+        html += `</tbody></table></div>`;
+        container.innerHTML = html;
+        if (typeof updatePrintHeader === 'function') updatePrintHeader();
+    }, 10);
+}
+
+function exportClassAttendanceCsv() {
+    const studentList = state.students;
+    const attendanceData = state.attendance.records;
+
+    if (studentList.length === 0) { alert('学生データがありません'); return; }
+
+    let csvContent = "\uFEFF氏名,合計欠席,合計遅刻,合計早退,最多欠席科目,最多欠席数,最多遅刻科目,最多遅刻スロット\n";
+
+    studentList.forEach(name => {
+        const records = attendanceData[name] || {};
+        let totalAbs = 0, totalLat = 0, totalEarly = 0;
+        const subAbs = {}, subLat = {};
+
+        Object.entries(records).forEach(([dStr, dayEvents]) => {
+            const di = new Date(dStr).getDay();
+            const dl = ["日", "月", "火", "水", "木", "金", "土"][di];
+            dayEvents.forEach(ev => {
+                if (ev.status === "欠") {
+                    totalAbs++;
+                    if (ev.subj) subAbs[ev.subj] = (subAbs[ev.subj] || 0) + 1;
+                }
+                else if (ev.status === "遅") {
+                    totalLat++;
+                    if (ev.subj) {
+                        if (!subLat[ev.subj]) subLat[ev.subj] = { count: 0, slots: {} };
+                        subLat[ev.subj].count++;
+                        const sk = `${dl}/${ev.p || "?"}限`;
+                        subLat[ev.subj].slots[sk] = (subLat[ev.subj].slots[sk] || 0) + 1;
+                    }
+                }
+                else if (ev.status === "早") totalEarly++;
+            });
+        });
+
+        let maxSub = "-", maxSubCount = 0;
+        Object.entries(subAbs).forEach(([sub, count]) => { if (count > maxSubCount) { maxSubCount = count; maxSub = sub; } });
+
+        let maxLatSub = "-", maxLatSlot = "", maxLatCount = 0;
+        Object.entries(subLat).forEach(([sub, data]) => {
+            if (data.count > maxLatCount) {
+                maxLatCount = data.count;
+                maxLatSub = sub;
+                let ts = "";
+                let tc = 0;
+                Object.entries(data.slots).forEach(([slot, c]) => { if (c > tc) { tc = c; ts = slot; } });
+                maxLatSlot = ts;
+            }
+        });
+
+        csvContent += [getDisplayName(name), totalAbs, totalLat, totalEarly, maxSub, maxSubCount, maxLatSub, maxLatSlot].join(',') + "\n";
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `ClassAttendanceStats.csv`;
+    link.click();
+}
+
+function updatePrintHeader() {
+    const nameEl = document.getElementById('print-student-name');
+    const dateEl = document.getElementById('print-date');
+    const titleEl = document.getElementById('print-report-title');
+
+    if (nameEl) nameEl.textContent = state.currentStudent ? getDisplayName(state.currentStudent) : "クラス全体";
+    if (dateEl) dateEl.textContent = new Date().toLocaleDateString('ja-JP');
+
+    if (titleEl) {
+        let titleText = "成績レポート";
+        switch (state.currentTab) {
+            case 'stats':
+            case 'stats2':
+                titleText = "分析レポート (Statistics)";
+                break;
+            case 'attendance':
+                titleText = "出欠管理レポート (Attendance)";
+                break;
+            case 'class_stats':
+                titleText = "クラス統計レポート (Class Stats)";
+                break;
+            case 'seating':
+                titleText = "座席配置図 (Seating Chart)";
+                break;
+            case 'student_summary':
+                titleText = "成績のあゆみ";
+                break;
+        }
+        titleEl.textContent = titleText;
+    }
+}
+
+// ==================== STUDENT SUMMARY ====================
+
+function renderStudentSummary() {
+    const studentName = state.currentStudent;
+    const testKey = document.getElementById('summaryTestSelect')?.value || '前期末';
+
+    // Get year from select, fallback to current year
+    const yearSelect = document.getElementById('summaryYearSelect');
+    const targetYear = yearSelect ? parseInt(yearSelect.value) : state.currentYear;
+
+    const area = document.getElementById('studentSummaryArea');
+    if (!area) return;
+
+    if (!studentName) {
+        area.innerHTML = '<div style="text-align: center; padding: 5rem; color: #94a3b8;">学生を選択してください。</div>';
+        return;
+    }
+
+    area.innerHTML = getStudentSummaryHtml(studentName, testKey, targetYear);
+    updatePrintHeader();
+}
+
+function getStudentSummaryHtml(studentName, testKey, targetYear) {
+
+    // A. Context from Top Menu
+    const year = targetYear || state.currentYear;
+    const course = state.currentCourse;
+    const meta = state.studentMetadata[studentName] || {};
+    const studentId = meta['学籍番号'] || meta['id'] || "-";
+    const courseDisplay = course || "全体 (All Courses)";
+
+    // Use student's current cohort year to find classmates for comparison
+    // e.g. If student is Year 2, and we simply ask for Year 1 students, we get current Year 1s (wrong cohort).
+    // We want current Year 2s, but look at their Year 1 stats.
+    const cohortYear = parseInt(meta['年'] || meta['year'] || state.currentYear);
+    const classStudents = getClassStudents(cohortYear, course);
+
+    // Security: Ensure the viewed student is in the list for comparison even if metadata is slightly off
+    if (!classStudents.includes(studentName)) {
+        classStudents.push(studentName);
+    }
+
+    // B. Calculate Stats & Ranking (Class-based)
+    const stats = getStudentStats(studentName, year, testKey);
+    const testRankStr = calculateRank(year, testKey, studentName);
+    const classOverallRankStr = calculateOverallRank(year, studentName);
+
+    // 3. Previous Test Comparison Data
+    const testCycle = ["前期中間", "前期末", "後期中間", "学年末"];
+    const currentIdx = testCycle.indexOf(testKey);
+    let prevStatsLine = "";
+    let prevGpaLine = "";
+
+    if (currentIdx > 0) {
+        const prevTest = testCycle[currentIdx - 1];
+        const prevS = getStudentStats(studentName, year, prevTest);
+        const pRank = calculateRank(year, prevTest, studentName);
+        const pCount = getClassStudents(year, course).length; // Total in group
+
+        const pAvg = prevS.stats1.avg.toFixed(1);
+        prevStatsLine = `<div style="font-size: 0.7rem; color: #94a3b8; margin-top: 0.1rem;">前回: ${pAvg}点 / ${pRank}/${pCount}位</div>`;
+        prevGpaLine = `<span style="font-size: 0.7rem; color: #64748b; margin-left: 0.5rem; font-weight: normal;">(前回: GPA ${prevS.stats2.gpa.toFixed(2)})</span>`;
+    }
+
+
+    // C. Attendance Analysis (Matching At-Risk Extraction Logic)
+    const records = (state.attendance && state.attendance.records) ? state.attendance.records[studentName] : {};
+    let totalAbs = 0, totalLat = 0;
+    const subjectAttendance = {}; // Track per subject
+    const alerts = []; // For "At-Risk" items
+
+    const datesSorted = Object.keys(records).sort((a, b) => new Date(a) - new Date(b));
+    let maxStreak = 0, currentStreak = 0;
+    const dowStats = {};
+    const periodStats = {};
+
+    datesSorted.forEach(dStr => {
+        const dayEvents = records[dStr] || [];
+        const isBadDay = dayEvents.some(ev => ev.status === "欠" || ev.status === "遅");
+
+        if (isBadDay) currentStreak++;
+        else currentStreak = 0;
+        if (currentStreak > maxStreak) maxStreak = currentStreak;
+
+        const di = new Date(dStr).getDay();
+        const dl = ["日", "月", "火", "水", "木", "金", "土"][di];
+        if (!dowStats[dl]) dowStats[dl] = { abs: 0, lat: 0, total: 0 };
+
+        dayEvents.forEach(ev => {
+            if (!ev.subj && !ev.subject) return;
+            const subName = ev.subj || ev.subject;
+            if (!subjectAttendance[subName]) subjectAttendance[subName] = { abs: 0, lat: 0, total: 0, schedule: {} };
+            subjectAttendance[subName].total++;
+
+            const pKey = ev.p || "?";
+            const sk = `${dl}${pKey}限`;
+            subjectAttendance[subName].schedule[sk] = (subjectAttendance[subName].schedule[sk] || 0) + 1;
+
+            if (!periodStats[pKey]) periodStats[pKey] = { abs: 0, lat: 0, total: 0 };
+            periodStats[pKey].total++;
+
+            if (ev.status === '欠') {
+                totalAbs++;
+                subjectAttendance[subName].abs++;
+                dowStats[dl].abs++;
+                periodStats[pKey].abs++;
+            } else if (ev.status === '遅') {
+                totalLat++;
+                subjectAttendance[subName].lat++;
+                dowStats[dl].lat++;
+                periodStats[pKey].lat++;
+            }
+            // Increment total for dow stats inside the loop to count sessions
+            dowStats[dl].total++;
+        });
+    });
+
+    // 1. Pattern Alert: Consecutive Days
+    if (maxStreak >= 3) {
+        let level = 'warning', icon = '?', label = '注意';
+        if (maxStreak >= 8) { level = 'danger'; icon = '??'; label = '重度(Black)'; }
+        else if (maxStreak >= 7) { level = 'danger'; icon = '??'; label = '警告(Red)'; }
+        else if (maxStreak >= 5) { level = 'danger'; icon = '??'; label = '警戒(Orange)'; }
+        alerts.push({ type: level, icon, msg: `行動傾向: 連続${maxStreak}日の欠席/遅刻あり (${label})` });
+    }
+
+    // 2. Pattern Alert: Day of Week Concentration
+    Object.entries(dowStats).forEach(([dow, s]) => {
+        const points = s.abs + s.lat * 0.5;
+        const ratio = s.total > 0 ? points / s.total : 0;
+        if (ratio >= 0.10) {
+            alerts.push({ type: 'warning', icon: '???', msg: `行動傾向: ${dow}曜日に欠席/遅刻が集中 (欠席率: ${(ratio * 100).toFixed(0)}%)` });
+        }
+    });
+
+    // 3. Pattern Alert: Period Concentration
+    Object.entries(periodStats).forEach(([p, s]) => {
+        const points = s.abs + s.lat * 0.5;
+        const ratio = s.total > 0 ? points / s.total : 0;
+        if (ratio >= 0.10) {
+            let lv = 'warning', lab = '注意(10%超)', colorLevel = 'yellow';
+            if (ratio >= 1 / 3) { lv = 'danger'; lab = '黒(1/3超)'; colorLevel = 'black'; }
+            else if (ratio >= 0.30) { lv = 'danger'; lab = '赤(30%超)'; colorLevel = 'red'; }
+            else if (ratio >= 0.20) { lv = 'danger'; lab = '橙(20%超)'; colorLevel = 'orange'; }
+            alerts.push({ type: lv, colorLevel, icon: '??', msg: `行動傾向: ${p}限目の欠席/遅刻密度高 (${lab}: 欠席率 ${(ratio * 100).toFixed(0)}%)` });
+        }
+    });
+
+    // D. Build UI
+    let html = `
+    <div class="summary-report" style="font-family: 'Inter', system-ui, sans-serif; color: #1e293b; max-width: 800px; margin: 0 auto; line-height: 1.3;">
+        <!-- Header Info -->
+        <div style="display: flex; justify-content: space-between; align-items: baseline; border-bottom: 2px solid #334155; padding-bottom: 0.1rem; margin-bottom: 0.4rem;">
+            <div>
+                <h2 style="margin: 0; font-size: 1.2rem; font-weight: 800; color: #0f172a;">${getDisplayName(studentName)} <span style="font-size: 0.8rem; color: #64748b; font-weight: 400;">様</span></h2>
+                <div style="display: flex; gap: 1rem; margin-top: 0.2rem; font-size: 0.8rem; color: #475569;">
+                    <span>学籍番号: <strong>${studentId}</strong></span>
+                    <span>年次: <strong>${year}年</strong></span>
+                    <span>所属: <strong>${courseDisplay}</strong></span>
+                </div>
+            </div>
+            <div style="text-align: right; font-size: 0.75rem; color: #94a3b8;">
+                作成日: ${new Date().toLocaleDateString('ja-JP')}
+            </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.4rem; margin-bottom: 0.6rem;">
+            <!-- Card 1: Scores -->
+            <div style="background: #f8fafc; padding: 0.4rem; border-radius: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">
+                <div style="font-size: 0.65rem; color: #64748b; margin-bottom: 0px; font-weight: 600;">${testKey} 平均点</div>
+                <div style="font-size: 1.4rem; font-weight: 800; color: #2563eb;">${stats.stats1.avg.toFixed(1)}<span style="font-size: 0.75rem; font-weight: 400; color: #64748b; margin-left: 0.1rem;">点</span></div>
+                <div style="font-size: 0.7rem; color: #475569; margin-top: 0px;">順位: ${testRankStr}</div>
+                ${prevStatsLine}
+            </div>
+            <!-- Card 2: Credits -->
+            <div style="background: #f0fdf4; padding: 0.4rem; border-radius: 0.5rem; border: 1px solid #dcfce7; text-align: center;">
+                <div style="font-size: 0.65rem; color: #166534; margin-bottom: 0px; font-weight: 600;">累積修得単位数</div>
+                <div style="font-size: 1.4rem; font-weight: 800; color: #16a34a;">${stats.stats2.credits}<span style="font-size: 0.75rem; font-weight: 400; color: #166534; margin-left: 0.1rem;">単位</span></div>
+                <div style="font-size: 0.7rem; color: #166534; margin-top: 0px;">GPA:${stats.stats2.gpa.toFixed(2)} ${prevGpaLine}</div>
+                <div style="font-size: 0.65rem; color: #166534;">(年間: ${classOverallRankStr})</div>
+            </div>
+            <!-- Card 3: Attendance -->
+            <div style="background: #fff7ed; padding: 0.4rem; border-radius: 0.5rem; border: 1px solid #ffedd5; text-align: center;">
+                <div style="font-size: 0.65rem; color: #9a3412; margin-bottom: 0px; font-weight: 600;">欠席・遅刻状況</div>
+                <div style="display: flex; justify-content: center; gap: 0.5rem; align-items: baseline; margin-top: 0.1rem;">
+                    <div>
+                        <span style="font-size: 1.4rem; font-weight: 800; color: #ea580c;">${totalAbs}</span>
+                        <span style="font-size: 0.7rem; color: #9a3412;">欠</span>
+                    </div>
+                    <div style="width: 1px; height: 1rem; background: #fed7aa;"></div>
+                    <div>
+                        <span style="font-size: 1.4rem; font-weight: 800; color: #f59e0b;">${totalLat}</span>
+                        <span style="font-size: 0.7rem; color: #9a3412;">遅</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Subject Scores Table -->
+        <h3 style="font-size: 0.85rem; border-left: 4px solid #2563eb; padding-left: 0.5rem; margin-bottom: 0.3rem; margin-top: 0.3rem;">科目別成績一覧 (${testKey})</h3>
+        <div style="background: white; border: 1px solid #e2e8f0; border-radius: 0.4rem; overflow: hidden; margin-bottom: 0.5rem;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 0.75rem;">
+                <thead>
+                    <tr style="background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+                        <th style="padding: 0.4rem 0.6rem; text-align: left; color: #475569;">科目名</th>
+                        <th style="padding: 0.4rem 0.2rem; text-align: center; color: #475569; width: 40px;">単位</th>
+                        <th style="padding: 0.4rem 0.2rem; text-align: center; color: #475569; width: 45px;">欠席</th>
+                        <th style="padding: 0.4rem 0.2rem; text-align: center; color: #475569; width: 45px;">遅刻</th>
+                        <th style="padding: 0.4rem 0.2rem; text-align: center; color: #475569; width: 60px;">${testKey}</th>
+                        <th style="padding: 0.4rem 0.2rem; text-align: center; color: #475569; width: 60px;">クラス順位</th>
+                        <th style="padding: 0.4rem 0.2rem; text-align: center; color: #475569; width: 50px;">評価</th>
+                    </tr>
+                </thead>
+                <tbody>
+`;
+
+    // Filter subjects for the specific student and year
+    // USE getTargetSubjects to ensure consistency with main view and credits calculation
+    const subjects = getTargetSubjects(s => {
+        // Standard year match
+        if (s.year === year) return true;
+        // Floater (Special Study) match
+        if (s.year === 0) {
+            const scoreObj = (state.scores[studentName] || {})[s.name];
+            const oy = scoreObj ? scoreObj.obtainedYear : 0;
+            return (oy === year || (oy === 0 && year === 1)); // Fallback to year 1 for orphans
+        }
+        return false;
+    }).filter(s => {
+        if (state.hideEmptySubjects) {
+            const scoreObj = (state.scores[studentName] || {})[s.name] || {};
+            const hasData = SCORE_KEYS.some(k => {
+                const val = scoreObj[k];
+                return val !== undefined && val !== null && val !== '';
+            });
+            if (!hasData) return false;
+        }
+        return true;
+    });
+    subjects.forEach(sub => {
+        const score = getScore(studentName, sub.name, testKey);
+        let scoreDisplay = score === null ? "-" : score;
+        let evalDisplay = "-";
+        let scoreStyle = "";
+
+        if (typeof score === 'number') {
+            if (score <= 59) {
+                scoreStyle = "color: #ef4444; font-weight: 700;";
+                evalDisplay = "D";
+            } else if (score < 70) evalDisplay = "C";
+            else if (score < 80) evalDisplay = "B";
+            else if (score < 90) evalDisplay = "A";
+            else evalDisplay = "S";
+        } else if (typeof score === 'string' && score !== "") {
+            evalDisplay = score; // Non-numeric pass/fail
+        }
+
+        const subAtt = subjectAttendance[sub.name] || { abs: 0, lat: 0, total: 0, schedule: {} };
+        let absStyle = subAtt.abs > 0 ? "color: #ef4444; font-weight: 600;" : "color: #94a3b8;";
+        let latStyle = subAtt.lat > 0 ? "color: #f59e0b; font-weight: 600;" : "color: #94a3b8;";
+
+        // Calculate subject class rank
+        const subScores = classStudents.map(s => ({
+            name: s,
+            val: getScore(s, sub.name, testKey)
+        })).filter(x => typeof x.val === 'number');
+        let subRankDisplay = "-";
+        if (subScores.length > 0 && typeof score === 'number') {
+            subScores.sort((a, b) => b.val - a.val);
+            const sIdx = subScores.findIndex(x => x.name === studentName);
+            if (sIdx !== -1) subRankDisplay = `${sIdx + 1} / ${subScores.length}`;
+        }
+
+        // Alert Logic (Matching At-Risk Criteria)
+        const sched = subAtt.schedule || {};
+        const typical = Object.entries(sched).sort((a, b) => b[1] - a[1])[0]?.[0] || "";
+        const schedStr = typical ? ` [${typical}]` : "";
+
+        // 1. Grades Alerts
+        if (typeof score === 'number' && score <= 59.9) {
+            let lv = 'warning', ic = '?', lab = '不合格';
+            if (score <= 39.9) { lv = 'danger'; ic = '??'; lab = '重度不振'; }
+            else if (score <= 49.9) { lv = 'danger'; ic = '??'; lab = '警戒'; }
+            alerts.push({ type: lv, icon: ic, msg: `${sub.name}${schedStr}: ${score.toFixed(1)}点 (${lab})` });
+        }
+
+        // 2. Attendance Density Alerts (2 Lates = 1 Absence)
+        // 2. Attendance Density Alerts (2 Lates = 1 Absence)
+        const attPoints = subAtt.abs + (subAtt.lat * 0.5);
+        const ratio = subAtt.total > 0 ? attPoints / subAtt.total : 0;
+
+        if (ratio >= 0.10) {
+            let lv = 'warning', ic = '??', lab = '注意', colorLevel = 'yellow';
+            if (ratio >= 1 / 3) { lv = 'danger'; lab = '黒(1/3超)'; colorLevel = 'black'; }
+            else if (ratio >= 0.30) { lv = 'danger'; lab = '赤(30%超)'; colorLevel = 'red'; }
+            else if (ratio >= 0.20) { lv = 'danger'; lab = '橙(20%超)'; colorLevel = 'orange'; }
+            alerts.push({ type: lv, colorLevel, icon: ic, msg: `${sub.name}${schedStr}: 欠席・遅刻密度高 (${lab}: 欠席率 ${(ratio * 100).toFixed(0)}%)` });
+        }
+        // Removed strict 2-late warning based on user feedback (too sensitive)
+
+        html += `
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 0.25rem 0.6rem; font-weight: 500;">${sub.name}</td>
+            <td style="padding: 0.25rem 0.2rem; text-align: center; color: #64748b;">${sub.credits}</td>
+            <td style="padding: 0.25rem 0.2rem; text-align: center; ${absStyle}">${subAtt.abs}</td>
+            <td style="padding: 0.25rem 0.2rem; text-align: center; ${latStyle}">${subAtt.lat}</td>
+            <td style="padding: 0.25rem 0.2rem; text-align: center; ${scoreStyle}">${scoreDisplay}</td>
+            <td style="padding: 0.25rem 0.2rem; text-align: center; color: #475569;">${subRankDisplay}</td>
+            <td style="padding: 0.25rem 0.2rem; text-align: center; font-weight: 600;">${evalDisplay}</td>
+        </tr>
+    `;
+    });
+    html += `
+                </tbody>
+            </table>
+        </div>
+    `;
+
+    // E. Alerts Section (Replacing comment box)
+    if (alerts.length > 0) {
+        html += `
+        <div style="background: #fff1f2; padding: 0.4rem 0.6rem; border-radius: 0.4rem; border: 1px solid #fecaca; margin-bottom: 0.4rem; break-inside: auto;">
+            <h4 style="margin: 0 0 0.2rem 0; color: #b91c1c; font-size: 0.8rem; display: flex; align-items: center; gap: 0.3rem;">
+                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                要確認・注意項目 (Alerts)
+            </h4>
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.2rem;">
+        `;
+        alerts.forEach(a => {
+            // Default Yellow
+            let bg = '#fef3c7', tc = '#92400e', bd = '#fef08a';
+
+            // Override based on colorLevel
+            if (a.colorLevel === 'black') { bg = '#000000'; tc = '#ffffff'; bd = '#000000'; }
+            else if (a.colorLevel === 'red') { bg = '#fee2e2'; tc = '#b91c1c'; bd = '#fecaca'; }
+            else if (a.colorLevel === 'orange') { bg = '#ffedd5'; tc = '#c2410c'; bd = '#fed7aa'; }
+            // Legacy/Fallback check
+            else if (a.type === 'danger' && !a.colorLevel) { bg = '#fee2e2'; tc = '#b91c1c'; bd = '#fecaca'; }
+
+            html += `
+                <div style="display: flex; align-items: center; gap: 0.3rem; padding: 0.1rem 0.4rem; background: ${bg}; border-radius: 0.25rem; font-size: 0.65rem; color: ${tc}; font-weight: 500; border: 0.5px solid ${bd}; line-height: 1.1;">
+                    <span style="font-size: 0.75rem;">${a.icon}</span> ${a.msg}
+                </div>
+            `;
+        });
+        html += `</div></div>`;
+    } else {
+        html += `
+        <div style="background: #f0fdf4; padding: 0.5rem; border-radius: 0.4rem; border: 1px solid #dcfce7; margin-bottom: 0.6rem; text-align: center; color: #166534; font-size: 0.75rem;">
+            ? 現在、要注意項目は認められません。
+        </div>
+        `;
+    }
+
+    html += `
+        <div class="no-print" style="margin-top: 0.8rem; text-align: center; color: #94a3b8; font-size: 0.7rem;">
+            ※ 本データはシステム上の登録状況を表示したものです。面談等で活用してください。
+        </div>
+    </div>
+    `;
+
+    return html;
+}
+
+function printAllStudentSummaries() {
+    const testKey = document.getElementById('summaryTestSelect')?.value || '前期末';
+    const year = state.currentYear;
+    const course = state.currentCourse;
+
+    const classStudents = state.students.filter(s => {
+        const m = state.studentMetadata[s] || {};
+        if (parseInt(m['年'] || m['year'] || 1) !== year) return false;
+        const stCourse = (m['コース'] || m['course'] || "").trim();
+        if (!course || course === "") return true;
+        return stCourse === course || course.includes(stCourse) || stCourse.includes(course);
+    });
+
+    if (classStudents.length === 0) {
+        alert("現在の抽出条件（学年・学科）に一致する学生がいません。");
+        return;
+    }
+
+    const confirmPrint = confirm(`${classStudents.length}名分のサマリーを一括生成します。よろしいですか？\n(生成後に印刷ダイアログが開きます)`);
+    if (!confirmPrint) return;
+
+    const area = document.getElementById('studentSummaryArea');
+    const originalContent = area.innerHTML;
+    const originalStudent = state.currentStudent;
+
+    let totalHtml = "";
+    classStudents.forEach((student, index) => {
+        // Build individual summary
+        const studentHtml = getStudentSummaryHtml(student, testKey);
+
+        // Add wrapper with page break
+        totalHtml += `
+            <div class="multi-print-wrapper" style="${index > 0 ? 'break-before: page; margin-top: 1rem;' : ''}">
+                ${studentHtml}
+            </div>
+        `;
+    });
+
+    // Temporarily swap content
+    area.innerHTML = totalHtml;
+    updatePrintHeader();
+
+    // Trigger print
+    setTimeout(() => {
+        window.print();
+        // Restore
+        const restore = confirm("印刷が完了しましたか？画面を元の表示に戻します。");
+        if (restore) {
+            state.currentStudent = originalStudent;
+            renderStudentSummary();
+        }
+    }, 500);
+}
+

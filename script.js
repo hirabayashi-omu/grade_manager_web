@@ -2621,6 +2621,9 @@ function renderGraduationRequirements() {
     const studentName = state.currentStudent;
     if (!studentName) return;
 
+    // Clean up/Sync Special Activities before rendering
+    syncSpecialActivitiesForAll();
+
     const summaryContainer = document.getElementById('gradRequirementsSummary');
     const detailsBody = document.getElementById('gradRequirementsDetails');
     const courseFilterSelect = document.getElementById('gradCourseFilter');
@@ -3278,14 +3281,15 @@ function renderStats2() {
 
         // Determine the latest test point for the "current" year snapshot
         let targetTest = '学年末';
-        // For each year, we try to find the best representative data point.
         // Priority: 学年末 -> 後期中間 -> 前期末 -> 前期中間
         for (const tk of testKeys) {
-            const hasTestScores = state.subjects.filter(s => s.year === y).some(s => {
+            // MUST check for NUMERIC subjects and NUMERIC values, 
+            // otherwise auto-filled "履" in Year-End will pick Year-End even if no grades exist yet.
+            const hasNumericScores = state.subjects.filter(s => s.year === y && isNumericSubject(s.name)).some(s => {
                 const sc = getScore(currentStudent, s.name, tk);
-                return sc !== undefined && sc !== null && sc !== '';
+                return typeof sc === 'number';
             });
-            if (hasTestScores) {
+            if (hasNumericScores) {
                 targetTest = tk;
                 break;
             }
@@ -3824,6 +3828,7 @@ function syncSpecialActivitiesForAll() {
             // Check if any standard subject in this year has a Year End score
             const hasYearEndData = state.subjects.some(sub => {
                 if (sub.name.includes('特別活動')) return false;
+                if (sub.type1 === '特別学修' || sub.type2 === '特別学修') return false;
 
                 // Year match logic (standard or floater)
                 let matchesYear = (sub.year === year);
@@ -3836,14 +3841,17 @@ function syncSpecialActivitiesForAll() {
                 return scoreObj && scoreObj['学年末'] && scoreObj['学年末'] !== '' && scoreObj['学年末'] !== '-';
             });
 
-            if (hasYearEndData) {
-                const spActName1 = `特・特別活動${year}`;
-                const spActName2 = `特･特別活動${year}`;
-                const spAct = state.subjects.find(s => s.name === spActName1 || s.name === spActName2);
-                if (spAct) {
-                    const actualName = spAct.name;
+            const spActName1 = `特・特別活動${year}`;
+            const spActName2 = `特･特別活動${year}`;
+            const spAct = state.subjects.find(s => s.name === spActName1 || s.name === spActName2);
+            if (spAct) {
+                const actualName = spAct.name;
+                if (hasYearEndData) {
                     if (!studentScores[actualName]) studentScores[actualName] = {};
                     studentScores[actualName]['学年末'] = '履';
+                } else if (studentScores[actualName] && studentScores[actualName]['学年末'] === '履') {
+                    // Bi-directional sync: If no regular data exists, clear the automatic '履' status
+                    studentScores[actualName]['学年末'] = '';
                 }
             }
         });
@@ -3889,7 +3897,8 @@ function updateScore(student, subject, key, value) {
     }
 
     // Auto-mark Special Activities "履" when any Year End score for that year is entered
-    if (key === '学年末' && value !== '' && value !== '-' && !subject.includes('特別活動')) {
+    const isSpecialStudy = subDef && (subDef.type1 === '特別学修' || subDef.type2 === '特別学修');
+    if (key === '学年末' && value !== '' && value !== '-' && !subject.includes('特別活動') && !isSpecialStudy) {
         let sy = 0;
         if (subDef) {
             sy = (subDef.year !== 0) ? subDef.year : (state.scores[student][subject].obtainedYear || state.currentYear);
@@ -5203,7 +5212,10 @@ function renderAtRiskReport() {
                         Object.entries(subStats).forEach(([subj, s]) => {
                             const points = s.abs + s.lat * 0.5;
                             const ratio = s.total > 0 ? points / s.total : 0;
-                            if (ratio >= 0.10) {
+                            // Threshold: 10 points (2 lates = 1 abs) in a typical 15-week course is ~30%
+                            // But here we use ratio. Let's adjust ratio thresholds if needed, 
+                            // or use absolute points. The user specifically asked for "10 points".
+                            if (points >= 10) {
                                 let level = 'yellow';
                                 if (ratio >= 1 / 3) level = 'black'; // 33.33%
                                 else if (ratio >= 0.30) level = 'red';
@@ -5800,10 +5812,10 @@ function renderSeatingGrid() {
                     // RGB Values for milestones
                     const m = [
                         { p: 0, r: 255, g: 255, b: 255 }, // White
-                        { p: 5, r: 253, g: 224, b: 71 },  // Yellow (fde047)
-                        { p: 10, r: 251, g: 146, b: 60 }, // Orange (fb923c)
-                        { p: 15, r: 239, g: 68, b: 68 },  // Red (ef4444)
-                        { p: 20, r: 0, g: 0, b: 0 }       // Black
+                        { p: 10, r: 253, g: 224, b: 71 }, // Yellow (fde047) - Milestone 1: 10pt
+                        { p: 15, r: 251, g: 146, b: 60 }, // Orange (fb923c)
+                        { p: 20, r: 239, g: 68, b: 68 },  // Red (ef4444)
+                        { p: 25, r: 0, g: 0, b: 0 }       // Black
                     ];
 
                     let r, g, b;
@@ -8946,11 +8958,11 @@ function getStudentSummaryHtml(studentName, testKey, targetYear) {
         const attPoints = subAtt.abs + (subAtt.lat * 0.5);
         const ratio = subAtt.total > 0 ? attPoints / subAtt.total : 0;
 
-        if (ratio >= 0.10) {
-            let lv = 'warning', ic = '??', lab = '注意', colorLevel = 'yellow';
+        if (attPoints >= 10) {
+            let lv = 'warning', ic = '??', lab = '注意(10pt超)', colorLevel = 'yellow';
             if (ratio >= 1 / 3) { lv = 'danger'; lab = '黒(1/3超)'; colorLevel = 'black'; }
             else if (ratio >= 0.30) { lv = 'danger'; lab = '赤(30%超)'; colorLevel = 'red'; }
-            else if (ratio >= 0.20) { lv = 'danger'; lab = '橙(20%超)'; colorLevel = 'orange'; }
+            else if (ratio >= 0.25) { lv = 'danger'; lab = '橙(25%超)'; colorLevel = 'orange'; }
             alerts.push({ type: lv, colorLevel, icon: ic, msg: `${sub.name}${schedStr}: 欠席・遅刻密度高 (${lab}: 欠席率 ${(ratio * 100).toFixed(0)}%)` });
         }
         // Removed strict 2-late warning based on user feedback (too sensitive)
