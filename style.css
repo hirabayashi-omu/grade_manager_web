@@ -772,8 +772,9 @@ th {
         box-shadow: none !important;
         border: 1px solid #eee !important;
         padding: 0 !important;
-        margin-bottom: 8mm !important;
-        break-inside: avoid !important;
+        margin-bottom: 5mm !important;
+        break-inside: auto !important;
+        /* Changed from avoid to allow internal breaks if too long */
     }
 
     .card-title {
@@ -803,8 +804,8 @@ th {
     th,
     td {
         border: 0.5pt solid #666 !important;
-        padding: 4pt 6pt !important;
-        font-size: 8.5pt !important;
+        padding: 3pt 5pt !important;
+        font-size: 8pt !important;
         color: black !important;
     }
 

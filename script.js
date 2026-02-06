@@ -8805,9 +8805,9 @@ function getStudentSummaryHtml(studentName, testKey, targetYear) {
 
     // D. Build UI
     let html = `
-    <div class="summary-report" style="font-family: 'Inter', system-ui, sans-serif; color: #1e293b; max-width: 900px; margin: 0 auto;">
+    <div class="summary-report" style="font-family: 'Inter', system-ui, sans-serif; color: #1e293b; max-width: 800px; margin: 0 auto; line-height: 1.3;">
         <!-- Header Info -->
-        <div style="display: flex; justify-content: space-between; align-items: baseline; border-bottom: 2px solid #334155; padding-bottom: 0.2rem; margin-bottom: 0.6rem;">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; border-bottom: 2px solid #334155; padding-bottom: 0.1rem; margin-bottom: 0.4rem;">
             <div>
                 <h2 style="margin: 0; font-size: 1.2rem; font-weight: 800; color: #0f172a;">${getDisplayName(studentName)} <span style="font-size: 0.8rem; color: #64748b; font-weight: 400;">様</span></h2>
                 <div style="display: flex; gap: 1rem; margin-top: 0.2rem; font-size: 0.8rem; color: #475569;">
@@ -8821,25 +8821,25 @@ function getStudentSummaryHtml(studentName, testKey, targetYear) {
             </div>
         </div>
 
-        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin-bottom: 0.8rem;">
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.4rem; margin-bottom: 0.6rem;">
             <!-- Card 1: Scores -->
-            <div style="background: #f8fafc; padding: 0.6rem; border-radius: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">
-                <div style="font-size: 0.7rem; color: #64748b; margin-bottom: 0.1rem; font-weight: 600;">${testKey} 平均点</div>
-                <div style="font-size: 1.6rem; font-weight: 800; color: #2563eb;">${stats.stats1.avg.toFixed(1)}<span style="font-size: 0.8rem; font-weight: 400; color: #64748b; margin-left: 0.1rem;">点</span></div>
-                <div style="font-size: 0.75rem; color: #475569; margin-top: 0.1rem;">順位: ${testRankStr}</div>
+            <div style="background: #f8fafc; padding: 0.4rem; border-radius: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">
+                <div style="font-size: 0.65rem; color: #64748b; margin-bottom: 0px; font-weight: 600;">${testKey} 平均点</div>
+                <div style="font-size: 1.4rem; font-weight: 800; color: #2563eb;">${stats.stats1.avg.toFixed(1)}<span style="font-size: 0.75rem; font-weight: 400; color: #64748b; margin-left: 0.1rem;">点</span></div>
+                <div style="font-size: 0.7rem; color: #475569; margin-top: 0px;">順位: ${testRankStr}</div>
                 ${prevStatsLine}
             </div>
             <!-- Card 2: Credits -->
-            <div style="background: #f0fdf4; padding: 0.6rem; border-radius: 0.5rem; border: 1px solid #dcfce7; text-align: center;">
-                <div style="font-size: 0.7rem; color: #166534; margin-bottom: 0.1rem; font-weight: 600;">累積修得単位数</div>
-                <div style="font-size: 1.6rem; font-weight: 800; color: #16a34a;">${stats.stats2.credits}<span style="font-size: 0.8rem; font-weight: 400; color: #166534; margin-left: 0.1rem;">単位</span></div>
-                <div style="font-size: 0.75rem; color: #166534; margin-top: 0.1rem;">GPA:${stats.stats2.gpa.toFixed(2)} ${prevGpaLine}</div>
-                <div style="font-size: 0.7rem; color: #166534;">(年間: ${classOverallRankStr})</div>
+            <div style="background: #f0fdf4; padding: 0.4rem; border-radius: 0.5rem; border: 1px solid #dcfce7; text-align: center;">
+                <div style="font-size: 0.65rem; color: #166534; margin-bottom: 0px; font-weight: 600;">累積修得単位数</div>
+                <div style="font-size: 1.4rem; font-weight: 800; color: #16a34a;">${stats.stats2.credits}<span style="font-size: 0.75rem; font-weight: 400; color: #166534; margin-left: 0.1rem;">単位</span></div>
+                <div style="font-size: 0.7rem; color: #166534; margin-top: 0px;">GPA:${stats.stats2.gpa.toFixed(2)} ${prevGpaLine}</div>
+                <div style="font-size: 0.65rem; color: #166534;">(年間: ${classOverallRankStr})</div>
             </div>
             <!-- Card 3: Attendance -->
-            <div style="background: #fff7ed; padding: 0.6rem; border-radius: 0.5rem; border: 1px solid #ffedd5; text-align: center;">
-                <div style="font-size: 0.7rem; color: #9a3412; margin-bottom: 0.1rem; font-weight: 600;">欠席・遅刻状況</div>
-                <div style="display: flex; justify-content: center; gap: 0.6rem; align-items: baseline; margin-top: 0.2rem;">
+            <div style="background: #fff7ed; padding: 0.4rem; border-radius: 0.5rem; border: 1px solid #ffedd5; text-align: center;">
+                <div style="font-size: 0.65rem; color: #9a3412; margin-bottom: 0px; font-weight: 600;">欠席・遅刻状況</div>
+                <div style="display: flex; justify-content: center; gap: 0.5rem; align-items: baseline; margin-top: 0.1rem;">
                     <div>
                         <span style="font-size: 1.4rem; font-weight: 800; color: #ea580c;">${totalAbs}</span>
                         <span style="font-size: 0.7rem; color: #9a3412;">欠</span>
@@ -8854,8 +8854,8 @@ function getStudentSummaryHtml(studentName, testKey, targetYear) {
         </div>
 
         <!-- Subject Scores Table -->
-        <h3 style="font-size: 0.9rem; border-left: 4px solid #2563eb; padding-left: 0.6rem; margin-bottom: 0.5rem; margin-top: 0.5rem;">科目別成績一覧 (${testKey})</h3>
-        <div style="background: white; border: 1px solid #e2e8f0; border-radius: 0.5rem; overflow: hidden; margin-bottom: 1rem;">
+        <h3 style="font-size: 0.85rem; border-left: 4px solid #2563eb; padding-left: 0.5rem; margin-bottom: 0.3rem; margin-top: 0.3rem;">科目別成績一覧 (${testKey})</h3>
+        <div style="background: white; border: 1px solid #e2e8f0; border-radius: 0.4rem; overflow: hidden; margin-bottom: 0.5rem;">
             <table style="width: 100%; border-collapse: collapse; font-size: 0.75rem;">
                 <thead>
                     <tr style="background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
@@ -8976,12 +8976,12 @@ function getStudentSummaryHtml(studentName, testKey, targetYear) {
     // E. Alerts Section (Replacing comment box)
     if (alerts.length > 0) {
         html += `
-        <div style="background: #fff1f2; padding: 0.5rem 0.8rem; border-radius: 0.4rem; border: 1px solid #fecaca; margin-bottom: 0.6rem;">
-            <h4 style="margin: 0 0 0.3rem 0; color: #b91c1c; font-size: 0.85rem; display: flex; align-items: center; gap: 0.4rem;">
-                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+        <div style="background: #fff1f2; padding: 0.4rem 0.6rem; border-radius: 0.4rem; border: 1px solid #fecaca; margin-bottom: 0.4rem; break-inside: auto;">
+            <h4 style="margin: 0 0 0.2rem 0; color: #b91c1c; font-size: 0.8rem; display: flex; align-items: center; gap: 0.3rem;">
+                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
                 要確認・注意項目 (Alerts)
             </h4>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.35rem;">
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.2rem;">
         `;
         alerts.forEach(a => {
             // Default Yellow
@@ -8995,8 +8995,8 @@ function getStudentSummaryHtml(studentName, testKey, targetYear) {
             else if (a.type === 'danger' && !a.colorLevel) { bg = '#fee2e2'; tc = '#b91c1c'; bd = '#fecaca'; }
 
             html += `
-                <div style="display: flex; align-items: center; gap: 0.4rem; padding: 0.15rem 0.5rem; background: ${bg}; border-radius: 0.3rem; font-size: 0.7rem; color: ${tc}; font-weight: 500; border: 0.5px solid ${bd};">
-                    <span style="font-size: 0.8rem;">${a.icon}</span> ${a.msg}
+                <div style="display: flex; align-items: center; gap: 0.3rem; padding: 0.1rem 0.4rem; background: ${bg}; border-radius: 0.25rem; font-size: 0.65rem; color: ${tc}; font-weight: 500; border: 0.5px solid ${bd}; line-height: 1.1;">
+                    <span style="font-size: 0.75rem;">${a.icon}</span> ${a.msg}
                 </div>
             `;
         });
@@ -9051,7 +9051,7 @@ function printAllStudentSummaries() {
 
         // Add wrapper with page break
         totalHtml += `
-            <div class="multi-print-wrapper" style="${index > 0 ? 'break-before: page; margin-top: 2rem;' : ''}">
+            <div class="multi-print-wrapper" style="${index > 0 ? 'break-before: page; margin-top: 1rem;' : ''}">
                 ${studentHtml}
             </div>
         `;
