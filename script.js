@@ -2709,7 +2709,7 @@ function renderGraduationRequirements() {
                 totalGeneralCredits += credits;
             } else if (effectiveType2 !== 'その他') {
                 // Professional usually includes 専門共通, 基盤専門, 応用専門, 特別学修
-                if (effectiveType2 === '特別学修') {
+                if (effectiveType2 === '特別学修' || effectiveType2 === '特別学習') {
                     earnedSpecialStudyRaw += credits;
                 } else {
                     totalProfessionalCredits += credits;
@@ -2914,9 +2914,11 @@ const getTargetSubjects = (predicate) => {
         if (!predicate(s)) return false;
 
         // Exclude logic: Skip subjects marked 'exclude' (GPA exempt), 
-        // BUT allow Arts subjects (Music/Art/Calligraphy) because they count for credits even if GPA exempt.
+        // BUT allow Arts subjects and Special Studies because they count for credits even if GPA exempt.
         const isArts = ["音楽", "美術", "書道"].some(art => s.name.includes(art));
-        if (s.exclude && !isArts) return false;
+        const namesStartsContents = ['特・', '特･'];
+        const isSpecial = (s.type2 === '特別学修' || s.type2 === '特別学習' || namesStartsContents.some(prefix => s.name.startsWith(prefix)));
+        if (s.exclude && !isArts && !isSpecial) return false;
 
         // Course Filter
         if (courseFilter && courseFilter !== "") {
@@ -3110,7 +3112,14 @@ function getStudentStats(studentName, targetYear, targetTest) {
         if (s.year > 0 && s.year <= targetYear) return true;
         if (s.year === 0) {
             const scoreObj = (state.scores[studentName] || {})[s.name];
-            return scoreObj && scoreObj.obtainedYear > 0 && scoreObj.obtainedYear <= targetYear;
+            if (!scoreObj) return false;
+            // Support subjects obtained in specific year, or fallback to ANY year presence for stats2 (cumulative)
+            const oy = scoreObj.obtainedYear || 0;
+            if (oy > 0 && oy <= targetYear) return true;
+            // Fallback: If obtainedYear is missing, check if there's any score data recorded
+            const hasData = SCORE_KEYS.some(k => scoreObj[k] !== undefined && scoreObj[k] !== null && scoreObj[k] !== '');
+            if (hasData && oy === 0) return true; // Assume year 1 if data exists but year is missing? 
+            // Better: if year is 0 but it has data, for cumulative credits, we probably should count it.
         }
         return false;
     });
@@ -3174,7 +3183,7 @@ function getStudentStats(studentName, targetYear, targetTest) {
             }
 
             // Auto-pass for other special subjects ONLY if they have some data (to match Hide Empty)
-            if (!passed && sub.name.startsWith('特・')) {
+            if (!passed && (sub.name.startsWith('特・') || sub.type2 === '特別学修')) {
                 const hasAnyYearEnd = (finalVal !== undefined && finalVal !== null && finalVal !== '');
                 if (hasAnyYearEnd) passed = true;
             }
@@ -3187,8 +3196,11 @@ function getStudentStats(studentName, targetYear, targetTest) {
 
         if (passed) {
             const t2 = (sub.type2 || "").trim();
-            if (t2.includes('専門')) s2CredSpec += (sub.credits || 0);
-            else s2CredGen += (sub.credits || 0);
+            const namesStartsContents = ['特・', '特･'];
+            const isSpecial = (t2 === '特別学修' || t2 === '特別学習' || namesStartsContents.some(prefix => sub.name.startsWith(prefix)));
+            const credits = parseFloat(sub.credits) || 0;
+            if (t2.includes('専門') || isSpecial) s2CredSpec += credits;
+            else s2CredGen += credits;
         }
     });
 
@@ -3719,7 +3731,10 @@ function renderGradesTable() {
 // Helper to identify subjects that are numeric (0-100 scores)
 function isNumericSubject(name) {
     if (!name) return false;
-    // Exclude experiments, practical training, graduation research, and disaster literacy
+    // Exclude special activities and floater subjects that are non-numeric
+    if (name.includes('特別活動')) return false;
+    if (name.startsWith('特・') || name.startsWith('特･')) return false;
+    // Exclude experiments, practical training, graduation research
     return !name.match(/(実験|実習|卒業研究|防災リテラシー)/);
 }
 
@@ -8803,8 +8818,18 @@ function getStudentSummaryHtml(studentName, testKey, targetYear) {
 `;
 
     // Filter subjects for the specific student and year
-    const subjects = state.subjects.filter(s => {
-        if (s.year !== year || s.exclude) return false;
+    // USE getTargetSubjects to ensure consistency with main view and credits calculation
+    const subjects = getTargetSubjects(s => {
+        // Standard year match
+        if (s.year === year) return true;
+        // Floater (Special Study) match
+        if (s.year === 0) {
+            const scoreObj = (state.scores[studentName] || {})[s.name];
+            const oy = scoreObj ? scoreObj.obtainedYear : 0;
+            return (oy === year || (oy === 0 && year === 1)); // Fallback to year 1 for orphans
+        }
+        return false;
+    }).filter(s => {
         if (state.hideEmptySubjects) {
             const scoreObj = (state.scores[studentName] || {})[s.name] || {};
             const hasData = SCORE_KEYS.some(k => {
