@@ -2972,24 +2972,61 @@ const getTargetSubjects = (predicate) => {
 /**
  * Standardized way to get the list of students for a specific year and course.
  */
-// Helper to safely get metadata even if key is messy or Initialized
+// Helper to safely get metadata even if name is slightly different or encrypted
 function getStudentMetadataSafe(rawName) {
     if (!rawName) return null;
-    let m = state.studentMetadata[rawName];
-    if (m) return m;
 
-    const trimmed = rawName.trim();
-    m = state.studentMetadata[trimmed];
-    if (m) return m;
+    // Normalization helper (lowercase, trim, half-width, remove leading numbers)
+    const norm = (s) => (s || "").toString().trim()
+        .toLowerCase()
+        .replace(/\s+/g, '')
+        .replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+        .replace(/^\d+[\.\-\s]/, '') // Remove "1. " or "1-"
+        .replace(/[\(\)（）]/g, '');
 
-    // If still not found and we are in Initial mode, maybe rawName is the Initial?
-    // Try to find a key in metadata that transforms to this Initial
-    if (state.nameDisplayMode === 'initial') {
-        const realName = Object.keys(state.studentMetadata).find(k => getDisplayName(k) === rawName);
-        if (realName) return state.studentMetadata[realName];
+    const targetNorm = norm(rawName);
+
+    // 1. Direct match (Preferred)
+    if (state.studentMetadata[rawName]) return state.studentMetadata[rawName];
+
+    // 2. Normalized mapping
+    const keys = Object.keys(state.studentMetadata);
+    for (const k of keys) {
+        if (norm(k) === targetNorm) return state.studentMetadata[k];
+    }
+
+    // 3. Display Name / Alias resolution
+    for (const k of keys) {
+        const meta = state.studentMetadata[k] || {};
+        const aliases = [
+            getDisplayName(k),
+            meta['暗号化氏名1'], meta['暗号化氏名'], meta['EncryptedName'],
+            meta['氏名'], meta['名前'], meta['Name'],
+            meta['学籍番号'], meta['id'], meta['studentId']
+        ];
+        if (aliases.some(a => a && norm(a) === targetNorm)) return state.studentMetadata[k];
     }
 
     return null;
+}
+
+/**
+ * Robustly extract a value from metadata by checking multiple possible Japanese/English keys.
+ */
+function getMetaValue(meta, possibleKeys) {
+    if (!meta) return "";
+    const metaKeys = Object.keys(meta);
+    for (const pk of possibleKeys) {
+        // Direct
+        if (meta[pk] !== undefined && meta[pk] !== null && meta[pk] !== "") return String(meta[pk]).trim();
+        // Normalized key match
+        const normPk = pk.toLowerCase().replace(/\s/g, '');
+        const foundKey = metaKeys.find(mk => mk.toLowerCase().replace(/\s/g, '') === normPk);
+        if (foundKey && meta[foundKey] !== undefined && meta[foundKey] !== null && meta[foundKey] !== "") {
+            return String(meta[foundKey]).trim();
+        }
+    }
+    return "";
 }
 
 /**
@@ -3005,41 +3042,39 @@ function getClassStudents(year, course) {
         const m = getStudentMetadataSafe(s);
 
         if (m) {
-            stYear = parseInt(m['年'] || m['year'] || 1);
-            stCourse = (m['コース'] || m['course'] || "").trim();
+            const yStr = getMetaValue(m, ['年', '学年', 'year', 'Grade', '年次']);
+            stYear = parseInt(yStr) || 1;
+            stCourse = getMetaValue(m, ['コース', '学科', 'course', 'Dept', '応用専門分野・領域', '所属']);
         } else {
-            // Fallback: if it's the current student, use current state config
-            // (Only if direct metadata lookup failed entirely)
+            // Fallback for current student
             if (s === currentName || s.trim() === currentName) {
                 stYear = state.currentYear;
                 stCourse = state.currentCourse;
             } else {
-                // If we can't identify the student's year, we have to filter them out
-                // or assume year 1. Let's filter out to avoid ghosts.
-                return false;
+                // If it's a peer but no metadata, assume same year if it fits a numbering pattern or just default to target year?
+                // To avoid '1/1' ranking, we should be MORE inclusive.
+                // If year is the target year, and someone exists in the student list, they are likely a peer.
+                const yearMatch = s.match(/(\d)年/);
+                if (yearMatch) stYear = parseInt(yearMatch[1]);
+                else stYear = year; // Leniency: Assume same year as target if metadata is missing.
             }
         }
 
         if (stYear !== year) return false;
 
         // Course Filter:
-        if (!course || course === "") return true;
-
-        // If student matches course, or has NO course (assume common), include them
-        // Note: "".includes("AnyString") is false, but "AnyString".includes("") is true.
-        // So correct logic for including empty students is simple inclusion check from course side.
+        if (!course || course === "" || course === "全体 (All Courses)") return true;
         if (stCourse === "" || stCourse === course || course.includes(stCourse) || stCourse.includes(course)) return true;
 
         return false;
     });
 
-    // Always ensure current student is in the list
-    // (Check if currentStudent is present in result list either by raw name or resolved)
-    // To be safe, just push raw currentStudent if not found
-    if (currentName && !result.includes(currentName)) {
-        // Double check if it's not there under a different alias? 
-        // No, list should contain keys from state.students.
-        result.push(currentName);
+    // Ensure identity resolution for includes check
+    if (currentName && !result.some(s => s === currentName || getStudentMetadataSafe(s) === getStudentMetadataSafe(currentName))) {
+        const m = getStudentMetadataSafe(currentName);
+        const yStr = m ? getMetaValue(m, ['年', '学年', 'year', 'Grade', '年次']) : "";
+        const curY = parseInt(yStr) || state.currentYear;
+        if (curY === year) result.push(currentName);
     }
 
     return result;
@@ -3250,7 +3285,26 @@ function hasDataForYear(studentName, year) {
 
 function getScore(studentName, subjectName, testKey) {
     if (!studentName || !subjectName) return null;
-    const studentScores = state.scores[studentName] || {};
+
+    // Resolve Identity
+    let dataKey = studentName;
+    if (!state.scores[dataKey]) {
+        // Try metadata-based identity resolution
+        const targetMeta = getStudentMetadataSafe(studentName);
+        if (targetMeta) {
+            const foundKey = Object.keys(state.scores).find(k => getStudentMetadataSafe(k) === targetMeta);
+            if (foundKey) dataKey = foundKey;
+        }
+
+        // Fallback: Display Name mapping
+        if (dataKey === studentName && !state.scores[dataKey]) {
+            const found = Object.keys(state.scores).find(k => getDisplayName(k) === studentName);
+            if (found) dataKey = found;
+        }
+    }
+
+    const studentScores = state.scores[dataKey] || {};
+
     // Dot-agnostic lookup
     let scoreObj = studentScores[subjectName];
     if (!scoreObj) {
@@ -4115,44 +4169,51 @@ function renderStats() {
 
         // 1. Year
         tr.innerHTML = `<td style="font-weight:bold; position:sticky; left:0; background:white; z-index:1; border-right:1px solid #e2e8f0;">${year}年</td>`;
+        let rowHtml = `<td style="font-weight:bold; position:sticky; left:0; background:white; z-index:1; border-right:1px solid #e2e8f0;">${year}年</td>`;
 
         // All scores, ranks, and credits are now driven by the centralized getStudentStats
         const sStats = getStudentStats(state.currentStudent, year, '学年末');
 
         // 2-9. Scores & Ranks for 4 tests
+        let testRowsHtml = '';
         SCORE_KEYS.forEach(key => {
             const periodStats = getStudentStats(state.currentStudent, year, key);
             const avg = periodStats.stats1.count > 0 ? periodStats.stats1.avg.toFixed(1) : "";
             const rank = calculateRank(year, key, state.currentStudent);
 
             const avgClass = (avg !== "" && parseFloat(avg) < 60) ? 'color:red;' : '';
-            const avgTd = document.createElement('td');
-            avgTd.style.textAlign = 'center'; avgTd.style.borderLeft = '1px solid #e2e8f0'; avgTd.style.cssText += avgClass;
-            avgTd.textContent = avg;
-
-            const rankTd = document.createElement('td');
-            rankTd.style.textAlign = 'center'; rankTd.textContent = rank;
-            tr.appendChild(avgTd);
-            tr.appendChild(rankTd);
+            testRowsHtml += `
+                <td style="text-align:center; border-left:1px solid #e2e8f0; ${avgClass}">${avg}</td>
+                <td style="text-align:center;">${rank}</td>
+            `;
         });
+        rowHtml += testRowsHtml;
 
         // 10-12. Cumulative Credits
-        tr.innerHTML += `<td style="text-align:center; border-left:1px solid #e2e8f0;">${sStats.stats2.credGen}</td>`;
-        tr.innerHTML += `<td style="text-align:center;">${sStats.stats2.credSpec}</td>`;
-        tr.innerHTML += `<td style="text-align:center; font-weight:bold;">${sStats.stats2.credits}</td>`;
+        const creditsHtml = `
+            <td style="text-align:center; border-left:1px solid #e2e8f0;">${sStats.stats2.credGen}</td>
+            <td style="text-align:center;">${sStats.stats2.credSpec}</td>
+            <td style="text-align:center; font-weight:bold;">${sStats.stats2.credits}</td>
+        `;
+        rowHtml += creditsHtml;
 
         // 13-14. Promotion
         const required = promotionUnits[year] || 0;
         const shortfall = sStats.stats2.credits - required;
         const shortFallClass = shortfall < 0 ? 'color:red; font-weight:bold;' : '';
 
-        tr.innerHTML += `<td style="text-align:center; border-left:1px solid #e2e8f0;">${required}</td>`;
-        tr.innerHTML += `<td style="text-align:center; ${shortFallClass}">${shortfall}</td>`;
+        const promotionHtml = `
+            <td style="text-align:center; border-left:1px solid #e2e8f0;">${required}</td>
+            <td style="text-align:center; ${shortFallClass}">${shortfall}</td>
+        `;
+        rowHtml += promotionHtml;
 
         // 15. Overall Rank (Yearly Total Score)
         const overallRank = calculateOverallRank(year, state.currentStudent);
-        tr.innerHTML += `<td style="text-align:center; border-left:1px solid #e2e8f0;">${overallRank}</td>`;
+        const overallRankHtml = `<td style="text-align:center; border-left:1px solid #e2e8f0;">${overallRank}</td>`;
+        rowHtml += overallRankHtml;
 
+        tr.innerHTML = rowHtml;
         tbody.appendChild(tr);
     }
 
@@ -4167,7 +4228,7 @@ function calculateOverallRank(year, targetStudent) {
     let cohortYear = year;
     const m = getStudentMetadataSafe(targetStudent);
     if (m) {
-        cohortYear = parseInt(m['年'] || m['year'] || year);
+        cohortYear = parseInt(getMetaValue(m, ['年', '学年', 'year', 'Grade', '年次'])) || year;
     } else if (targetStudent === state.currentStudent) {
         cohortYear = state.currentYear;
     }
@@ -4190,7 +4251,7 @@ function calculateOverallRank(year, targetStudent) {
         if (i > 0 && Math.abs(sums[i].total - sums[i - 1].total) > 0.0001) {
             rank = i + 1;
         }
-        if (sums[i].name === targetStudent) return `${rank} / ${sums.length}`;
+        if (sums[i].name === targetStudent) return `${rank} / ${classStudents.length}`;
     }
     return "";
 }
@@ -4198,14 +4259,11 @@ function calculateOverallRank(year, targetStudent) {
 function calculateRank(year, key, targetStudent) {
     const course = state.currentCourse;
 
-    // Fix: Use the student's CURRENT enrollment year (cohort) to find classmates, 
-    // instead of the historical data year 'year'.
-    // e.g. When calculating rank for 1st year grades of a current 2nd year student, 
-    // we want to compare with other current 2nd year students.
+    // Fix: Use the student's CURRENT enrollment year (cohort) to find classmates
     let cohortYear = year;
     const m = getStudentMetadataSafe(targetStudent);
     if (m) {
-        cohortYear = parseInt(m['年'] || m['year'] || year);
+        cohortYear = parseInt(getMetaValue(m, ['年', '学年', 'year', 'Grade', '年次'])) || year;
     } else if (targetStudent === state.currentStudent) {
         cohortYear = state.currentYear;
     }
@@ -4230,7 +4288,7 @@ function calculateRank(year, key, targetStudent) {
             rank = i + 1;
         }
         if (avgs[i].name === targetStudent) {
-            const result = `${rank} / ${avgs.length}`;
+            const result = `${rank} / ${classStudents.length}`;
             return result;
         }
     }
@@ -6743,10 +6801,17 @@ function getFilteredAndSortedCandidates() {
     // 1. Filter
     let list = importState.candidates.filter(c => {
         const meta = c.metadata || {};
-        if (importState.filters.year && (meta['年'] || String(c.year)) != importState.filters.year) return false;
-        if (importState.filters.class && (meta['組'] || c.class) != importState.filters.class) return false;
-        if (importState.filters.gender && meta['性別'] != importState.filters.gender) return false;
-        if (importState.filters.course && (meta['コース'] || meta['応用専門分野・領域']) != importState.filters.course) return false;
+        const cYear = getMetaValue(meta, ['年', '学年', 'year', 'Grade', '年次']) || String(c.year);
+        if (importState.filters.year && cYear != importState.filters.year) return false;
+
+        const cClass = getMetaValue(meta, ['組', 'クラス', 'class', 'Class']) || c.class;
+        if (importState.filters.class && cClass != importState.filters.class) return false;
+
+        if (importState.filters.gender && getMetaValue(meta, ['性別', 'Gender']) != importState.filters.gender) return false;
+
+        const cCourse = getMetaValue(meta, ['コース', '学科', 'course', 'Dept', '応用専門分野・領域', '所属']);
+        if (importState.filters.course && cCourse != importState.filters.course) return false;
+
         if (importState.filters.status) {
             const isNew = !new Set(state.students).has(c.name);
             if (importState.filters.status === 'new' && !isNew) return false;
@@ -8694,14 +8759,13 @@ function getStudentSummaryHtml(studentName, testKey, targetYear) {
     // A. Context from Top Menu
     const year = targetYear || state.currentYear;
     const course = state.currentCourse;
-    const meta = state.studentMetadata[studentName] || {};
-    const studentId = meta['学籍番号'] || meta['id'] || "-";
+    const meta = getStudentMetadataSafe(studentName) || {};
+    const studentId = getMetaValue(meta, ['学籍番号', 'id', 'OMUID', 'omuid']) || "-";
     const courseDisplay = course || "全体 (All Courses)";
 
     // Use student's current cohort year to find classmates for comparison
-    // e.g. If student is Year 2, and we simply ask for Year 1 students, we get current Year 1s (wrong cohort).
-    // We want current Year 2s, but look at their Year 1 stats.
-    const cohortYear = parseInt(meta['年'] || meta['year'] || state.currentYear);
+    const cohortYearStr = getMetaValue(meta, ['年', '学年', 'year', 'Grade', '年次']);
+    const cohortYear = parseInt(cohortYearStr) || state.currentYear;
     const classStudents = getClassStudents(cohortYear, course);
 
     // Security: Ensure the viewed student is in the list for comparison even if metadata is slightly off
