@@ -3248,7 +3248,12 @@ function hasDataForYear(studentName, year) {
 function getScore(studentName, subjectName, testKey) {
     if (!studentName || !subjectName) return null;
     const studentScores = state.scores[studentName] || {};
-    const scoreObj = studentScores[subjectName] || {};
+    // Dot-agnostic lookup
+    let scoreObj = studentScores[subjectName];
+    if (!scoreObj) {
+        const altName = subjectName.includes('・') ? subjectName.replace('・', '･') : subjectName.replace('･', '・');
+        scoreObj = studentScores[altName] || {};
+    }
     const val = scoreObj[testKey];
     if (val === undefined || val === null || val === '') return null;
     const num = parseFloat(val);
@@ -3468,38 +3473,41 @@ function renderGradesTable() {
         if (s.year === state.currentYear) return true;
 
         // B. Floater / Special Subjects (Year = 0)
-        if (s.year === 0) {
-            const scoreObj = (state.scores[state.currentStudent] || {})[s.name];
+        if (parseInt(s.year) === 0) {
+            const studentScores = state.scores[state.currentStudent] || {};
+            // Dot-agnostic lookup for filter
+            let scoreObj = studentScores[s.name];
+            if (!scoreObj) {
+                const alt = s.name.includes('・') ? s.name.replace('・', '･') : s.name.replace('･', '・');
+                scoreObj = studentScores[alt];
+            }
+
             const oy = scoreObj ? parseInt(scoreObj.obtainedYear) : 0;
 
             // SPECIAL FIX: For "Special Activities 1-3", they correspond roughly to Year 1-3.
-            // If they are strictly named "特・特別活動N", map them to Year N.
-            const match = s.name.match(/特・特別活動(\d+)/);
+            const match = s.name.match(/特[・･]特別活動(\d+)/);
             if (match) {
                 const targetYear = parseInt(match[1]);
-                if (targetYear === state.currentYear) return true;
-                return false;
+                return targetYear == state.currentYear;
             }
 
             // Other Special Subjects:
-            // If obtainedYear is recorded, Strict Check (using loose match for safety)
             if (oy > 0) {
-                return oy === state.currentYear;
+                return oy == state.currentYear;
             }
 
-            // If NO obtainedYear recorded yet:
-            // 1. Check if it already has ANY score data
+            // Check if it already has ANY score data
             const hasData = scoreObj && SCORE_KEYS.some(k => {
                 const val = scoreObj[k];
                 return val !== undefined && val !== null && val !== '' && val !== '-';
             });
 
             if (hasData) {
-                // If it has data but no year, anchor it to Year 1 to prevent it showing everywhere
-                return state.currentYear === 1;
+                // Anchor to Year 1 if data exists but no obtainedYear
+                return state.currentYear == 1;
             }
 
-            // 2. If it has NO data, show everywhere so the user can see it in any tab to start entry
+            // If NO data, show everywhere so the user can start entry
             return true;
         }
 
@@ -3555,9 +3563,12 @@ function renderGradesTable() {
         let targetTbody = tbody;
         let isSpecialRow = false;
 
-        if (sub.name.startsWith('特・')) {
+        const isSpecialStart = sub.name.startsWith('特・') || sub.name.startsWith('特･');
+        const isSpecialActMatch = sub.name.match(/特[・･]特別活動(\d+)/);
+
+        if (isSpecialStart) {
             // "特・特別活動1/2/3" are explicitly requested to be in Others table
-            if (sub.name === '特・特別活動1' || sub.name === '特・特別活動2' || sub.name === '特・特別活動3') {
+            if (isSpecialActMatch) {
                 targetTbody = otherTbody;
             } else {
                 targetTbody = specialTbody;
@@ -3581,7 +3592,12 @@ function renderGradesTable() {
             else if (sub.type1 === '選必') typeBadgeClass = 'badge-success';
 
             // Get actual value from data (prefer '学年末' - Final, or any existing)
-            const scoreObj = studentScores[sub.name] || {};
+            let scoreObj = studentScores[sub.name];
+            if (!scoreObj) {
+                const alt = sub.name.includes('・') ? sub.name.replace('・', '･') : sub.name.replace('･', '・');
+                scoreObj = studentScores[alt];
+            }
+            scoreObj = scoreObj || {};
             let currentVal = scoreObj['学年末'] || '';
 
             // If Year End is empty, look for ANY other value (e.g. Early Mid, Late Mid, etc.)
@@ -3821,10 +3837,13 @@ function syncSpecialActivitiesForAll() {
             });
 
             if (hasYearEndData) {
-                const spActName = `特・特別活動${year}`;
-                if (state.subjects.some(s => s.name === spActName)) {
-                    if (!studentScores[spActName]) studentScores[spActName] = {};
-                    studentScores[spActName]['学年末'] = '履';
+                const spActName1 = `特・特別活動${year}`;
+                const spActName2 = `特･特別活動${year}`;
+                const spAct = state.subjects.find(s => s.name === spActName1 || s.name === spActName2);
+                if (spAct) {
+                    const actualName = spAct.name;
+                    if (!studentScores[actualName]) studentScores[actualName] = {};
+                    studentScores[actualName]['学年末'] = '履';
                 }
             }
         });
@@ -3834,7 +3853,18 @@ function syncSpecialActivitiesForAll() {
 
 function updateScore(student, subject, key, value) {
     if (!state.scores[student]) state.scores[student] = {};
-    if (!state.scores[student][subject]) state.scores[student][subject] = {};
+    // Dot-agnostic subject lookup to prevent duplicates
+    let scoreObj = state.scores[student][subject];
+    if (!scoreObj) {
+        const alt = subject.includes('・') ? subject.replace('・', '･') : subject.replace('･', '・');
+        if (state.scores[student][alt]) {
+            scoreObj = state.scores[student][alt];
+            subject = alt; // Redirect to existing key
+        } else {
+            state.scores[student][subject] = {};
+            scoreObj = state.scores[student][subject];
+        }
+    }
 
     // For year-0 subjects (Floaters), pin them to the year they were first entered
     const courseFilter = state.currentCourse;
@@ -3845,9 +3875,9 @@ function updateScore(student, subject, key, value) {
         return true;
     }) || state.subjects.find(s => s.name === subject);
 
-    if (subDef && subDef.year === 0) {
-        if (!state.scores[student][subject].obtainedYear) {
-            state.scores[student][subject].obtainedYear = state.currentYear;
+    if (subDef && parseInt(subDef.year) === 0) {
+        if (!scoreObj.obtainedYear) {
+            scoreObj.obtainedYear = state.currentYear;
         }
     }
 
