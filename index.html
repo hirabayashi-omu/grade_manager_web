@@ -1305,57 +1305,118 @@
                         </div>
                     </div>
 
-                    <!-- Right: Subject List -->
-                    <div class="card">
-                        <div class="card-header"
-                            style="justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 1rem; margin-bottom: 1.5rem;">
-                            <div class="card-title">全学年科目定義</div>
-                            <div style="display: flex; gap: 0.8rem; align-items: center;">
-                                <button id="exportSubjectsCsvBtn" class="btn btn-secondary" style="font-size: 0.85rem;">
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                        stroke="currentColor" stroke-width="2" width="16" height="16">
-                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                            d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                    </svg>
-                                    CSV保存
-                                </button>
-                                <button id="importSubjectsCsvBtn" class="btn btn-secondary" style="font-size: 0.85rem;">
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                        stroke="currentColor" stroke-width="2" width="16" height="16">
-                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                                    </svg>
-                                    CSV読出
-                                </button>
-                                <input type="file" id="subjectsCsvFileInput" accept=".csv" class="hidden">
-                                <!-- Course Filter -->
-                                <select id="subjectCourseFilter"
-                                    style="padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 0.4rem; font-size: 0.85rem; margin-right: 0.5rem;">
-                                    <option value="">未選択</option>
-                                    <option value="エネルギー機械">エネルギー機械 (M)</option>
-                                    <option value="プロダクトデザイン">プロダクトデザイン (D)</option>
-                                    <option value="エレクトロニクス">エレクトロニクス (E)</option>
-                                    <option value="知能情報">知能情報 (I)</option>
-                                </select>
-                                <div style="position: relative;">
-                                    <input type="text" id="subjectSearchInput" placeholder="科目を検索..."
-                                        style="padding: 0.5rem 1rem 0.5rem 2.2rem; border: 1px solid #cbd5e1; border-radius: 9999px; font-size: 0.85rem; width: 220px;">
-                                    <svg xmlns="http://www.w3.org/2000/svg"
-                                        style="position: absolute; left: 0.8rem; top: 50%; transform: translateY(-50%); color: #94a3b8;"
-                                        fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
-                                        width="16" height="16">
-                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                    </svg>
+                    <!-- Right: Subject List & Storage Management -->
+                    <div style="display: flex; flex-direction: column; gap: 2rem;">
+                        <div class="card">
+                            <div class="card-header"
+                                style="justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 1rem; margin-bottom: 1.5rem;">
+                                <div class="card-title">全学年科目定義</div>
+                                <div style="display: flex; gap: 0.8rem; align-items: center;">
+                                    <button id="exportSubjectsCsvBtn" class="btn btn-secondary"
+                                        style="font-size: 0.85rem;">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                            stroke="currentColor" stroke-width="2" width="16" height="16">
+                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                        </svg>
+                                        CSV保存
+                                    </button>
+                                    <button id="importSubjectsCsvBtn" class="btn btn-secondary"
+                                        style="font-size: 0.85rem;">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                            stroke="currentColor" stroke-width="2" width="16" height="16">
+                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                        </svg>
+                                        CSV読出
+                                    </button>
+                                    <input type="file" id="subjectsCsvFileInput" accept=".csv" class="hidden">
+                                    <!-- Course Filter -->
+                                    <select id="subjectCourseFilter"
+                                        style="padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 0.4rem; font-size: 0.85rem; margin-right: 0.5rem;">
+                                        <option value="">未選択</option>
+                                        <option value="エネルギー機械">エネルギー機械 (M)</option>
+                                        <option value="プロダクトデザイン">プロダクトデザイン (D)</option>
+                                        <option value="エレクトロニクス">エレクトロニクス (E)</option>
+                                        <option value="知能情報">知能情報 (I)</option>
+                                    </select>
+                                    <div style="position: relative;">
+                                        <input type="text" id="subjectSearchInput" placeholder="科目を検索..."
+                                            style="padding: 0.5rem 1rem 0.5rem 2.2rem; border: 1px solid #cbd5e1; border-radius: 9999px; font-size: 0.85rem; width: 220px;">
+                                        <svg xmlns="http://www.w3.org/2000/svg"
+                                            style="position: absolute; left: 0.8rem; top: 50%; transform: translateY(-50%); color: #94a3b8;"
+                                            fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
+                                            width="16" height="16">
+                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                        </svg>
+                                    </div>
+                                    <button id="addSubjectBtn" class="btn btn-primary">新規科目追加</button>
                                 </div>
-                                <button id="addSubjectBtn" class="btn btn-primary">新規科目追加</button>
+                            </div>
+
+                            <div id="subjectsGroupedList" style="display: flex; flex-direction: column; gap: 2.5rem;">
+                                <!-- Grouped by Year list will be rendered here -->
                             </div>
                         </div>
 
-                        <div id="subjectsGroupedList" style="display: flex; flex-direction: column; gap: 2.5rem;">
-                            <!-- Grouped by Year list will be rendered here -->
+                        <!-- Storage Management Card -->
+                        <div class="card" id="storage-mgmt-card">
+                            <div class="card-header" style="border-bottom: 1px solid #e2e8f0; margin-bottom: 1rem;">
+                                <div class="card-title">ストレージ容量管理 (Storage Management)</div>
+                            </div>
+                            <div class="card-body">
+                                <p style="font-size: 0.9rem; color: #64748b; margin-bottom: 1.5rem;">
+                                    ブラウザの保存容量（localStorage）の使用状況を確認し、不要な一時データを削除して空き容量を増やせます。<br>
+                                    <span style="color: #ef4444; font-weight: 600;">※iPadなどモバイル端末では約5MBが上限です。</span>
+                                </p>
+
+                                <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 2rem;">
+                                    <div
+                                        style="flex: 1; height: 1.5rem; background: #e2e8f0; border-radius: 1rem; overflow: hidden; display: flex;">
+                                        <div id="storage-usage-bar"
+                                            style="width: 0%; background: #3b82f6; transition: width 0.5s ease;"></div>
+                                    </div>
+                                    <div style="font-weight: 700; color: #1e293b; font-size: 1.1rem; min-width: 100px;">
+                                        <span id="storage-usage-text">0.00</span> MB / 5 MB
+                                    </div>
+                                </div>
+
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                                    <div
+                                        style="border: 1px solid #e2e8f0; border-radius: 0.5rem; padding: 1rem; background: #f8fafc;">
+                                        <div style="font-weight: 600; color: #475569; margin-bottom: 0.25rem;">
+                                            名簿ドキュメント一時データ</div>
+                                        <div style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 0.8rem;">
+                                            「名簿取り込み」で読み込んだCSVの一時キャッシュです。削除しても既存の学生名簿は消えません。</div>
+                                        <div
+                                            style="display: flex; justify-content: space-between; align-items: center;">
+                                            <span style="font-weight: 700; color: #334155;" id="storage-roster-size">0
+                                                KB</span>
+                                            <button id="clearRosterCacheBtn" class="btn btn-secondary"
+                                                style="font-size: 0.8rem; padding: 0.4rem 0.8rem;">キャッシュ削除</button>
+                                        </div>
+                                    </div>
+
+                                    <div
+                                        style="border: 1px solid #e2e8f0; border-radius: 0.5rem; padding: 1rem; background: #f8fafc;">
+                                        <div style="font-weight: 600; color: #475569; margin-bottom: 0.25rem;">出欠記録データ
+                                        </div>
+                                        <div style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 0.8rem;">
+                                            読み込んだすべての出欠ログデータです。削除するとカレンダーや統計が表示されなくなります。</div>
+                                        <div
+                                            style="display: flex; justify-content: space-between; align-items: center;">
+                                            <span style="font-weight: 700; color: #334155;"
+                                                id="storage-attendance-size">0 KB</span>
+                                            <button id="clearAttendanceDataBtn" class="btn btn-secondary"
+                                                style="font-size: 0.8rem; padding: 0.4rem 0.8rem; color: #ef4444; border-color: #fecaca;">データ削除</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
+
                 </div>
             </div>
 

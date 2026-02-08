@@ -326,7 +326,11 @@ function saveSessionState() {
     } catch (e) {
         console.error('Save State Error:', e);
         if (e.name === 'QuotaExceededError' || e.code === 22) {
-            alert('【警告】ブラウザの保存容量上限に達したため、データ（プリセット等）が保存できませんでした。\n不要なデータ（学生データなど）を減らしてください。');
+            alert('【警告】ブラウザの保存容量上限（約5MB）に達したため、データが保存できませんでした。\n\n「システム環境設定」タブの「ストレージ容量管理」から、不要な「名簿ドキュメント一時データ」などを削除してください。');
+            // Proactively switch to settings tab so they can fix it
+            if (state.currentTab !== 'settings') {
+                setTimeout(() => switchTab('settings'), 500);
+            }
         }
     }
 }
@@ -1197,6 +1201,9 @@ function setupEventListeners() {
         }
     });
 
+    document.getElementById('clearRosterCacheBtn')?.addEventListener('click', () => clearStorageType('roster'));
+    document.getElementById('clearAttendanceDataBtn')?.addEventListener('click', () => clearStorageType('attendance'));
+
     document.getElementById('exportStudentsCsvBtn')?.addEventListener('click', exportStudentsCsv);
     document.getElementById('importStudentsCsvBtn')?.addEventListener('click', () => {
         document.getElementById('studentsCsvFileInput')?.click();
@@ -1428,39 +1435,128 @@ function handleJsonImport(e) {
     reader.readAsText(file);
 }
 
+function updateStorageUsageDisplay() {
+    const textEl = document.getElementById('storage-usage-text');
+    if (!textEl) return;
+
+    const usage = getLocalStorageUsageInMB();
+    const limit = 5.0; // Standard localStorage limit is approx 5MB
+
+    const barEl = document.getElementById('storage-usage-bar');
+    if (textEl) textEl.textContent = usage.toFixed(2);
+    if (barEl) {
+        const percent = Math.min((usage / limit) * 100, 100);
+        barEl.style.width = percent + '%';
+        if (percent > 90) barEl.style.background = '#ef4444';
+        else if (percent > 70) barEl.style.background = '#f59e0b';
+        else barEl.style.background = '#3b82f6';
+    }
+
+    // Individual component sizes
+    const rosterSize = (getItemSizeInKB('gm_roster_candidates') + getItemSizeInKB('gm_faculty_candidates'));
+    const attSize = getItemSizeInKB('gm_attendance_data');
+
+    const rosterSizeEl = document.getElementById('storage-roster-size');
+    const attSizeEl = document.getElementById('storage-attendance-size');
+    if (rosterSizeEl) rosterSizeEl.textContent = rosterSize > 1024 ? (rosterSize / 1024).toFixed(2) + ' MB' : rosterSize.toFixed(0) + ' KB';
+    if (attSizeEl) attSizeEl.textContent = attSize > 1024 ? (attSize / 1024).toFixed(2) + ' MB' : attSize.toFixed(0) + ' KB';
+}
+
+function getLocalStorageUsageInMB() {
+    let total = 0;
+    try {
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            const val = localStorage.getItem(key);
+            if (val) total += (key.length + val.length) * 2; // Roughly 2 bytes per character for UTF-16
+        }
+    } catch (e) {
+        console.error("Usage calculation error", e);
+    }
+    return total / (1024 * 1024);
+}
+
+function getItemSizeInKB(key) {
+    const val = localStorage.getItem(key);
+    if (!val) return 0;
+    return ((key.length + val.length) * 2) / 1024;
+}
+
+function clearStorageType(type) {
+    if (type === 'roster') {
+        const rosterSize = (getItemSizeInKB('gm_roster_candidates') + getItemSizeInKB('gm_faculty_candidates'));
+        if (rosterSize < 1) {
+            alert('名簿キャッシュは既に空です。');
+            return;
+        }
+
+        if (confirm('名簿ドキュメントの一時キャッシュを削除しますか？\n(既に確定した学生リストや成績などは削除されません。次に名簿を取り込む際に再度ファイルを読み込む必要があります)')) {
+            localStorage.removeItem('gm_roster_candidates');
+            localStorage.removeItem('gm_faculty_candidates');
+            importState.candidates = [];
+            facultyImportState.candidates = [];
+            alert('名簿キャッシュを削除しました。');
+            updateStorageUsageDisplay();
+            // Refresh table if on roster tab
+            if (state.currentTab === 'roster_board') renderRosterBoardTable();
+        }
+    } else if (type === 'attendance') {
+        if (confirm('【注意】出欠ログデータを「すべて」削除しますか？\n削除するとこれまで読み込んだ出欠履歴が消え、元に戻せません。')) {
+            if (confirm('本当によろしいですか？')) {
+                localStorage.removeItem('gm_attendance_data');
+                state.attendance = {
+                    records: {},
+                    periodInfo: { start: '', end: '' },
+                    fileName: '',
+                    memos: {}
+                };
+                alert('出欠データを削除しました。');
+                updateStorageUsageDisplay();
+                if (state.currentTab === 'attendance') renderAttendanceCalendar();
+            }
+        }
+    }
+}
+
 function renderSettings() {
     // 1. Render Students (List style)
     const studentsList = document.getElementById('studentsList');
-    studentsList.innerHTML = '';
-    state.students.forEach((s, idx) => {
-        const item = document.createElement('div');
-        item.style.cssText = 'display: flex; align-items: center; justify-content: space-between; background: white; padding: 0.6rem 0.8rem; border-radius: 0.5rem; border: 1px solid #e2e8f0; font-size: 0.9rem; transition: all 0.2s;';
-        const isCurrent = (s === state.currentStudent);
-        if (isCurrent) {
-            item.style.background = '#eff6ff';
-            item.style.borderColor = '#3b82f6';
-        }
-        item.innerHTML = `
-            <div style="display: flex; align-items: center; gap: 0.6rem; overflow: hidden; cursor: pointer;" onclick="document.getElementById('studentSelect').value='${s}'; state.currentStudent='${s}'; saveSessionState(); renderSettings();">
-                <div style="width: 24px; height: 24px; background: ${isCurrent ? '#bfdbfe' : '#f1f5f9'}; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; color: ${isCurrent ? '#1e40af' : '#64748b'};">${idx + 1}</div>
-                <span style="font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; ${isCurrent ? 'color: #1d4ed8;' : ''}">${s} ${isCurrent ? '<span style="font-size:0.7em; color:#3b82f6; border:1px solid #3b82f6; padding:1px 4px; border-radius:4px; margin-left:4px;">選択中</span>' : ''}</span>
-            </div>
-            <div style="display: flex; gap: 0.2rem;">
-                <button onclick="editStudentMetadata('${s}')" style="border:none; background:none; color:#94a3b8; cursor:pointer; padding: 0.2rem; display: flex;" title="詳細情報を編集">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                </button>
-                <!-- Rename Button (Separate from Metadata) -->
-                <button onclick="editStudentSetting(${idx})" style="border:none; background:none; color:#94a3b8; cursor:pointer; padding: 0.2rem; display: flex;" title="氏名変更">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                </button>
-                <button onclick="removeStudentSetting(${idx})" style="border:none; background:none; color:#94a3b8; cursor:pointer; padding: 0.2rem; display: flex;" title="削除">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                </button>
-            </div>
-        `;
-        studentsList.appendChild(item);
-    });
-    updatePlaceholderNames();
+    if (studentsList) {
+        studentsList.innerHTML = '';
+        state.students.forEach((s, idx) => {
+            const item = document.createElement('div');
+            item.style.cssText = 'display: flex; align-items: center; justify-content: space-between; background: white; padding: 0.6rem 0.8rem; border-radius: 0.5rem; border: 1px solid #e2e8f0; font-size: 0.9rem; transition: all 0.2s;';
+            const isCurrent = (s === state.currentStudent);
+            if (isCurrent) {
+                item.style.background = '#eff6ff';
+                item.style.borderColor = '#3b82f6';
+            }
+            item.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 0.6rem; overflow: hidden; cursor: pointer;" onclick="document.getElementById('studentSelect').value='${s}'; state.currentStudent='${s}'; saveSessionState(); renderSettings();">
+                    <div style="width: 24px; height: 24px; background: ${isCurrent ? '#bfdbfe' : '#f1f5f9'}; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; color: ${isCurrent ? '#1e40af' : '#64748b'};">${idx + 1}</div>
+                    <span style="font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; ${isCurrent ? 'color: #1d4ed8;' : ''}">${s} ${isCurrent ? '<span style="font-size:0.7em; color:#3b82f6; border:1px solid #3b82f6; padding:1px 4px; border-radius:4px; margin-left:4px;">選択中</span>' : ''}</span>
+                </div>
+                <div style="display: flex; gap: 0.2rem;">
+                    <button onclick="editStudentMetadata('${s}')" style="border:none; background:none; color:#94a3b8; cursor:pointer; padding: 0.2rem; display: flex;" title="詳細情報を編集">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                    </button>
+                    <!-- Rename Button (Separate from Metadata) -->
+                    <button onclick="editStudentSetting(${idx})" style="border:none; background:none; color:#94a3b8; cursor:pointer; padding: 0.2rem; display: flex;" title="氏名変更">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                    </button>
+                    <button onclick="removeStudentSetting(${idx})" style="border:none; background:none; color:#94a3b8; cursor:pointer; padding: 0.2rem; display: flex;" title="削除">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                </div>
+            `;
+            studentsList.appendChild(item);
+        });
+        updatePlaceholderNames();
+    }
+
+    // 4. Update Storage Usage
+    updateStorageUsageDisplay();
+
 
     // 2. Render Subjects (Grouped List)
     const container = document.getElementById('subjectsGroupedList'); // Ensure this ID matches HTML
