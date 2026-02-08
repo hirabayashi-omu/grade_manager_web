@@ -1,4 +1,4 @@
-
+﻿
 // ==================== SIDEBAR CONTROL ====================
 function toggleSidebar(show) {
     const sidebar = document.querySelector('.sidebar');
@@ -2207,18 +2207,16 @@ function handleStudentsCsvImport(e) {
     const file = e.target.files[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
+    readFileText(file).then(text => {
         try {
-            const text = event.target.result;
-            const lines = text.split(/\r?\n/).filter(line => line.trim());
+            const rows = parseCSV(text).filter(row => row.length > 0 && row.some(col => col.trim()));
 
-            if (lines.length < 2) {
+            if (rows.length < 2) {
                 throw new Error('CSVファイルが空か、データが不足しています。');
             }
 
-            // Parse header
-            const header = lines[0].replace(/^\uFEFF/, '').split(',').map(h => h.trim());
+            // Parse header (BOM already handled by readFileText if present)
+            const header = rows[0].map(h => h.trim());
 
             if (header[0] !== '学生名') {
                 throw new Error('CSVファイルの形式が正しくありません。\n最初の列は「学生名」である必要があります。');
@@ -2231,8 +2229,8 @@ function handleStudentsCsvImport(e) {
             const importedStudents = [];
             const importedMetadata = {};
 
-            for (let i = 1; i < lines.length; i++) {
-                const cols = lines[i].split(',').map(c => c.trim());
+            for (let i = 1; i < rows.length; i++) {
+                const cols = rows[i].map(c => c.trim());
                 if (cols.length < 1 || !cols[0]) continue; // Skip invalid rows
 
                 const studentName = cols[0];
@@ -2307,9 +2305,11 @@ function handleStudentsCsvImport(e) {
         } finally {
             e.target.value = '';
         }
-    };
-
-    reader.readAsText(file, 'UTF-8');
+    }).catch(err => {
+        console.error('File read error:', err);
+        alert('ファイルの読み込みに失敗しました:\n' + err.message);
+        e.target.value = '';
+    });
 }
 
 function exportSubjectsCsv() {
@@ -2348,18 +2348,16 @@ function handleSubjectsCsvImport(e) {
     const file = e.target.files[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
+    readFileText(file).then(text => {
         try {
-            const text = event.target.result;
-            const lines = text.split(/\r?\n/).filter(line => line.trim());
+            const rows = parseCSV(text).filter(row => row.length > 0 && row.some(col => col.trim()));
 
-            if (lines.length < 2) {
+            if (rows.length < 2) {
                 throw new Error('CSVファイルが空か、データが不足しています。');
             }
 
-            // Parse header
-            const header = lines[0].replace(/^\uFEFF/, '').split(',').map(h => h.trim());
+            // Parse header (BOM already handled by readFileText if present)
+            const header = rows[0].map(h => h.trim());
 
             // Validate header format
             const expectedHeaders = ['授業科目', '単位', '学年', '種別1', '種別2', '種別3', '種別4'];
@@ -2371,8 +2369,8 @@ function handleSubjectsCsvImport(e) {
 
             // Parse subjects
             const importedSubjects = [];
-            for (let i = 1; i < lines.length; i++) {
-                const cols = lines[i].split(',').map(c => c.trim());
+            for (let i = 1; i < rows.length; i++) {
+                const cols = rows[i].map(c => c.trim());
                 if (cols.length < 3) continue; // Skip invalid rows
 
                 const subject = {
@@ -2444,9 +2442,11 @@ function handleSubjectsCsvImport(e) {
         } finally {
             e.target.value = '';
         }
-    };
-
-    reader.readAsText(file, 'UTF-8');
+    }).catch(err => {
+        console.error('File read error:', err);
+        alert('ファイルの読み込みに失敗しました:\n' + err.message);
+        e.target.value = '';
+    });
 }
 
 
@@ -2578,32 +2578,57 @@ function readFileText(file) {
         reader.onload = (e) => {
             const buffer = e.target.result;
             try {
-                // Check for UTF-8 BOM
                 const view = new Uint8Array(buffer);
+
+                // 1. Check for UTF-8 BOM
                 if (view.length >= 3 && view[0] === 0xEF && view[1] === 0xBB && view[2] === 0xBF) {
                     const decoder = new TextDecoder('utf-8');
                     resolve(decoder.decode(buffer));
                     return;
                 }
 
-                const decoder = new TextDecoder('utf-8', { fatal: true });
-                resolve(decoder.decode(buffer));
-            } catch (e1) {
-                try {
-                    // Try Shift_JIS (using windows-31j for CP932 support)
-                    const decoder = new TextDecoder('windows-31j', { fatal: true });
+                // 2. Check for UTF-16LE BOM
+                if (view.length >= 2 && view[0] === 0xFF && view[1] === 0xFE) {
+                    const decoder = new TextDecoder('utf-16le');
                     resolve(decoder.decode(buffer));
-                } catch (e2) {
-                    // Fallback: Lazy windows-31j
+                    return;
+                }
+
+                // 3. Check for UTF-16BE BOM
+                if (view.length >= 2 && view[0] === 0xFE && view[1] === 0xFF) {
+                    const decoder = new TextDecoder('utf-16be');
+                    resolve(decoder.decode(buffer));
+                    return;
+                }
+
+                // 4. Try UTF-8 (Strict)
+                try {
+                    const decoder = new TextDecoder('utf-8', { fatal: true });
+                    resolve(decoder.decode(buffer));
+                    return;
+                } catch (utfError) {
+                    // Not valid UTF-8, continue to Shift-JIS
+                }
+
+                // 5. Try Shift_JIS variants
+                // Note: windows-31j is more comprehensive for Japanese Excel CSVs
+                const encodings = ['windows-31j', 'shift-jis', 'shift_jis', 'sjis', 'cp932'];
+                for (const enc of encodings) {
                     try {
-                        const decoder = new TextDecoder('windows-31j');
+                        const decoder = new TextDecoder(enc, { fatal: true });
                         resolve(decoder.decode(buffer));
-                    } catch (e3) {
-                        // Final Fallback: Lazy sjis
-                        const decoder = new TextDecoder('sjis');
-                        resolve(decoder.decode(buffer));
+                        return;
+                    } catch (err) {
+                        continue;
                     }
                 }
+
+                // 6. Last resort: UTF-8 with replacement characters
+                const decoder = new TextDecoder('utf-8', { fatal: false });
+                resolve(decoder.decode(buffer));
+            } catch (error) {
+                console.error('readFileText error:', error);
+                reject(error);
             }
         };
         reader.onerror = () => reject(reader.error);
@@ -6415,10 +6440,9 @@ function loadSeatingLayout() {
         const file = e.target.files[0];
         if (!file) return;
 
-        const reader = new FileReader();
-        reader.onload = (event) => {
+        readFileText(file).then(text => {
             try {
-                const data = JSON.parse(event.target.result);
+                const data = JSON.parse(text);
 
                 // Validate data
                 if (!data.cols || !data.rows || !data.assignments) {
@@ -6447,8 +6471,9 @@ function loadSeatingLayout() {
             } catch (err) {
                 alert('ファイルの読み込みに失敗しました: ' + err.message);
             }
-        };
-        reader.readAsText(file);
+        }).catch(err => {
+            alert('ファイルの読み込みに失敗しました: ' + err.message);
+        });
     };
     input.click();
 }
@@ -7767,11 +7792,9 @@ function handleFacultyRosterSelect(e) {
     const file = e.target.files[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = function (evt) {
-        let text = evt.target.result;
+    readFileText(file).then(text => {
         try {
-            const rows = parseCSV(text).filter(row => row.length > 0);
+            const rows = parseCSV(text).filter(row => row.length > 0 && row.some(col => col.trim()));
             if (rows.length < 2) throw new Error("Empty or invalid CSV");
 
             // Header: 所属,校務分掌１,校務分掌２,氏名,OMUメール,OMU ID
@@ -7806,8 +7829,10 @@ function handleFacultyRosterSelect(e) {
         } finally {
             e.target.value = '';
         }
-    };
-    reader.readAsText(file);
+    }).catch(err => {
+        alert('名簿読み込みエラー: ' + err.message);
+        e.target.value = '';
+    });
 }
 
 function renderFacultyFilters() {
@@ -8097,12 +8122,17 @@ function populateAttendanceSubjectFilter() {
 
 function handleAttendanceFileUpload(e) {
     const file = e.target.files[0];
-    if (!file) return;
+    console.log('handleAttendanceFileUpload called, file:', file);
+    if (!file) {
+        console.warn('No file selected');
+        return;
+    }
 
     readFileText(file).then(text => {
         try {
-            // Use a simple CSV parser that can handle multiple header rows
-            const lines = text.split(/\r?\n/).map(l => l.split(','));
+            // Use robust CSV parser
+            const lines = parseCSV(text).filter(row => row.length > 0 && row.some(col => col.trim()));
+            console.log('Parsed lines:', lines.length);
             if (lines.length < 5) throw new Error("CSV行数が不足しています。");
 
             // Python Logic:
@@ -8127,6 +8157,7 @@ function handleAttendanceFileUpload(e) {
             }
 
             if (firstDateIdx === -1) throw new Error("日付列が見つかりません。");
+            console.log('First date column index:', firstDateIdx);
 
             const records = {};
             let globalMinDate = null;
@@ -8168,6 +8199,7 @@ function handleAttendanceFileUpload(e) {
                 }
             });
 
+            console.log('Records built, student count:', Object.keys(records).length);
             state.attendance.records = records;
             state.attendance.fileName = file.name;
             if (globalMinDate && globalMaxDate) {
@@ -8193,16 +8225,18 @@ function handleAttendanceFileUpload(e) {
             }
 
             saveSessionState();
+            console.log('Attendance data saved, initializing...');
             initAttendance();
             alert('出欠データを読み込みました。');
         } catch (err) {
-            console.error(err);
+            console.error('CSV parsing error:', err);
             alert('CSVの解析に失敗しました: ' + err.message);
         }
     }).catch(err => {
-        console.error(err);
-        alert('CSVの解析に失敗しました: ' + err.message);
+        console.error('File read error:', err);
+        alert('ファイルの読み込みに失敗しました: ' + err.message);
     }).finally(() => {
+        console.log('Resetting file input');
         e.target.value = '';
     });
 }
