@@ -122,9 +122,10 @@
                 </svg>
                 JSON/Load
             </button>
-            <input type="file" id="jsonFileInput" accept=".json" class="hidden">
-            <input type="file" id="csvFileInput" accept=".csv,.json" class="hidden">
-            <input type="file" id="rosterFileInput" accept=".csv" class="hidden">
+            <input type="file" id="jsonFileInput" accept=".json,application/json" class="hidden">
+            <input type="file" id="csvFileInput" accept=".csv,text/csv,text/plain,.json,application/json"
+                class="hidden">
+            <input type="file" id="rosterFileInput" accept=".csv,text/csv,text/plain" class="hidden">
             <!-- Roster Import Button removed from Header, moved to new tab -->
             <!-- Clear button removed from here, moved to Settings -->
             <button id="logoutBtn" class="btn btn-secondary" title="システムをロックしてログアウトします" style="display: none;">
@@ -1579,7 +1580,8 @@
                                 </svg>
                                 CSV読込
                             </button>
-                            <input type="file" id="attendanceCsvFileInput" accept=".csv" class="hidden">
+                            <input type="file" id="attendanceCsvFileInput" accept=".csv,text/csv,text/plain"
+                                class="hidden">
                             <button id="attendanceExportPdfBtn" class="btn btn-primary">PDF出力</button>
                         </div>
                     </div>

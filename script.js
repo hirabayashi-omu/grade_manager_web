@@ -2572,15 +2572,31 @@ function readFileText(file) {
         reader.onload = (e) => {
             const buffer = e.target.result;
             try {
+                // Check for UTF-8 BOM
+                const view = new Uint8Array(buffer);
+                if (view.length >= 3 && view[0] === 0xEF && view[1] === 0xBB && view[2] === 0xBF) {
+                    const decoder = new TextDecoder('utf-8');
+                    resolve(decoder.decode(buffer));
+                    return;
+                }
+
                 const decoder = new TextDecoder('utf-8', { fatal: true });
                 resolve(decoder.decode(buffer));
             } catch (e1) {
                 try {
-                    const decoder = new TextDecoder('shift-jis', { fatal: true });
+                    // Try Shift_JIS (using windows-31j for CP932 support)
+                    const decoder = new TextDecoder('windows-31j', { fatal: true });
                     resolve(decoder.decode(buffer));
                 } catch (e2) {
-                    const decoder = new TextDecoder('shift-jis');
-                    resolve(decoder.decode(buffer));
+                    // Fallback: Lazy windows-31j
+                    try {
+                        const decoder = new TextDecoder('windows-31j');
+                        resolve(decoder.decode(buffer));
+                    } catch (e3) {
+                        // Final Fallback: Lazy sjis
+                        const decoder = new TextDecoder('sjis');
+                        resolve(decoder.decode(buffer));
+                    }
                 }
             }
         };
