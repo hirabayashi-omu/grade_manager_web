@@ -1,10 +1,65 @@
 
+
+// ==================== SIDEBAR CONTROL ====================
+function toggleSidebar(show) {
+    const sidebar = document.querySelector('.sidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+
+    if (show) {
+        if (sidebar) sidebar.classList.add('open');
+        if (overlay) overlay.classList.add('active');
+    } else {
+        if (sidebar) sidebar.classList.remove('open');
+        if (overlay) overlay.classList.remove('active');
+    }
+}
+
 // ==================== DATA CONSTANTS ====================
 // ==================== DATA CONSTANTS ====================
 // These are factory defaults. We use localStorage for actual master data.
 const DEFAULT_STUDENTS_RAW = `
 学生太郎,学生次郎,学生花子,学生A,学生B,学生C,学生D,学生E
 `;
+
+
+const DEFAULT_OFFICER_ROLES = [
+    {
+        category: "クラス役員 (HR Officers)",
+        roles: [
+            { id: "sodai", name: "総代", limit: 1, desc: "代表としてクラスをまとめる。高専祭等においてクラスの長を務める。" },
+            { id: "fuku_sodai", name: "副総代", limit: 1, desc: "HRの進行役。記録も付ける。" },
+            { id: "hr_iincho", name: "HR委員長", limit: 1, desc: "HRの計画・運営を指揮する。" },
+            { id: "hr_iin", name: "HR委員", limit: 0, desc: "HRの計画・運営をする。" }
+        ]
+    },
+    {
+        category: "係・分掌 (Class Duties)",
+        roles: [
+            { id: "kyomu", name: "教務係", limit: 1, desc: "出席簿管理、印刷物配布などを行う。" },
+            { id: "taiiku_m", name: "体育係(男)", limit: 1, desc: "体育時の貴重品管理、教員連絡(男)。" },
+            { id: "taiiku_f", name: "体育係(女)", limit: 1, desc: "体育時の貴重品管理、教員連絡(女)。" },
+            { id: "kankyo", name: "環境推進員", limit: 1, desc: "教室環境（電灯・空調・加湿器）の管理。" },
+            { id: "kaikei", name: "会計係", limit: 1, desc: "クラスイベント時の会計管理。" },
+            { id: "bika", name: "美化委員", limit: 0, desc: "教室及び校内美化を推進する。" }
+        ]
+    },
+    {
+        category: "行事委員 (Event Committees)",
+        roles: [
+            { id: "olympic", name: "高専オリンピック委員", limit: 0, desc: "イベント運営の補助。" },
+            { id: "kosensai", name: "高専祭委員", limit: 0, desc: "イベント運営の補助。" },
+            { id: "album", name: "アルバム委員", limit: 2, desc: "卒業アルバムの作成準備。" }
+        ]
+    },
+    {
+        category: "学友会関連 (Student Association)",
+        roles: [
+            { id: "hyogi", name: "評議員", limit: 0, desc: "クラスを代表して評議会に出席し、学友会執行部の提案を審議する。審議内容をクラスに報告する。" },
+            { id: "shikko", name: "准執行委員", limit: 0, desc: "執行委員長を補佐し、執行委員会の業務を分掌する。" },
+            { id: "senkyo", name: "選挙管理委員", limit: 0, desc: "選挙等を管理する。" }
+        ]
+    }
+];
 
 const DEFAULT_SUBJECTS_RAW = `授業科目,単位,学年,種別1,種別2,種別3,種別4,除外
 国語1,2,1,必履修,一般,DP-C,コース共通,
@@ -9374,44 +9429,7 @@ function printAllStudentSummaries() {
 
 // ==================== CLASS OFFICERS ====================
 
-const DEFAULT_OFFICER_ROLES = [
-    {
-        category: "クラス役員 (HR Officers)",
-        roles: [
-            { id: "sodai", name: "総代", limit: 1, desc: "代表としてクラスをまとめる。高専祭等においてクラスの長を務める。" },
-            { id: "fuku_sodai", name: "副総代", limit: 1, desc: "HRの進行役。記録も付ける。" },
-            { id: "hr_iincho", name: "HR委員長", limit: 1, desc: "HRの計画・運営を指揮する。" },
-            { id: "hr_iin", name: "HR委員", limit: 0, desc: "HRの計画・運営をする。" }
-        ]
-    },
-    {
-        category: "係・分掌 (Class Duties)",
-        roles: [
-            { id: "kyomu", name: "教務係", limit: 1, desc: "出席簿管理、印刷物配布などを行う。" },
-            { id: "taiiku_m", name: "体育係(男)", limit: 1, desc: "体育時の貴重品管理、教員連絡(男)。" },
-            { id: "taiiku_f", name: "体育係(女)", limit: 1, desc: "体育時の貴重品管理、教員連絡(女)。" },
-            { id: "kankyo", name: "環境推進員", limit: 1, desc: "教室環境（電灯・空調・加湿器）の管理。" },
-            { id: "kaikei", name: "会計係", limit: 1, desc: "クラスイベント時の会計管理。" },
-            { id: "bika", name: "美化委員", limit: 0, desc: "教室及び校内美化を推進する。" }
-        ]
-    },
-    {
-        category: "行事委員 (Event Committees)",
-        roles: [
-            { id: "olympic", name: "高専オリンピック委員", limit: 0, desc: "イベント運営の補助。" },
-            { id: "kosensai", name: "高専祭委員", limit: 0, desc: "イベント運営の補助。" },
-            { id: "album", name: "アルバム委員", limit: 2, desc: "卒業アルバムの作成準備。" }
-        ]
-    },
-    {
-        category: "学友会関連 (Student Association)",
-        roles: [
-            { id: "hyogi", name: "評議員", limit: 0, desc: "クラスを代表して評議会に出席し、学友会執行部の提案を審議する。審議内容をクラスに報告する。" },
-            { id: "shikko", name: "准執行委員", limit: 0, desc: "執行委員長を補佐し、執行委員会の業務を分掌する。" },
-            { id: "senkyo", name: "選挙管理委員", limit: 0, desc: "選挙等を管理する。" }
-        ]
-    }
-];
+
 
 function initOfficerRoles() {
     // Migration: Rename old category if exists
@@ -9869,16 +9887,3 @@ function importOfficerAssignmentsCsv(event) {
 }
 
 
-// ==================== SIDEBAR CONTROL ====================
-function toggleSidebar(show) {
-    const sidebar = document.querySelector('.sidebar');
-    const overlay = document.getElementById('sidebarOverlay');
-
-    if (show) {
-        if (sidebar) sidebar.classList.add('open');
-        if (overlay) overlay.classList.add('active');
-    } else {
-        if (sidebar) sidebar.classList.remove('open');
-        if (overlay) overlay.classList.remove('active');
-    }
-}
