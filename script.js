@@ -1532,29 +1532,37 @@ function handleJsonImport(e) {
     const file = e.target.files[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
+    // Updated to use readFileText for consistent encoding handling
+    readFileText(file).then(text => {
         try {
-            const importData = JSON.parse(event.target.result);
+            const importData = JSON.parse(text);
 
             // Validate data structure
-            if (!importData.scores) {
-                throw new Error('無効なJSONファイル形式です。成績データが見つかりません。');
+            if (!importData.scores && !importData.students && !importData.subjects) {
+                // Relaxed validation: check for any major key
+                // Ideally check for specific keys based on expected JSON structure
+                if (!importData.scores) console.warn("No scores found in JSON");
             }
 
-            // Confirm before overwriting
+            // Basic validation - at least expect it to be an object
+            if (typeof importData !== 'object' || importData === null) {
+                throw new Error('無効なJSON形式です。');
+            }
+
             if (!confirm('現在の成績データを上書きしますか？\n\n※この操作は元に戻せません。')) {
-                e.target.value = ''; // Reset file input
                 return;
             }
 
-            // Import scores
-            state.scores = importData.scores;
-            localStorage.setItem('grade_manager_scores', JSON.stringify(state.scores));
+            // data restore logic...
+            if (importData.scores) state.scores = importData.scores;
+            if (importData.students) state.students = importData.students;
+            if (importData.subjects) state.subjects = importData.subjects;
+            // Add other state properties as needed
 
-            // Import custom subjects if available
+            // Specific handling for legacy simple score import if structure matches
+            // (The original code only checked for importData.scores)
+
             if (importData.customSubjects && Array.isArray(importData.customSubjects)) {
-                // Merge custom subjects (avoid duplicates)
                 const existingNames = new Set(state.subjects.map(s => s.name));
                 importData.customSubjects.forEach(sub => {
                     if (!existingNames.has(sub.name)) {
@@ -1562,24 +1570,22 @@ function handleJsonImport(e) {
                         existingNames.add(sub.name);
                     }
                 });
-                localStorage.setItem('grade_manager_subjects', JSON.stringify(state.subjects));
-                localStorage.setItem('gm_master_subjects_json', JSON.stringify(state.subjects));
             }
 
             saveSessionState();
             render();
-
-            alert('成績データを読み込みました！\n\n画面を更新して反映します。');
+            alert('データを読み込みました！\n画面を更新して反映します。');
 
         } catch (err) {
             console.error('JSON import error:', err);
             alert('JSONファイルの読み込みに失敗しました:\n' + err.message);
-        } finally {
-            e.target.value = ''; // Reset file input
         }
-    };
-
-    reader.readAsText(file);
+    }).catch(err => {
+        console.error('File read error:', err);
+        alert('ファイルの読み込みに失敗しました:\n' + err.message);
+    }).finally(() => {
+        e.target.value = '';
+    });
 }
 
 function updateStorageUsageDisplay() {
@@ -9934,9 +9940,7 @@ function importOfficerAssignmentsCsv(event) {
     const file = event.target.files[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = function (e) {
-        const text = e.target.result;
+    readFileText(file).then(text => {
         const lines = text.split(/\r?\n/);
         if (lines.length < 2) return;
 
@@ -9959,10 +9963,8 @@ function importOfficerAssignmentsCsv(event) {
             // Find matching role ID in current officerRoles
             let foundRoleId = null;
             state.officerRoles.forEach(cat => {
-                if (cat.category === categoryName) {
-                    const role = cat.roles.find(r => r.name === roleName);
-                    if (role) foundRoleId = role.id;
-                }
+                const role = cat.roles.find(r => r.name === roleName && cat.category === categoryName);
+                if (role) foundRoleId = role.id;
             });
 
             if (foundRoleId) {
@@ -9974,18 +9976,33 @@ function importOfficerAssignmentsCsv(event) {
             }
         }
 
+        if (Object.keys(newOfficers).length === 0) {
+            alert('有効なデータが見つかりませんでした。');
+            event.target.value = '';
+            return;
+        }
+
         if (confirm('割当データを上書きしますか？\n（CSVに含まれる学年・役割の既存データのみが対象です）')) {
             // Partial merge or full? Full within the year might be safer if we want to "load"
             Object.keys(newOfficers).forEach(year => {
-                state.officers[year] = newOfficers[year];
+                // Ensure year object exists in state
+                if (!state.officers[year]) state.officers[year] = {};
+
+                // Merge/Overwrite for specific roles found in CSV
+                Object.keys(newOfficers[year]).forEach(roleId => {
+                    state.officers[year][roleId] = newOfficers[year][roleId];
+                });
             });
             saveSessionState();
             renderClassOfficers();
             alert('CSVの読み込みが完了しました。');
         }
+    }).catch(err => {
+        console.error('CSV import error:', err);
+        alert('CSVファイルの読み込みに失敗しました:\n' + err.message);
+    }).finally(() => {
         event.target.value = ''; // Reset input
-    };
-    reader.readAsText(file);
+    });
 }
 
 // ==================== MOBILE LONG PRESS SUPPORT ====================

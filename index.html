@@ -1499,7 +1499,7 @@
                                 </svg>
                                 CSV出力
                             </button>
-                            <button onclick="document.getElementById('officerAssignmentsCsvInput').click()"
+                            <button onclick="document.getElementById('officerAssignmentsCsvInput').click();"
                                 class="btn btn-secondary" title="CSVから割当状況を読み込みます">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                                     stroke="currentColor" stroke-width="2" width="16" height="16">
@@ -1508,8 +1508,8 @@
                                 </svg>
                                 CSV読込
                             </button>
-                            <input type="file" id="officerAssignmentsCsvInput" style="display: none;" accept=".csv"
-                                onchange="importOfficerAssignmentsCsv(event)">
+                            <input type="file" id="officerAssignmentsCsvInput" class="hidden"
+                                accept=".csv,text/csv,text/plain" onchange="importOfficerAssignmentsCsv(event)">
                         </div>
                     </div>
                 </div>
