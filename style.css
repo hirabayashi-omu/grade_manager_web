@@ -142,6 +142,11 @@ select {
     cursor: pointer;
 }
 
+/* Hide hamburger menu by default (desktop) */
+#menuToggle {
+    display: none;
+}
+
 /* Main Layout */
 main {
     flex: 1;
@@ -256,7 +261,50 @@ main {
     }
 
     .charts-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: 1fr !important;
+        /* Force 1 column on mobile */
+    }
+
+    /* Mobile Typography Adjustments for High-Res/FHD+ Screens */
+    body {
+        font-size: 16px;
+        /* Ensure base size is comfortable */
+    }
+
+    input,
+    select,
+    button,
+    textarea {
+        font-size: 16px !important;
+        /* Prevent zoom on iOS and improve tap target size */
+        padding: 0.6rem 0.8rem !important;
+        /* Larger touch targets */
+    }
+
+    .nav-item {
+        font-size: 1rem;
+        padding: 1rem;
+        /* Larger touch targets for menu */
+    }
+
+    .modal-title {
+        font-size: 1.25rem;
+    }
+
+    /* Force single column for seating and settings grids on mobile */
+    .seating-wrapper {
+        grid-template-columns: 1fr !important;
+    }
+
+    /* Settings page: student list and subject management */
+    #settings-content>div>div[style*="grid-template-columns: 320px 1fr"],
+    #settings-content>div>div[style*="grid-template-columns: 280px 1fr"] {
+        grid-template-columns: 1fr !important;
+    }
+
+    /* Storage management cards */
+    #storage-mgmt-card div[style*="grid-template-columns: 1fr 1fr"] {
+        grid-template-columns: 1fr !important;
     }
 }
 
@@ -413,7 +461,9 @@ th {
 
 .charts-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    /* Decrease min-width to prevent overflow */
+
     gap: 1.5rem;
     margin-top: 2rem;
 }
@@ -576,6 +626,21 @@ th {
     border-bottom-right-radius: 1.25rem;
 }
 
+/* Responsive Grid for Student Summary */
+.student-summary-grid {
+    display: grid;
+    /* Use auto-fit to align widths properly when wrapping */
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 0.4rem;
+    margin-bottom: 0.6rem;
+}
+
+@media (max-width: 600px) {
+    .student-summary-grid {
+        grid-template-columns: 1fr !important;
+    }
+}
+
 .paste-area {
     width: 100%;
     height: 300px;
@@ -611,6 +676,11 @@ th {
 
 #seatingGrid {
     transition: var(--transition);
+    /* Ensure grid wraps properly on small screens if flex; if grid, ensure min-width */
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: center;
 }
 
 .seat-item {

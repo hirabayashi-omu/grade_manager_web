@@ -367,6 +367,8 @@ function saveSessionState() {
         localStorage.setItem('gm_state_seating', JSON.stringify(state.seating));
         localStorage.setItem('gm_state_officers', JSON.stringify(state.officers));
         localStorage.setItem('gm_state_officerRoles', JSON.stringify(state.officerRoles));
+        // Use sessionStorage for login state so it clears when browser is closed
+        sessionStorage.setItem('gm_state_isLoggedIn', state.isLoggedIn ? 'true' : 'false');
 
         // Auto-save the actual lists and scores so everything is remembered on reload
         localStorage.setItem('grade_manager_students', JSON.stringify(state.students));
@@ -402,6 +404,8 @@ function loadSessionState() {
     const savedCourse = localStorage.getItem('gm_state_course');
     const savedNameDisplay = localStorage.getItem('gm_state_name_display');
     const savedSeating = localStorage.getItem('gm_state_seating');
+    // Load from sessionStorage so login state is cleared when browser closes
+    const savedIsLoggedIn = sessionStorage.getItem('gm_state_isLoggedIn');
 
     if (savedTab) state.currentTab = savedTab;
     if (savedHideEmpty !== null) state.hideEmptySubjects = (savedHideEmpty === 'true');
@@ -410,6 +414,7 @@ function loadSessionState() {
     if (savedCourse !== null) state.currentCourse = savedCourse;
     if (savedNameDisplay) state.nameDisplayMode = savedNameDisplay;
     if (savedSeating) state.seating = JSON.parse(savedSeating);
+    if (savedIsLoggedIn !== null) state.isLoggedIn = (savedIsLoggedIn === 'true');
 
     const savedOfficers = localStorage.getItem('gm_state_officers');
     if (savedOfficers) state.officers = JSON.parse(savedOfficers);
@@ -581,7 +586,14 @@ function initAuth() {
     }
 }
 
+let isLoginProcessing = false;
+
 async function handleLogin() {
+    if (isLoginProcessing) {
+        console.log('Login already processing, ignoring duplicate call');
+        return; // Prevent duplicate calls
+    }
+
     const passInput = document.getElementById('loginPass');
     const errorMsg = document.getElementById('loginError');
     if (!passInput) return;
@@ -589,20 +601,43 @@ async function handleLogin() {
     const password = passInput.value;
 
     if (!password) {
-        alert('パスワードを入力してください。');
+        console.log('Password is empty');
+        // Don't show alert - just display error message
+        if (errorMsg) {
+            errorMsg.textContent = 'パスワードを入力してください';
+            errorMsg.style.display = 'block';
+        }
         return;
     }
 
-    const hash = await hashPassword(password);
-    if (hash === state.passwordHash) {
-        state.isLoggedIn = true;
-        if (errorMsg) errorMsg.style.display = 'none';
-        passInput.value = '';
-        initAuth(); // This will reveal the main content and hide overlay
-    } else {
-        if (errorMsg) errorMsg.style.display = 'block';
-        passInput.value = '';
-        passInput.focus();
+    isLoginProcessing = true;
+    console.log('Starting login process...');
+
+    try {
+        const hash = await hashPassword(password);
+        console.log('Password hashed, checking...');
+
+        if (hash === state.passwordHash) {
+            console.log('Login successful!');
+            state.isLoggedIn = true;
+            saveSessionState(); // Save the logged-in state
+            if (errorMsg) errorMsg.style.display = 'none';
+            passInput.value = '';
+            initAuth(); // This will reveal the main content and hide overlay
+        } else {
+            console.log('Login failed - incorrect password');
+            if (errorMsg) {
+                errorMsg.textContent = 'パスワードが正しくありません';
+                errorMsg.style.display = 'block';
+            }
+            passInput.value = '';
+            passInput.focus();
+        }
+    } catch (error) {
+        console.error('Login error:', error);
+    } finally {
+        isLoginProcessing = false;
+        console.log('Login process completed');
     }
 }
 
@@ -1255,11 +1290,17 @@ function setupEventListeners() {
     // Auth Listeners
     document.getElementById('doLoginBtn')?.addEventListener('click', handleLogin);
     document.getElementById('loginPass')?.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') handleLogin();
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            handleLogin();
+        }
     });
     document.getElementById('confirmSetupBtn')?.addEventListener('click', handleSetup);
     document.getElementById('setupPass2')?.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') handleSetup();
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            handleSetup();
+        }
     });
     document.getElementById('logoutBtn')?.addEventListener('click', handleLogout);
     document.getElementById('forgotPassBtn')?.addEventListener('click', () => {
@@ -9180,7 +9221,7 @@ function getStudentSummaryHtml(studentName, testKey, targetYear) {
             </div>
         </div>
 
-        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.4rem; margin-bottom: 0.6rem;">
+        <div class="student-summary-grid">
             <!-- Card 1: Scores -->
             <div style="background: #f8fafc; padding: 0.4rem; border-radius: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">
                 <div style="font-size: 0.65rem; color: #64748b; margin-bottom: 0px; font-weight: 600;">${testKey} 平均点</div>
@@ -9931,6 +9972,10 @@ function addLongPressTrigger(target) {
     target.addEventListener('touchend', cancel, { passive: true });
     target.addEventListener('touchcancel', cancel, { passive: true });
 }
+
+// ==================== APP INITIALIZATION ====================
+// Must be called after DOMContentLoaded or simply at the end of body
+init();
 
 
 
