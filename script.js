@@ -1,5 +1,18 @@
 
-// ==================== DATA CONSTANTS ====================
+// ==================== SIDEBAR CONTROL ====================
+function toggleSidebar(show) {
+    const sidebar = document.querySelector('.sidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+
+    if (show) {
+        if (sidebar) sidebar.classList.add('open');
+        if (overlay) overlay.classList.add('active');
+    } else {
+        if (sidebar) sidebar.classList.remove('open');
+        if (overlay) overlay.classList.remove('active');
+    }
+}
+
 // ==================== DATA CONSTANTS ====================
 // These are factory defaults. We use localStorage for actual master data.
 const DEFAULT_STUDENTS_RAW = `
@@ -1315,10 +1328,13 @@ function setupEventListeners() {
     const menuToggleBtn = document.getElementById('menuToggle');
     const sidebarOverlay = document.getElementById('sidebarOverlay');
     if (menuToggleBtn) {
-        menuToggleBtn.addEventListener('click', (e) => {
+        const toggleHandler = (e) => {
+            e.preventDefault();
             e.stopPropagation();
             toggleSidebar(true);
-        });
+        };
+        menuToggleBtn.addEventListener('click', toggleHandler);
+        menuToggleBtn.addEventListener('touchstart', toggleHandler, { passive: false });
     }
     if (sidebarOverlay) {
         sidebarOverlay.addEventListener('click', () => toggleSidebar(false));
@@ -6116,6 +6132,8 @@ function renderSeatingGrid() {
             cell.addEventListener('contextmenu', (e) => {
                 showSeatContextMenu(e, pos); // Correct function name
             });
+            // Mobile Long Press Support
+            addLongPressTrigger(cell);
 
             // Allow dragging student OUT of seat
             if (student && !isFixed) {
@@ -7254,6 +7272,8 @@ function renderRosterBoardTable() {
 
             showRosterContextMenu(e.clientX, e.clientY);
         });
+        // Mobile Long Press Support
+        addLongPressTrigger(tr);
 
         // Checkbox Change (keep existing logic for simple checkbox clicks)
         checkbox.addEventListener('change', (e) => {
@@ -7767,6 +7787,7 @@ function renderFacultyTable() {
             e.preventDefault();
             showFacultyContextMenu(e, c);
         });
+        addLongPressTrigger(tr);
 
         // Hover effect
         tr.addEventListener('mouseenter', () => {
@@ -9871,17 +9892,45 @@ function importOfficerAssignmentsCsv(event) {
     reader.readAsText(file);
 }
 
+// ==================== MOBILE LONG PRESS SUPPORT ====================
+function addLongPressTrigger(target) {
+    let timer;
+    const longPressDuration = 500; // 0.5s
 
-// ==================== SIDEBAR CONTROL ====================
-function toggleSidebar(show) {
-    const sidebar = document.querySelector('.sidebar');
-    const overlay = document.getElementById('sidebarOverlay');
+    const start = (e) => {
+        // Only single touch
+        if (e.touches && e.touches.length > 1) return;
 
-    if (show) {
-        if (sidebar) sidebar.classList.add('open');
-        if (overlay) overlay.classList.add('active');
-    } else {
-        if (sidebar) sidebar.classList.remove('open');
-        if (overlay) overlay.classList.remove('active');
-    }
+        timer = setTimeout(() => {
+            if (e.touches && e.touches[0]) {
+                const touch = e.touches[0];
+                // Dispatch synthetic contextmenu event
+                const event = new MouseEvent('contextmenu', {
+                    bubbles: true,
+                    cancelable: true,
+                    view: window,
+                    clientX: touch.clientX,
+                    clientY: touch.clientY
+                });
+                // Find the correct target (target passed in, or the actual element touched)
+                target.dispatchEvent(event);
+            }
+        }, longPressDuration);
+    };
+
+    const cancel = () => {
+        if (timer) {
+            clearTimeout(timer);
+            timer = null;
+        }
+    };
+
+    // Use passive: true to allow scrolling if user moves finger
+    target.addEventListener('touchstart', start, { passive: true });
+    target.addEventListener('touchmove', cancel, { passive: true });
+    target.addEventListener('touchend', cancel, { passive: true });
+    target.addEventListener('touchcancel', cancel, { passive: true });
 }
+
+
+
