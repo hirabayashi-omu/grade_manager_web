@@ -315,18 +315,6 @@ main {
         height: 20px;
     }
 
-    /* Hide "Grade Manager" text on very small screens */
-    @media (max-width: 480px) {
-        .logo {
-            font-size: 0;
-        }
-
-        .logo svg:first-of-type,
-        .logo span,
-        .logo button {
-            font-size: 1rem;
-        }
-    }
 
     .controls {
         gap: 0.25rem !important;
@@ -340,8 +328,8 @@ main {
         display: none;
     }
 
-    /* Hide labels on mobile */
-    .control-group label {
+    /* Hide labels on mobile - but only for select elements */
+    .control-group:has(select) label {
         display: none;
     }
 
@@ -355,11 +343,12 @@ main {
         padding: 0.4rem 1.5rem 0.4rem 0.5rem !important;
         font-size: 0.8rem !important;
         min-width: 60px;
+        display: block !important;
     }
 
     #studentSelect {
-        width: 80px !important;
-        max-width: 100px;
+        width: 90px !important;
+        max-width: 120px;
     }
 
     /* Hide checkbox label text, keep checkbox */
@@ -374,19 +363,32 @@ main {
         margin: 0;
     }
 
-    /* Button text hidden, icon only */
+    /* Button text hidden, icon only - use better method */
     .btn {
         padding: 0.5rem !important;
-        font-size: 0 !important;
-        min-width: 36px;
-        min-height: 36px;
+        min-width: 40px;
+        min-height: 40px;
         justify-content: center;
+        white-space: nowrap;
+        overflow: hidden;
+    }
+
+    /* Hide button text but keep SVG visible */
+    .btn svg {
+        margin: 0 !important;
+        width: 20px;
+        height: 20px;
+        display: block !important;
+    }
+
+    /* Hide text nodes in buttons */
+    .btn {
+        font-size: 0 !important;
+        line-height: 0;
     }
 
     .btn svg {
-        margin: 0 !important;
-        width: 18px;
-        height: 18px;
+        font-size: initial;
     }
 
     /* Force single column for seating and settings grids on mobile */
@@ -403,6 +405,19 @@ main {
     /* Storage management cards */
     #storage-mgmt-card div[style*="grid-template-columns: 1fr 1fr"] {
         grid-template-columns: 1fr !important;
+    }
+}
+
+/* Extra small screens - hide Grade Manager text */
+@media (max-width: 480px) {
+    .logo {
+        font-size: 0 !important;
+    }
+
+    .logo svg:first-of-type,
+    .logo span,
+    .logo button {
+        font-size: 1rem !important;
     }
 }
 
