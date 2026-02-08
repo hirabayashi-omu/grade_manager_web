@@ -2566,6 +2566,29 @@ function parseCSV(text) {
     return rows;
 }
 
+function readFileText(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const buffer = e.target.result;
+            try {
+                const decoder = new TextDecoder('utf-8', { fatal: true });
+                resolve(decoder.decode(buffer));
+            } catch (e1) {
+                try {
+                    const decoder = new TextDecoder('shift-jis', { fatal: true });
+                    resolve(decoder.decode(buffer));
+                } catch (e2) {
+                    const decoder = new TextDecoder('shift-jis');
+                    resolve(decoder.decode(buffer));
+                }
+            }
+        };
+        reader.onerror = () => reject(reader.error);
+        reader.readAsArrayBuffer(file);
+    });
+}
+
 function handleFileUpload(e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -2580,9 +2603,7 @@ function handleFileUpload(e) {
     }
 
     // Handle CSV file (existing logic)
-    const reader = new FileReader();
-    reader.onload = function (evt) {
-        const text = evt.target.result;
+    readFileText(file).then(text => {
         try {
             // New logic: Only try to parse Score CSV or Subject Definitions here. 
             // Roster CSV should ideally go through "Roster Import" button, but we can support fallback or redirect.
@@ -2752,8 +2773,10 @@ function handleFileUpload(e) {
             alert(`エラー: ${err.message}`);
             e.target.value = '';
         }
-    };
-    reader.readAsText(file);
+    }).catch(err => {
+        alert(`エラー: ${err.message}`);
+        e.target.value = '';
+    });
 }
 
 
@@ -2763,9 +2786,7 @@ function handleRosterSelect(e) {
     const file = e.target.files[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = function (evt) {
-        const text = evt.target.result;
+    readFileText(file).then(text => {
         try {
             const rows = parseCSV(text).filter(row => row.length > 0);
             if (rows.length < 2) throw new Error("Empty or invalid CSV");
@@ -2776,8 +2797,10 @@ function handleRosterSelect(e) {
         } finally {
             e.target.value = ''; // Reset
         }
-    };
-    reader.readAsText(file);
+    }).catch(err => {
+        alert('名簿読み込みエラー: ' + err.message);
+        e.target.value = '';
+    });
 }
 
 function processRosterCSV(rows, header) {
@@ -8054,11 +8077,9 @@ function handleAttendanceFileUpload(e) {
     const file = e.target.files[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
+    readFileText(file).then(text => {
         try {
             // Use a simple CSV parser that can handle multiple header rows
-            const text = event.target.result;
             const lines = text.split(/\r?\n/).map(l => l.split(','));
             if (lines.length < 5) throw new Error("CSV行数が不足しています。");
 
@@ -8156,11 +8177,12 @@ function handleAttendanceFileUpload(e) {
             console.error(err);
             alert('CSVの解析に失敗しました: ' + err.message);
         }
-    };
-    // Note: Python uses CP932. For web, maybe Shift-JIS or UTF-8. 
-    // Usually school systems export in Shift-JIS.
-    reader.readAsText(file, 'Shift_JIS');
-    e.target.value = '';
+    }).catch(err => {
+        console.error(err);
+        alert('CSVの解析に失敗しました: ' + err.message);
+    }).finally(() => {
+        e.target.value = '';
+    });
 }
 
 function renderAttendanceCalendar() {
