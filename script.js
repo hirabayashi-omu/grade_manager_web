@@ -1,4 +1,4 @@
-﻿
+
 // ==================== DATA CONSTANTS ====================
 // ==================== DATA CONSTANTS ====================
 // These are factory defaults. We use localStorage for actual master data.
@@ -235,6 +235,7 @@ let state = {
     boxPlotYear: null, // Year for box plot (null = auto-detect latest)
     boxPlotTest: null,  // Test for box plot (null = auto-detect latest)
     currentCourse: localStorage.getItem('gm_state_course') || '',
+    currentClass: localStorage.getItem('gm_state_class') || '1',
     isLoggedIn: false,
     passwordHash: localStorage.getItem('gm_auth_hash') || null,
     seating: {
@@ -249,7 +250,6 @@ let state = {
         gradeMethod: 'cumulative'
     },
     seatingPresets: [],
-    seatingPresets: [],
     studentMetadata: {}, // Store tag info (extra columns from roster)
     nameDisplayMode: localStorage.getItem('gm_state_name_display') || 'name', // 'name' or 'initial'
     attendance: {
@@ -257,7 +257,9 @@ let state = {
         periodInfo: { start: '', end: '' },
         fileName: '',
         memos: {} // Key: "StudentName_YYYY/MM/DD", Value: { text: "...", color: "blue" }
-    }
+    },
+    officerRoles: JSON.parse(localStorage.getItem('gm_state_officerRoles') || 'null'), // Default in init
+    officers: JSON.parse(localStorage.getItem('gm_state_officers') || '{}') // Key: year, Value: { roleId: [name1, name2], ... }
 };
 
 const ATTENDANCE_STATUS_GAP = "-";
@@ -307,9 +309,11 @@ function saveSessionState() {
         localStorage.setItem('gm_state_boxplot_year', state.boxPlotYear || '');
         localStorage.setItem('gm_state_boxplot_test', state.boxPlotTest || '');
         localStorage.setItem('gm_state_course', state.currentCourse || '');
-        localStorage.setItem('gm_state_course', state.currentCourse || '');
+        localStorage.setItem('gm_state_class', state.currentClass || '1');
         localStorage.setItem('gm_state_name_display', state.nameDisplayMode || 'name');
         localStorage.setItem('gm_state_seating', JSON.stringify(state.seating));
+        localStorage.setItem('gm_state_officers', JSON.stringify(state.officers));
+        localStorage.setItem('gm_state_officerRoles', JSON.stringify(state.officerRoles));
 
         // Auto-save the actual lists and scores so everything is remembered on reload
         localStorage.setItem('grade_manager_students', JSON.stringify(state.students));
@@ -350,10 +354,15 @@ function loadSessionState() {
     if (savedHideEmpty !== null) state.hideEmptySubjects = (savedHideEmpty === 'true');
     if (savedBPYear) state.boxPlotYear = parseInt(savedBPYear);
     if (savedBPTest) state.boxPlotTest = savedBPTest;
-    if (savedBPTest) state.boxPlotTest = savedBPTest;
     if (savedCourse !== null) state.currentCourse = savedCourse;
     if (savedNameDisplay) state.nameDisplayMode = savedNameDisplay;
     if (savedSeating) state.seating = JSON.parse(savedSeating);
+
+    const savedOfficers = localStorage.getItem('gm_state_officers');
+    if (savedOfficers) state.officers = JSON.parse(savedOfficers);
+
+    const savedOfficerRoles = localStorage.getItem('gm_state_officerRoles');
+    if (savedOfficerRoles) state.officerRoles = JSON.parse(savedOfficerRoles);
 
     // Load presets (Isolated function)
     loadPresetsOnly();
@@ -941,6 +950,9 @@ function setupEventListeners() {
         item.addEventListener('click', (e) => {
             const tab = e.currentTarget.dataset.tab;
             switchTab(tab);
+            if (window.innerWidth <= 768) {
+                toggleSidebar(false);
+            }
         });
     });
     document.getElementById('saveBtn')?.addEventListener('click', saveData);
@@ -1094,6 +1106,12 @@ function setupEventListeners() {
 
     document.getElementById('generateClassAttendanceStatsBtn')?.addEventListener('click', generateClassAttendanceStats);
     document.getElementById('exportClassAttendanceCsvBtn')?.addEventListener('click', exportClassAttendanceCsv);
+
+    document.getElementById('classSelect')?.addEventListener('change', (e) => {
+        state.currentClass = e.target.value;
+        saveSessionState();
+        render();
+    });
 
     // Mobile tabs
     document.querySelectorAll('.mobile-tab').forEach(tab => {
@@ -1253,6 +1271,19 @@ function setupEventListeners() {
         if (type1Wrapper) type1Wrapper.style.display = isSpecial ? 'none' : 'flex';
     });
 
+    // Sidebar Toggle Listeners
+    const menuToggleBtn = document.getElementById('menuToggle');
+    const sidebarOverlay = document.getElementById('sidebarOverlay');
+    if (menuToggleBtn) {
+        menuToggleBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleSidebar(true);
+        });
+    }
+    if (sidebarOverlay) {
+        sidebarOverlay.addEventListener('click', () => toggleSidebar(false));
+    }
+
     setupAttendanceListeners();
 }
 
@@ -1334,6 +1365,8 @@ function switchTab(tabName) {
     } else if (tabName === 'student_summary') {
         populateControls(); // Refresh dropdown
         renderStudentSummary();
+    } else if (tabName === 'class_officers') {
+        renderClassOfficers();
     }
 }
 
@@ -2986,6 +3019,7 @@ function renderGraduationRequirements() {
 
 // ==================== RENDERING ====================
 function render() {
+    updateClassSelectVisibility();
     updatePrintHeader();
 
     if (state.currentTab === 'grades') {
@@ -7091,6 +7125,16 @@ function renderRosterBoardTable() {
             <td><div style="font-weight:500;">${displayName}</div></td>
             <td style="color:#cbd5e1; font-size:0.8rem; font-family:monospace;">${c.metadata['暗号化氏名1'] || c.metadata['暗号化氏名'] || ''}</td>
             <td style="font-family:monospace; font-size:0.85rem;">${c.metadata['OMUID'] || c.metadata['omuid'] || '-'}</td>
+            <td style="text-align:center;">
+                <div style="display: flex; gap: 0.4rem; justify-content: center;">
+                    <a href="https://teams.microsoft.com/l/chat/0/0?users=${encodeURIComponent(getStudentEmail(c.name, c.metadata))}" target="_blank" title="Teamsチャット" style="display:flex;">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="#4f46e5" stroke-width="2" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+                    </a>
+                    <a href="mailto:${getStudentEmail(c.name, c.metadata)}" title="メール送信" style="display:flex;">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="#0891b2" stroke-width="2" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                    </a>
+                </div>
+            </td>
             <td>${c.metadata['性別'] || '-'}</td>
             <td>${c.metadata['選択'] || c.metadata['選択科目'] || '-'}</td>
             <td>${c.metadata['応用専門分野・領域'] || c.metadata['コース'] || '-'}</td>
@@ -7364,14 +7408,42 @@ function openMailForSelected() {
     window.location.href = `mailto:${to}`;
 }
 
+// Helper to get email for a specific student name with fallback
+function getStudentEmail(studentName, metaArg = null) {
+    // Priority: 1. Passed metaArg, 2. Global metadata (normalized)
+    const meta = metaArg || getStudentMetadataSafe(studentName) || {};
+    let email = meta['Email'] || meta['email'] || meta['メール'] || meta['メールアドレス'] || meta['e-mail'];
+
+    // Fallback: If OMUID exists, use it as email prefix
+    if (!email) {
+        const omuid = meta['OMUID'] || meta['omuid'] || meta['id'] || meta['学籍番号'] || meta['studentId'];
+        if (omuid && /^[a-z0-9.]+$/i.test(omuid)) {
+            email = `${omuid}@st.omu.ac.jp`; // Correct Student OMU domain
+        }
+    }
+    return email || "";
+}
+
+// Helper for faculty email (omu.ac.jp)
+function getFacultyEmail(faculty) {
+    if (!faculty) return "";
+    let email = faculty.email;
+    if (!email) {
+        const omuid = faculty.omuid || faculty.id;
+        if (omuid && /^[a-z0-9.]+$/i.test(omuid)) {
+            email = `${omuid}@omu.ac.jp`; // Correct Faculty OMU domain
+        }
+    }
+    return email || "";
+}
+
 function getEmailsForSelected(showAlerts = false) {
     const students = importState.candidates.filter(c => importState.selected.has(c.name));
     const emails = [];
     const missing = [];
 
     students.forEach(s => {
-        const meta = s.metadata;
-        const email = meta['Email'] || meta['email'] || meta['メール'] || meta['メールアドレス'] || meta['e-mail'];
+        const email = getStudentEmail(s.name, s.metadata);
         if (email) {
             emails.push(email);
         } else {
@@ -7626,7 +7698,8 @@ function renderFacultyTable() {
         const rowStyle = isSelected ? 'background-color: #f0f9ff;' : '';
         tr.style.cssText = rowStyle + ' cursor: pointer;';
         tr.dataset.facultyId = c.id;
-        tr.dataset.facultyEmail = c.email || '';
+        const facultyEmail = getFacultyEmail(c);
+        tr.dataset.facultyEmail = facultyEmail;
         tr.dataset.facultyName = c.name || '';
 
         tr.innerHTML = `
@@ -7635,8 +7708,18 @@ function renderFacultyTable() {
             <td>${c.duty1}</td>
             <td>${c.duty2}</td>
             <td style="font-weight:600; color:#334155;">${c.name}</td>
-            <td style="font-family: monospace; font-size: 0.8rem;">${c.email}</td>
+            <td style="font-family: monospace; font-size: 0.8rem;">${facultyEmail}</td>
             <td style="color:#64748b;">${c.omuid}</td>
+            <td style="text-align:center;">
+                <div style="display: flex; gap: 0.4rem; justify-content: center;">
+                    <a href="https://teams.microsoft.com/l/chat/0/0?users=${encodeURIComponent(facultyEmail)}" target="_blank" title="Teamsチャット" style="display:flex;">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="#4f46e5" stroke-width="2" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+                    </a>
+                    <a href="mailto:${facultyEmail}" title="メール送信" style="display:flex;">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="#0891b2" stroke-width="2" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                    </a>
+                </div>
+            </td>
         `;
 
         // Add right-click context menu
@@ -7673,8 +7756,9 @@ function showFacultyContextMenu(event, faculty) {
     const existingMenu = document.getElementById('facultyContextMenu');
     if (existingMenu) existingMenu.remove();
 
-    if (!faculty.email) {
-        alert('この教職員にはメールアドレスが登録されていません。');
+    const facultyEmail = getFacultyEmail(faculty);
+    if (!facultyEmail) {
+        alert('この教職員にはメールアドレス情報が見つかりません。');
         return;
     }
 
@@ -7759,7 +7843,7 @@ function openFacultyTeamsChat() {
     const selected = facultyImportState.candidates.filter(c => facultyImportState.selected.has(c.id));
     if (selected.length === 0) { alert('対象者を選択してください'); return; }
 
-    const emails = selected.map(c => c.email).filter(Boolean);
+    const emails = selected.map(c => getFacultyEmail(c)).filter(Boolean);
     if (emails.length === 0) { alert('メールアドレスが見つかりません'); return; }
 
     const url = `https://teams.microsoft.com/l/chat/0/0?users=${emails.join(',')}`;
@@ -7770,7 +7854,7 @@ function openFacultyMail() {
     const selected = facultyImportState.candidates.filter(c => facultyImportState.selected.has(c.id));
     if (selected.length === 0) { alert('対象者を選択してください'); return; }
 
-    const emails = selected.map(c => c.email).filter(Boolean);
+    const emails = selected.map(c => getFacultyEmail(c)).filter(Boolean);
     if (emails.length === 0) { alert('メールアドレスが見つかりません'); return; }
 
     const url = `mailto:${emails.join(';')}`;
@@ -8826,6 +8910,38 @@ function updatePrintHeader() {
         }
         titleEl.textContent = titleText;
     }
+
+    // Add Year/Course/Class info to name line if it exists
+    if (nameEl) {
+        const className = getClassName();
+        const studentName = state.currentStudent ? getDisplayName(state.currentStudent) : "クラス全体";
+        nameEl.textContent = `${className} / ${studentName}`;
+    }
+}
+
+function getClassName() {
+    const year = state.currentYear;
+    const course = state.currentCourse;
+    if (year === 1) {
+        if (!course || course === "") {
+            return `${year}年${state.currentClass || 1}組`;
+        }
+        return `${year}年 ${course}`;
+    }
+    return `${year}年 ${course || '共通'}`;
+}
+
+function updateClassSelectVisibility() {
+    const classGroup = document.getElementById('classSelectGroup');
+    const classSelect = document.getElementById('classSelect');
+    if (!classGroup || !classSelect) return;
+
+    if (state.currentYear === 1 && (!state.currentCourse || state.currentCourse === "")) {
+        classGroup.style.display = 'flex';
+        classSelect.value = state.currentClass || '1';
+    } else {
+        classGroup.style.display = 'none';
+    }
 }
 
 // ==================== STUDENT SUMMARY ====================
@@ -8981,7 +9097,17 @@ function getStudentSummaryHtml(studentName, testKey, targetYear) {
         <!-- Header Info -->
         <div style="display: flex; justify-content: space-between; align-items: baseline; border-bottom: 2px solid #334155; padding-bottom: 0.1rem; margin-bottom: 0.4rem;">
             <div>
-                <h2 style="margin: 0; font-size: 1.2rem; font-weight: 800; color: #0f172a;">${getDisplayName(studentName)} <span style="font-size: 0.8rem; color: #64748b; font-weight: 400;">様</span></h2>
+                <div style="display: flex; align-items: center; gap: 0.8rem;">
+                    <h2 style="margin: 0; font-size: 1.2rem; font-weight: 800; color: #0f172a;">${getDisplayName(studentName)} <span style="font-size: 0.8rem; color: #64748b; font-weight: 400;">様</span></h2>
+                    <div style="display: flex; gap: 0.4rem; padding-top: 2px;" class="no-print">
+                        <a href="https://teams.microsoft.com/l/chat/0/0?users=${encodeURIComponent(getStudentEmail(studentName))}" target="_blank" title="Teamsチャットで連絡" style="display:flex; padding: 4px; background: #eef2ff; border-radius: 4px; border: 1px solid #c7d2fe;">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="#4338ca" stroke-width="2" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+                        </a>
+                        <a href="mailto:${getStudentEmail(studentName)}" title="メールを送信" style="display:flex; padding: 4px; background: #ecfeff; border-radius: 4px; border: 1px solid #a5f3fc;">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="#0891b2" stroke-width="2" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                        </a>
+                    </div>
+                </div>
                 <div style="display: flex; gap: 1rem; margin-top: 0.2rem; font-size: 0.8rem; color: #475569;">
                     <span>学籍番号: <strong>${studentId}</strong></span>
                     <span>年次: <strong>${year}年</strong></span>
@@ -9245,3 +9371,514 @@ function printAllStudentSummaries() {
     }, 500);
 }
 
+
+// ==================== CLASS OFFICERS ====================
+
+const DEFAULT_OFFICER_ROLES = [
+    {
+        category: "クラス役員 (HR Officers)",
+        roles: [
+            { id: "sodai", name: "総代", limit: 1, desc: "代表としてクラスをまとめる。高専祭等においてクラスの長を務める。" },
+            { id: "fuku_sodai", name: "副総代", limit: 1, desc: "HRの進行役。記録も付ける。" },
+            { id: "hr_iincho", name: "HR委員長", limit: 1, desc: "HRの計画・運営を指揮する。" },
+            { id: "hr_iin", name: "HR委員", limit: 0, desc: "HRの計画・運営をする。" }
+        ]
+    },
+    {
+        category: "係・分掌 (Class Duties)",
+        roles: [
+            { id: "kyomu", name: "教務係", limit: 1, desc: "出席簿管理、印刷物配布などを行う。" },
+            { id: "taiiku_m", name: "体育係(男)", limit: 1, desc: "体育時の貴重品管理、教員連絡(男)。" },
+            { id: "taiiku_f", name: "体育係(女)", limit: 1, desc: "体育時の貴重品管理、教員連絡(女)。" },
+            { id: "kankyo", name: "環境推進員", limit: 1, desc: "教室環境（電灯・空調・加湿器）の管理。" },
+            { id: "kaikei", name: "会計係", limit: 1, desc: "クラスイベント時の会計管理。" },
+            { id: "bika", name: "美化委員", limit: 0, desc: "教室及び校内美化を推進する。" }
+        ]
+    },
+    {
+        category: "行事委員 (Event Committees)",
+        roles: [
+            { id: "olympic", name: "高専オリンピック委員", limit: 0, desc: "イベント運営の補助。" },
+            { id: "kosensai", name: "高専祭委員", limit: 0, desc: "イベント運営の補助。" },
+            { id: "album", name: "アルバム委員", limit: 2, desc: "卒業アルバムの作成準備。" }
+        ]
+    },
+    {
+        category: "学友会関連 (Student Association)",
+        roles: [
+            { id: "hyogi", name: "評議員", limit: 0, desc: "クラスを代表して評議会に出席し、学友会執行部の提案を審議する。審議内容をクラスに報告する。" },
+            { id: "shikko", name: "准執行委員", limit: 0, desc: "執行委員長を補佐し、執行委員会の業務を分掌する。" },
+            { id: "senkyo", name: "選挙管理委員", limit: 0, desc: "選挙等を管理する。" }
+        ]
+    }
+];
+
+function initOfficerRoles() {
+    // Migration: Rename old category if exists
+    if (state.officerRoles) {
+        const oldCat = state.officerRoles.find(c => c.category === "学生会・公的委員 (Student Council)" || c.category === "学生会・公的委員");
+        if (oldCat) {
+            oldCat.category = "学友会関連 (Student Association)";
+        }
+    }
+
+    if (!state.officerRoles) {
+        state.officerRoles = JSON.parse(JSON.stringify(DEFAULT_OFFICER_ROLES));
+    } else {
+        // Ensure new default categories/roles are added to existing ones
+        DEFAULT_OFFICER_ROLES.forEach(defaultCat => {
+            let cat = state.officerRoles.find(c => c.category === defaultCat.category);
+            if (!cat) {
+                state.officerRoles.push(JSON.parse(JSON.stringify(defaultCat)));
+            } else {
+                defaultCat.roles.forEach(defaultRole => {
+                    if (!cat.roles.find(r => r.id === defaultRole.id)) {
+                        cat.roles.push(JSON.parse(JSON.stringify(defaultRole)));
+                    }
+                });
+            }
+        });
+    }
+}
+
+function renderClassOfficers() {
+    initOfficerRoles();
+    const grid = document.getElementById('officerCategoriesGrid');
+    const studentList = document.getElementById('officerStudentList');
+    if (!grid || !studentList) return;
+
+    grid.innerHTML = '';
+    studentList.innerHTML = '';
+
+    const year = state.currentYear;
+    const yearOfficers = state.officers[year] || {};
+
+    // Pre-calculate assignment counts for marks
+    const assignedCounts = {};
+    Object.values(yearOfficers).forEach(names => {
+        if (!Array.isArray(names)) return;
+        names.forEach(name => {
+            assignedCounts[name] = (assignedCounts[name] || 0) + 1;
+        });
+    });
+
+    // Render Student List (Draggable)
+    const rosterStudents = [...state.students];
+    rosterStudents.forEach(name => {
+        const count = assignedCounts[name] || 0;
+        const checkMark = '<span style="color: #10b981; font-weight: bold; margin-left: auto;">' + '✔'.repeat(count) + '</span>';
+
+        const item = document.createElement('div');
+        item.className = 'badge';
+        item.style.cssText = 'background: white; border: 1px solid #e2e8f0; padding: 0.5rem; cursor: grab; display: flex; align-items: center; gap: 0.5rem; user-select: none;';
+        item.draggable = true;
+        item.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="14" height="14" style="color:#94a3b8;"><path stroke-linecap="round" stroke-linejoin="round" d="M4 8h16M4 16h16" /></svg>
+            <span style="flex-grow:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${name}</span>
+            ${count > 0 ? checkMark : ''}
+        `;
+        item.addEventListener('dragstart', (e) => {
+            e.dataTransfer.setData('text/plain', name);
+            item.style.opacity = '0.5';
+        });
+        item.addEventListener('dragend', () => item.style.opacity = '1');
+        studentList.appendChild(item);
+    });
+
+    // Render Roles
+    state.officerRoles.forEach((cat, catIdx) => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.style.background = 'white';
+
+        let rolesHtml = '';
+        cat.roles.forEach((role, roleIdx) => {
+            const assigned = yearOfficers[role.id] || [];
+
+            rolesHtml += `
+            <div id="role_target_${role.id}" class="role-drop-zone" style="padding: 1rem; border-bottom: 1px solid #f1f5f9; transition: background 0.2s;">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 0.5rem;">
+                    <div style="flex-grow: 1;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <div style="font-weight: 700; color: #1e293b; font-size: 0.95rem;">${role.name}</div>
+                            <div style="display: flex; gap: 0.3rem;">
+                                <span onclick="editOfficerRole(${catIdx}, ${roleIdx})" style="cursor:pointer; color: #cbd5e1; font-size: 0.8rem;" title="定義を編集">✏️</span>
+                                <span onclick="deleteOfficerRole(${catIdx}, ${roleIdx})" style="cursor:pointer; color: #cbd5e1; font-size: 0.8rem;" title="役割を削除">🗑️</span>
+                            </div>
+                        </div>
+                        <div style="font-size: 0.75rem; color: #64748b; line-height: 1.2;">${role.desc}</div>
+                    </div>
+                    <div style="font-size: 0.7rem; background: #f1f5f9; padding: 2px 6px; border-radius: 4px; color: #475569; white-space: nowrap;">
+                        ${role.limit === 0 ? '複数名' : role.limit + '名'}
+                    </div>
+                </div>
+                
+                <div class="role-assignment-container" style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; min-height: 32px; border: 1px dashed transparent; border-radius: 0.4rem;" 
+                     ondragover="event.preventDefault(); this.style.borderColor='#3b82f6'; this.style.background='rgba(59, 130, 246, 0.05)';" 
+                     ondragleave="this.style.borderColor='transparent'; this.style.background='transparent';"
+                     ondrop="handleOfficerDrop(event, '${role.id}')">
+                    ${assigned.map((name, idx2) => `
+                        <div class="badge" style="background: #eef2ff; color: #4f46e5; border: 1px solid #c7d2fe; display: flex; align-items:center; gap: 0.4rem; padding: 0.3rem 0.6rem;">
+                            ${name}
+                            <span onclick="removeOfficer('${role.id}', ${idx2})" style="cursor:pointer; font-weight:bold; color: #94a3b8;">×</span>
+                        </div>
+                    `).join('')}
+                    ${assigned.length === 0 ? '<div style="font-size: 0.75rem; color: #cbd5e1;">ドラッグして割り当て</div>' : ''}
+                </div>
+            </div>`;
+        });
+
+        card.innerHTML = `
+            <div class="card-header" style="background: #f8fafc; display: flex; justify-content: space-between; align-items: center;">
+                <h3 class="card-title" style="font-size: 1rem; color: #334155;">${cat.category}</h3>
+            </div>
+            <div style="display: flex; flex-direction: column;">
+                ${rolesHtml}
+            </div>
+        `;
+        grid.appendChild(card);
+    });
+}
+
+function handleOfficerDrop(e, roleId) {
+    e.preventDefault();
+    const studentName = e.dataTransfer.getData('text/plain');
+    if (studentName) addOfficer(roleId, studentName);
+
+    // Reset visual state
+    const target = e.currentTarget;
+    if (target) {
+        target.style.borderColor = 'transparent';
+        target.style.background = 'transparent';
+    }
+}
+
+function addOfficer(roleId, studentName) {
+    if (!studentName) return;
+    const year = state.currentYear;
+    if (!state.officers[year]) state.officers[year] = {};
+    if (!state.officers[year][roleId]) state.officers[year][roleId] = [];
+
+    // Find role limit
+    let limit = 0;
+    state.officerRoles.some(c => {
+        const found = c.roles.find(r => r.id === roleId);
+        if (found) { limit = found.limit; return true; }
+    });
+
+    if (limit === 1) {
+        state.officers[year][roleId] = [studentName];
+    } else {
+        if (!state.officers[year][roleId].includes(studentName)) {
+            state.officers[year][roleId].push(studentName);
+        }
+    }
+
+    saveSessionState();
+    renderClassOfficers();
+}
+
+function removeOfficer(roleId, index) {
+    const year = state.currentYear;
+    if (state.officers[year] && state.officers[year][roleId]) {
+        state.officers[year][roleId].splice(index, 1);
+        saveSessionState();
+        renderClassOfficers();
+    }
+}
+
+function showAddOfficerRoleModal() {
+    document.getElementById('officerRoleModalTitle').textContent = '新規役職・係の定義';
+    document.getElementById('saveOfficerRoleBtn').textContent = '追加定義する';
+    document.getElementById('editOfficerCatIdx').value = '-1';
+    document.getElementById('editOfficerRoleIdx').value = '-1';
+    document.getElementById('newRoleName').value = '';
+    document.getElementById('newRoleDesc').value = '';
+    document.getElementById('newRoleLimit').value = '1';
+    document.getElementById('addOfficerRoleModal').classList.add('open');
+}
+
+function editOfficerRole(catIdx, roleIdx) {
+    const role = state.officerRoles[catIdx].roles[roleIdx];
+    document.getElementById('officerRoleModalTitle').textContent = '役職・係の定義を編集';
+    document.getElementById('saveOfficerRoleBtn').textContent = '変更を保存する';
+    document.getElementById('editOfficerCatIdx').value = catIdx;
+    document.getElementById('editOfficerRoleIdx').value = roleIdx;
+    document.getElementById('newRoleCategory').value = state.officerRoles[catIdx].category;
+    document.getElementById('newRoleName').value = role.name;
+    document.getElementById('newRoleLimit').value = role.limit;
+    document.getElementById('newRoleDesc').value = role.desc;
+    document.getElementById('addOfficerRoleModal').classList.add('open');
+}
+
+function saveNewOfficerRole() {
+    const catIdx = parseInt(document.getElementById('editOfficerCatIdx').value);
+    const roleIdx = parseInt(document.getElementById('editOfficerRoleIdx').value);
+
+    const categoryName = document.getElementById('newRoleCategory').value;
+    const roleName = document.getElementById('newRoleName').value.trim();
+    const limit = parseInt(document.getElementById('newRoleLimit').value) || 0;
+    const desc = document.getElementById('newRoleDesc').value.trim();
+
+    if (!roleName) {
+        alert('役職・係名を入力してください。');
+        return;
+    }
+
+    initOfficerRoles();
+
+    if (catIdx >= 0 && roleIdx >= 0) {
+        // Edit existing
+        const oldCat = state.officerRoles[catIdx];
+        const role = oldCat.roles[roleIdx];
+
+        role.name = roleName;
+        role.limit = limit;
+        role.desc = desc;
+
+        // If category changed, move it
+        if (oldCat.category !== categoryName) {
+            oldCat.roles.splice(roleIdx, 1);
+            if (oldCat.roles.length === 0) {
+                state.officerRoles.splice(catIdx, 1);
+            }
+
+            let newCat = state.officerRoles.find(c => c.category === categoryName);
+            if (!newCat) {
+                newCat = { category: categoryName, roles: [] };
+                state.officerRoles.push(newCat);
+            }
+            newCat.roles.push(role);
+        }
+    } else {
+        // Create new
+        let cat = state.officerRoles.find(c => c.category === categoryName);
+        if (!cat) {
+            cat = { category: categoryName, roles: [] };
+            state.officerRoles.push(cat);
+        }
+
+        const newId = 'custom_' + Date.now();
+        cat.roles.push({
+            id: newId,
+            name: roleName,
+            limit: limit,
+            desc: desc
+        });
+    }
+
+    saveSessionState();
+    document.getElementById('addOfficerRoleModal').classList.remove('open');
+    renderClassOfficers();
+}
+
+function resetOfficerRolesToDefault() {
+    if (confirm('役職・係の定義を初期状態に戻しますか？\n（追加したカスタム係や編集内容は失われます。割り当て済みの学生データは維持されますが、定義から消えた係は表示されなくなります）')) {
+        state.officerRoles = JSON.parse(JSON.stringify(DEFAULT_OFFICER_ROLES));
+        saveSessionState();
+        renderClassOfficers();
+    }
+}
+
+function deleteOfficerRole(catIdx, roleIdx) {
+    if (confirm('この役職・係の定義を削除しますか？\n（割り当てられていた学生の記録も表示されなくなります）')) {
+        state.officerRoles[catIdx].roles.splice(roleIdx, 1);
+        if (state.officerRoles[catIdx].roles.length === 0) {
+            state.officerRoles.splice(catIdx, 1);
+        }
+        saveSessionState();
+        renderClassOfficers();
+    }
+}
+
+function exportClassOfficersPdf() {
+    const year = state.currentYear;
+    const yearOfficers = state.officers[year] || {};
+    const className = getClassName();
+
+    const printArea = document.createElement('div');
+    printArea.id = 'print-officer-area';
+    printArea.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 10000; 
+        background: white; padding: 15mm 12mm; 
+        font-family: 'Inter', 'Noto Sans JP', sans-serif; color: #1e293b;
+        user-select: none; box-sizing: border-box;
+    `;
+
+    // Header Area - Minimum Height
+    const headerHtml = `
+        <div style="display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 1.5pt solid #4f46e5; padding-bottom: 5px; margin-bottom: 10px;">
+            <div>
+                <h1 style="margin: 0; font-size: 16pt; font-weight: 800; letter-spacing: -0.01em;">${className} クラス役員・係名簿</h1>
+            </div>
+            <div style="text-align: right; font-size: 8pt; color: #64748b;">
+                出力日: ${new Date().toLocaleDateString('ja-JP')}
+            </div>
+        </div>
+    `;
+
+    let contentHtml = '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">';
+    state.officerRoles.forEach((cat, idx) => {
+        contentHtml += `
+            <div style="break-inside: avoid; margin-bottom: 8px;">
+                <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 4px; border-left: 3px solid #4f46e5; padding-left: 6px;">
+                    <h2 style="margin: 0; font-size: 9pt; font-weight: 700; color: #334155;">${cat.category}</h2>
+                </div>
+                <table style="width: 100%; border-collapse: collapse; border: 0.5pt solid #e2e8f0; font-size: 7.5pt;">
+                    <thead>
+                        <tr style="background: #f8fafc; border-bottom: 0.5pt solid #e2e8f0;">
+                            <th style="padding: 2px 4px; text-align: left; color: #64748b; width: 25%; border-right: 0.5pt solid #e2e8f0;">役割</th>
+                            <th style="padding: 2px 4px; text-align: left; color: #64748b; width: 45%; border-right: 0.5pt solid #e2e8f0;">説明</th>
+                            <th style="padding: 2px 4px; text-align: left; color: #64748b; width: 30%;">氏名</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+
+        cat.roles.forEach((role, rIdx) => {
+            const assigned = yearOfficers[role.id] || [];
+            contentHtml += `
+                        <tr style="border-bottom: 0.5pt solid #f1f5f9;">
+                            <td style="padding: 3px 4px; border-right: 0.5pt solid #e2e8f0; font-weight: 700; color: #1e293b; vertical-align: top; line-height: 1.1;">${role.name}</td>
+                            <td style="padding: 3px 4px; border-right: 0.5pt solid #e2e8f0; color: #64748b; font-size: 6.5pt; vertical-align: top; line-height: 1.1;">${role.desc || ''}</td>
+                            <td style="padding: 3px 4px; vertical-align: middle; line-height: 1.1;">
+                                <div style="font-weight: 600; color: #334155;">
+                                    ${assigned.length > 0 ? assigned.join('<br>') : '-'}
+                                </div>
+                            </td>
+                        </tr>`;
+        });
+
+        contentHtml += `</tbody></table></div>`;
+    });
+    contentHtml += '</div>';
+
+    const footerHtml = `
+        <div style="position: absolute; bottom: 10mm; left: 12mm; right: 12mm; display: flex; justify-content: space-between; align-items: center; padding-top: 5px; border-top: 0.5pt dashed #e2e8f0; font-size: 6pt; color: #cbd5e1;">
+            <div>Grade Manager GENE Professional</div>
+            <div>Confidential Document</div>
+        </div>
+    `;
+
+    printArea.innerHTML = headerHtml + contentHtml + footerHtml;
+    document.body.appendChild(printArea);
+
+    // Add print hide class to everything else
+    const style = document.createElement('style');
+    style.id = 'print-hide-style';
+    style.textContent = '@media print { body > *:not(#print-officer-area) { display: none !important; } #print-officer-area { position: absolute !important; padding: 0 !important; } }';
+    document.head.appendChild(style);
+
+    window.print();
+
+    // After print (using timeout as print blocks)
+    setTimeout(() => {
+        if (document.getElementById('print-officer-area')) {
+            document.body.removeChild(printArea);
+            document.head.removeChild(style);
+        }
+    }, 1000);
+}
+
+function exportOfficerAssignmentsCsv() {
+    const BOM = '\uFEFF';
+    let csvContent = '学年,カテゴリ,役割名,氏名\n';
+
+    // Get all years currently in state.officers
+    const years = Object.keys(state.officers).sort((a, b) => parseInt(a) - parseInt(b));
+
+    years.forEach(year => {
+        const yearOfficers = state.officers[year];
+        if (!yearOfficers) return;
+
+        state.officerRoles.forEach(cat => {
+            cat.roles.forEach(role => {
+                const assigned = yearOfficers[role.id] || [];
+                assigned.forEach(name => {
+                    csvContent += `${year},"${cat.category.replace(/"/g, '""')}","${role.name.replace(/"/g, '""')}","${name.replace(/"/g, '""')}"\n`;
+                });
+            });
+        });
+    });
+
+    const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `class_officers_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+function importOfficerAssignmentsCsv(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        const text = e.target.result;
+        const lines = text.split(/\r?\n/);
+        if (lines.length < 2) return;
+
+        const newOfficers = {}; // key: year, value: { roleId: [names] }
+
+        // Skip header
+        for (let i = 1; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (!line) continue;
+
+            // Handle quoted CSV values
+            const parts = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
+            if (!parts || parts.length < 4) continue;
+
+            const year = parts[0].replace(/"/g, '');
+            const categoryName = parts[1].replace(/"/g, '');
+            const roleName = parts[2].replace(/"/g, '');
+            const studentName = parts[3].replace(/"/g, '');
+
+            // Find matching role ID in current officerRoles
+            let foundRoleId = null;
+            state.officerRoles.forEach(cat => {
+                if (cat.category === categoryName) {
+                    const role = cat.roles.find(r => r.name === roleName);
+                    if (role) foundRoleId = role.id;
+                }
+            });
+
+            if (foundRoleId) {
+                if (!newOfficers[year]) newOfficers[year] = {};
+                if (!newOfficers[year][foundRoleId]) newOfficers[year][foundRoleId] = [];
+                if (!newOfficers[year][foundRoleId].includes(studentName)) {
+                    newOfficers[year][foundRoleId].push(studentName);
+                }
+            }
+        }
+
+        if (confirm('割当データを上書きしますか？\n（CSVに含まれる学年・役割の既存データのみが対象です）')) {
+            // Partial merge or full? Full within the year might be safer if we want to "load"
+            Object.keys(newOfficers).forEach(year => {
+                state.officers[year] = newOfficers[year];
+            });
+            saveSessionState();
+            renderClassOfficers();
+            alert('CSVの読み込みが完了しました。');
+        }
+        event.target.value = ''; // Reset input
+    };
+    reader.readAsText(file);
+}
+
+
+// ==================== SIDEBAR CONTROL ====================
+function toggleSidebar(show) {
+    const sidebar = document.querySelector('.sidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+
+    if (show) {
+        if (sidebar) sidebar.classList.add('open');
+        if (overlay) overlay.classList.add('active');
+    } else {
+        if (sidebar) sidebar.classList.remove('open');
+        if (overlay) overlay.classList.remove('active');
+    }
+}

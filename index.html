@@ -16,14 +16,23 @@
 </head>
 
 <body>
+    <div id="sidebarOverlay" class="sidebar-overlay"></div>
     <header>
         <div class="logo">
+            <button id="menuToggle" class="btn-icon"
+                style="background: none; border: none; padding: 0.5rem; margin-right: 0.5rem;">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                    stroke-width="2" width="24" height="24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+            </button>
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
                 stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round"
                     d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
             </svg>
-            Grade Manager
+            Grade Manager <span
+                style="font-size: 0.6em; background: #3b82f6; color: white; padding: 2px 6px; border-radius: 4px; vertical-align: middle; margin-left: 4px; font-weight: bold; letter-spacing: 0.05em;">GENE</span>
             <button id="headerHelpBtn"
                 style="background:none; border:none; color:#94a3b8; cursor:pointer; padding:4px; display:inline-flex; align-items:center; border-radius:50%; transition:all 0.2s;"
                 title="使用方法・セキュリティポリシーを表示">
@@ -36,6 +45,17 @@
         </div>
 
         <div class="controls">
+            <div class="control-group">
+                <label for="yearSelect">学年</label>
+                <select id="yearSelect" title="表示する学年を選択してください">
+                    <option value="1">1年</option>
+                    <option value="2">2年</option>
+                    <option value="3">3年</option>
+                    <option value="4">4年</option>
+                    <option value="5">5年</option>
+                </select>
+            </div>
+
             <div class="control-group" title="表示する対象コースを選択してください">
                 <label for="subjectCourseFilterHeader">コース</label>
                 <select id="subjectCourseFilterHeader">
@@ -47,20 +67,19 @@
                 </select>
             </div>
 
+            <div class="control-group" id="classSelectGroup" style="display: none;" title="1年生の組を選択してください">
+                <label for="classSelect">組</label>
+                <select id="classSelect">
+                    <option value="1">1組</option>
+                    <option value="2">2組</option>
+                    <option value="3">3組</option>
+                    <option value="4">4組</option>
+                </select>
+            </div>
+
             <div class="control-group" title="成績データが入力されていない科目を非表示にします">
                 <input type="checkbox" id="hideEmptySubjects" checked>
                 <label for="hideEmptySubjects">単位認定のない科目を隠す</label>
-            </div>
-
-            <div class="control-group">
-                <label for="yearSelect">学年</label>
-                <select id="yearSelect" title="表示する学年を選択してください">
-                    <option value="1">1年</option>
-                    <option value="2">2年</option>
-                    <option value="3">3年</option>
-                    <option value="4">4年</option>
-                    <option value="5">5年</option>
-                </select>
             </div>
 
             <div class="control-group">
@@ -253,6 +272,14 @@
                 </svg>
                 席決め (Seats)
             </div>
+            <div class="nav-item" data-tab="class_officers" title="クラス委員の選出と記録を行います">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                    stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
+                クラス委員 (Officers)
+            </div>
             <div class="nav-item" data-tab="settings" title="学生名や科目定義を直接編集します">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
                     stroke-width="2">
@@ -313,10 +340,19 @@
             <!-- Mobile Tab Switcher (visible only on mobile) -->
             <div class="mobile-tabs" style="display: none;">
                 <button class="mobile-tab active" data-tab="grades">成績一覧</button>
+                <button class="mobile-tab" data-tab="grad_requirements">卒業要件</button>
                 <button class="mobile-tab" data-tab="stats">統計</button>
                 <button class="mobile-tab" data-tab="stats2">統計2</button>
-                <button class="mobile-tab" data-tab="settings">設定</button>
-                <button class="mobile-tab" data-tab="help">注意</button>
+                <button class="mobile-tab" data-tab="attendance">出欠状況</button>
+                <button class="mobile-tab" data-tab="student_summary">サマリー</button>
+                <button class="mobile-tab" data-tab="class_stats">クラス統計</button>
+                <button class="mobile-tab" data-tab="at_risk">要注意</button>
+                <button class="mobile-tab" data-tab="seating">席決め</button>
+                <button class="mobile-tab" data-tab="class_officers">クラス委員</button>
+                <button class="mobile-tab" data-tab="roster_board">学籍名簿</button>
+                <button class="mobile-tab" data-tab="faculty_roster">教員名簿</button>
+                <button class="mobile-tab" data-tab="settings">システム設定</button>
+                <button class="mobile-tab" data-tab="help">ヘルプ</button>
             </div>
 
             <!-- Grades View -->
@@ -1040,6 +1076,7 @@
                                         <th style="width: 120px;">氏名</th>
                                         <th style="width: 200px;">OMUメール</th>
                                         <th style="width: 100px;">OMU ID</th>
+                                        <th style="width: 80px; text-align: center;">連絡</th>
                                     </tr>
                                 </thead>
                                 <tbody id="facultyRosterBody">
@@ -1181,6 +1218,7 @@
                                         <th class="sortable-th" data-sort="omuid"
                                             style="text-align: left; padding: 0.5rem; cursor: pointer;">OMUID <span
                                                 class="sort-icon"></span></th>
+                                        <th style="text-align: center; padding: 0.5rem; width: 60px;">連絡</th>
                                         <th class="sortable-th" data-sort="gender"
                                             style="text-align: left; padding: 0.5rem; cursor: pointer;">性別 <span
                                                 class="sort-icon"></span></th>
@@ -1421,6 +1459,106 @@
             </div>
 
             <!-- Attendance (出欠状況) View -->
+            <!-- Class Officers View -->
+            <div id="class_officers-content" class="tab-content hidden fade-in">
+                <div class="card" style="margin-bottom: 1.5rem;">
+                    <div class="card-header" style="justify-content: space-between; align-items: center;">
+                        <div class="card-title" style="display:flex; align-items:center; gap:0.6rem;">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor" stroke-width="2" width="20" height="20">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                            </svg>
+                            クラス委員・係選出 (Class Officers)
+                        </div>
+                        <div style="display:flex; gap:0.5rem;">
+                            <button onclick="resetOfficerRolesToDefault()" class="btn btn-secondary"
+                                style="color: #64748b;">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor" stroke-width="2" width="16" height="16">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                                デフォルト係を復元
+                            </button>
+                            <button onclick="exportClassOfficersPdf()" class="btn btn-secondary">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor" stroke-width="2" width="16" height="16">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                                </svg>
+                                委員名簿PDF出力
+                            </button>
+                            <button onclick="exportOfficerAssignmentsCsv()" class="btn btn-secondary"
+                                title="現在の割当状況(全学年)をCSV出力します">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor" stroke-width="2" width="16" height="16">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                CSV出力
+                            </button>
+                            <button onclick="document.getElementById('officerAssignmentsCsvInput').click()"
+                                class="btn btn-secondary" title="CSVから割当状況を読み込みます">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor" stroke-width="2" width="16" height="16">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                </svg>
+                                CSV読込
+                            </button>
+                            <input type="file" id="officerAssignmentsCsvInput" style="display: none;" accept=".csv"
+                                onchange="importOfficerAssignmentsCsv(event)">
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 1.5rem; align-items: flex-start;">
+                    <!-- Left Sidebar: Student List for dragging -->
+                    <div class="card"
+                        style="width: 280px; flex-shrink: 0; position: sticky; top: 1rem; max-height: calc(100vh - 12rem); display: flex; flex-direction: column;">
+                        <div class="card-header" style="padding: 0.8rem 1rem;">
+                            <h3 class="card-title"
+                                style="font-size: 0.9rem; display: flex; align-items: center; gap: 0.5rem;">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor" stroke-width="2" width="16" height="16">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                                </svg>
+                                学生リスト (Drag)
+                            </h3>
+                        </div>
+                        <div id="officerStudentList"
+                            style="padding: 0.5rem; overflow-y: auto; display: flex; flex-direction: column; gap: 0.3rem;">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+
+                    <!-- Right Main: Role Categories -->
+                    <div style="flex-grow: 1;">
+                        <div id="officerCategoriesGrid"
+                            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+                            <!-- Populated by JS -->
+                        </div>
+
+                        <!-- Add Category/Role Controls -->
+                        <div class="card" style="background: #f8fafc; border: 1px dashed #cbd5e1; box-shadow: none;">
+                            <div
+                                style="padding: 1.5rem; display: flex; align-items: center; justify-content: center; gap: 1rem;">
+                                <button onclick="showAddOfficerRoleModal()" class="btn btn-secondary"
+                                    style="border-style: dashed;">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                        stroke="currentColor" stroke-width="2" width="16" height="16">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                                    </svg>
+                                    新規の役職・係を追加定義する
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div id="attendance-content" class="tab-content hidden fade-in">
                 <div class="card">
                     <div class="card-header" style="justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
@@ -1594,6 +1732,80 @@
 
             <!-- Help & Security View -->
             <div id="help-content" class="tab-content hidden fade-in">
+                <!-- GENE Version Feature Summary -->
+                <div class="card"
+                    style="background: linear-gradient(135deg, #1e293b, #334155); color: white; border: none; margin-bottom: 2rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);">
+                    <div class="card-header" style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+                        <h2 class="card-title" style="color: white; display:flex; align-items:center; gap:0.8rem;">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor" stroke-width="2" width="24" height="24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                            Grade Manager GENE 機能概要
+                        </h2>
+                    </div>
+                    <div style="padding: 1.5rem;">
+                        <ul
+                            style="display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: 1rem; list-style: none; padding: 0; margin: 0;">
+                            <li
+                                style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 0.8rem; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: flex-start; gap: 0.8rem;">
+                                <div style="color: #60a5fa; font-weight: bold;">✓</div>
+                                <div><strong>システムへのパスワードログイン</strong><br><span
+                                        style="font-size: 0.85rem; color: #94a3b8;">セキュアなハッシュ認証によるデータ保護</span></div>
+                            </li>
+                            <li
+                                style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 0.8rem; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: flex-start; gap: 0.8rem;">
+                                <div style="color: #60a5fa; font-weight: bold;">✓</div>
+                                <div><strong>学生個人：教務システムからのコピペ成績入力</strong><br><span
+                                        style="font-size: 0.85rem; color: #94a3b8;">成績個票からの簡単インポート機能（成績個票入力）</span>
+                                </div>
+                            </li>
+                            <li
+                                style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 0.8rem; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: flex-start; gap: 0.8rem;">
+                                <div style="color: #60a5fa; font-weight: bold;">✓</div>
+                                <div><strong>学生個人：卒業要件確認①</strong><br><span
+                                        style="font-size: 0.85rem; color: #94a3b8;">単位数・必修・DP-X科目の取得確認</span></div>
+                            </li>
+                            <li
+                                style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 0.8rem; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: flex-start; gap: 0.8rem;">
+                                <div style="color: #60a5fa; font-weight: bold;">✓</div>
+                                <div><strong>学生個人：卒業要件確認②</strong><br><span
+                                        style="font-size: 0.85rem; color: #94a3b8;">DP-X科目の開講スケジュールと進捗確認</span></div>
+                            </li>
+                            <li
+                                style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 0.8rem; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: flex-start; gap: 0.8rem;">
+                                <div style="color: #60a5fa; font-weight: bold;">✓</div>
+                                <div><strong>学生個人：全定期試験の平均点・順位推移</strong><br><span
+                                        style="font-size: 0.85rem; color: #94a3b8;">過去すべての試験結果の推移を可視化</span></div>
+                            </li>
+                            <li
+                                style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 0.8rem; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: flex-start; gap: 0.8rem;">
+                                <div style="color: #60a5fa; font-weight: bold;">✓</div>
+                                <div><strong>学生個人：評点・GPAの累積推移</strong><br><span
+                                        style="font-size: 0.85rem; color: #94a3b8;">学年ごとの単純平均・加重平均・GPA算出</span></div>
+                            </li>
+                            <li
+                                style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 0.8rem; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: flex-start; gap: 0.8rem;">
+                                <div style="color: #60a5fa; font-weight: bold;">✓</div>
+                                <div><strong>クラス統計：平均点・累積GPAのまとめ</strong><br><span
+                                        style="font-size: 0.85rem; color: #94a3b8;">最新テスト結果に基づいたクラス全体の状況把握</span></div>
+                            </li>
+                            <li
+                                style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 0.8rem; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: flex-start; gap: 0.8rem;">
+                                <div style="color: #60a5fa; font-weight: bold;">✓</div>
+                                <div><strong>要注意学生のピックアップ</strong><br><span
+                                        style="font-size: 0.85rem; color: #94a3b8;">最新テストと年度通算の二通りでリスク学生を抽出</span></div>
+                            </li>
+                            <li
+                                style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 0.8rem; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: flex-start; gap: 0.8rem;">
+                                <div style="color: #60a5fa; font-weight: bold;">✓</div>
+                                <div><strong>席決め：成績分布の可視化配置</strong><br><span
+                                        style="font-size: 0.85rem; color: #94a3b8;">教室内の成績分布を確認しながら席配置可能</span></div>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
                 <div class="card" style="background: #f8fafc; border-left: 5px solid var(--primary);">
                     <div class="card-header">
                         <h2 class="card-title">基本的な使用方法 (Basic Usage)</h2>
@@ -2000,6 +2212,51 @@
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeMetadataEditorModal()">キャンセル</button>
                 <button class="btn btn-primary" onclick="saveStudentMetadata()">保存 (Save)</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Officer Role Modal -->
+    <div id="addOfficerRoleModal" class="modal-overlay">
+        <div class="modal" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2 class="modal-title" id="officerRoleModalTitle">新規役職・係の定義</h2>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="editOfficerCatIdx" value="-1">
+                <input type="hidden" id="editOfficerRoleIdx" value="-1">
+                <div style="margin-bottom: 1rem;">
+                    <label
+                        style="display:block; font-size: 0.85rem; color: #64748b; margin-bottom: 0.4rem;">カテゴリー</label>
+                    <select id="newRoleCategory" class="input-field">
+                        <option value="クラス役員 (HR Officers)">クラス役員</option>
+                        <option value="係・分掌 (Class Duties)">係・分掌</option>
+                        <option value="行事委員 (Event Committees)">行事委員</option>
+                        <option value="学友会関連 (Student Association)">学友会関連</option>
+                        <option value="その他 (Others)">その他</option>
+                    </select>
+                </div>
+                <div style="margin-bottom: 1rem;">
+                    <label
+                        style="display:block; font-size: 0.85rem; color: #64748b; margin-bottom: 0.4rem;">役職・係名</label>
+                    <input type="text" id="newRoleName" class="input-field" placeholder="例: 広報係">
+                </div>
+                <div style="margin-bottom: 1rem;">
+                    <label style="display:block; font-size: 0.85rem; color: #64748b; margin-bottom: 0.4rem;">メンバー数上限
+                        (0で制限なし)</label>
+                    <input type="number" id="newRoleLimit" class="input-field" value="1" min="0">
+                </div>
+                <div style="margin-bottom: 1rem;">
+                    <label
+                        style="display:block; font-size: 0.85rem; color: #64748b; margin-bottom: 0.4rem;">職務説明</label>
+                    <textarea id="newRoleDesc" class="input-field"
+                        style="width: 100%; height: 120px; font-family: inherit; font-size: 1rem; padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 0.3rem;"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary"
+                    onclick="document.getElementById('addOfficerRoleModal').classList.remove('open')">キャンセル</button>
+                <button class="btn btn-primary" id="saveOfficerRoleBtn" onclick="saveNewOfficerRole()">追加定義する</button>
             </div>
         </div>
     </div>

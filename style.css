@@ -33,13 +33,15 @@ body {
 
 header {
     background: var(--surface);
-    padding: 1rem 2rem;
+    padding: 1rem 1.5rem;
     border-bottom: 1px solid var(--border);
     display: flex;
     justify-content: space-between;
     align-items: center;
     box-shadow: var(--shadow);
     z-index: 10;
+    flex-wrap: wrap;
+    gap: 1rem;
 }
 
 .logo {
@@ -49,13 +51,42 @@ header {
     font-weight: 700;
     font-size: 1.25rem;
     color: var(--primary);
+    white-space: nowrap;
+}
+
+.logo svg {
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
 }
 
 .controls {
     display: flex;
-    gap: 1rem;
+    gap: 0.5rem;
     align-items: center;
     flex-wrap: wrap;
+    justify-content: flex-end;
+    flex: 1;
+    min-width: 0;
+}
+
+@media (max-width: 600px) {
+    header {
+        padding: 0.75rem 1rem;
+        justify-content: center;
+    }
+
+    .logo {
+        width: 100%;
+        justify-content: center;
+        margin-bottom: 0.25rem;
+    }
+
+    .controls {
+        justify-content: center;
+        width: 100%;
+        gap: 0.4rem;
+    }
 }
 
 select {
@@ -127,6 +158,26 @@ main {
     flex-direction: column;
     gap: 0.5rem;
     overflow-y: auto;
+    overflow-x: hidden;
+    height: 100%;
+    min-height: 0;
+}
+
+.sidebar::-webkit-scrollbar {
+    width: 5px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+    background: #e2e8f0;
+    border-radius: 10px;
+}
+
+.sidebar::-webkit-scrollbar-thumb:hover {
+    background: #cbd5e1;
 }
 
 .nav-item {
@@ -139,13 +190,74 @@ main {
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    white-space: nowrap;
+    white-space: normal;
+    line-height: 1.25;
 }
 
 .nav-item svg {
     width: 20px;
     height: 20px;
     flex-shrink: 0;
+}
+
+/* Sidebar Overlay */
+.sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 900;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.sidebar-overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Mobile Tabs & Sidebar (Hamburger Menu Implementation) */
+@media (max-width: 768px) {
+
+    /* Hide the scrolling tabs as we use sidebar now */
+    .mobile-tabs {
+        display: none !important;
+    }
+
+    /* Transform Sidebar into a Drawer */
+    .sidebar {
+        display: block !important;
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100%;
+        width: 250px;
+        z-index: 1000;
+        background: var(--surface);
+        /* Ensure background is set */
+        transform: translateX(-100%);
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: none;
+        /* Shadow applied when open */
+    }
+
+    .sidebar.open {
+        transform: translateX(0);
+        box-shadow: 4px 0 24px rgba(0, 0, 0, 0.15);
+    }
+
+    /* Force show the toggle button */
+    #menuToggle {
+        display: inline-flex !important;
+    }
+
+    .content {
+        padding: 1rem;
+    }
+
+    .charts-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 @media (max-height: 750px) {
@@ -482,47 +594,7 @@ th {
     box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
 }
 
-/* Mobile Tabs */
-@media (max-width: 768px) {
-    .sidebar {
-        display: none;
-    }
 
-    .mobile-tabs {
-        display: flex !important;
-        background: var(--surface);
-        border-bottom: 1px solid var(--border);
-        padding: 0.5rem;
-        gap: 0.5rem;
-        position: sticky;
-        top: 0;
-        z-index: 5;
-    }
-
-    .mobile-tab {
-        flex: 1;
-        padding: 0.5rem;
-        border-radius: 0.4rem;
-        font-size: 0.8rem;
-        font-weight: 600;
-        border: none;
-        background: none;
-        color: var(--text-muted);
-    }
-
-    .mobile-tab.active {
-        background: #eef2ff;
-        color: var(--primary);
-    }
-
-    .content {
-        padding: 1rem;
-    }
-
-    .charts-grid {
-        grid-template-columns: 1fr;
-    }
-}
 
 .hidden {
     display: none !important;
@@ -743,9 +815,20 @@ th {
     }
 
     #print-header {
-        border-bottom: 0.5pt solid #333;
-        padding-bottom: 4px;
-        margin-bottom: 8px;
+        border-bottom: 3pt solid var(--primary, #4f46e5);
+        padding-bottom: 12px;
+        margin-bottom: 25px;
+        position: relative;
+    }
+
+    #print-header::after {
+        content: '';
+        position: absolute;
+        bottom: -5pt;
+        left: 0;
+        width: 100%;
+        height: 1pt;
+        background: #1e293b;
     }
 
     /* Layout adjustments */
@@ -803,14 +886,19 @@ th {
 
     th,
     td {
-        border: 0.5pt solid #666 !important;
-        padding: 3pt 5pt !important;
-        font-size: 8pt !important;
-        color: black !important;
+        border: 0.3pt solid #cbd5e1 !important;
+        padding: 6pt 8pt !important;
+        font-size: 8.5pt !important;
+        color: #1e293b !important;
+        line-height: 1.4;
     }
 
     th {
-        background: #f1f5f9 !important;
+        background: #f8fafc !important;
+        color: #475569 !important;
+        font-weight: 700 !important;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
     }
