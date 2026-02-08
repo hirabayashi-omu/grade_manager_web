@@ -145,6 +145,10 @@ select {
 /* Hide hamburger menu by default (desktop) */
 #menuToggle {
     display: none;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 8px;
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
 }
 
 /* Main Layout */
@@ -222,7 +226,8 @@ main {
 }
 
 /* Mobile Tabs & Sidebar (Hamburger Menu Implementation) */
-@media (max-width: 768px) {
+/* Increased to 1024px to support tablets and larger phones */
+@media (max-width: 1024px) {
 
     /* Hide the scrolling tabs as we use sidebar now */
     .mobile-tabs {

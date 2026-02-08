@@ -1369,16 +1369,33 @@ function setupEventListeners() {
     const menuToggleBtn = document.getElementById('menuToggle');
     const sidebarOverlay = document.getElementById('sidebarOverlay');
     if (menuToggleBtn) {
-        const toggleHandler = (e) => {
+        // Use both click and touchend for maximum compatibility
+        menuToggleBtn.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
+            console.log('Menu toggle clicked');
             toggleSidebar(true);
-        };
-        menuToggleBtn.addEventListener('click', toggleHandler);
-        menuToggleBtn.addEventListener('touchstart', toggleHandler, { passive: false });
+        });
+
+        // Add touchend as a fallback for devices where click doesn't work well
+        let touchStarted = false;
+        menuToggleBtn.addEventListener('touchstart', (e) => {
+            touchStarted = true;
+            console.log('Menu toggle touch started');
+        }, { passive: true });
+
+        menuToggleBtn.addEventListener('touchend', (e) => {
+            if (touchStarted) {
+                e.preventDefault();
+                console.log('Menu toggle touch ended');
+                toggleSidebar(true);
+                touchStarted = false;
+            }
+        }, { passive: false });
     }
     if (sidebarOverlay) {
         sidebarOverlay.addEventListener('click', () => toggleSidebar(false));
+        sidebarOverlay.addEventListener('touchend', () => toggleSidebar(false), { passive: true });
     }
 
     setupAttendanceListeners();
