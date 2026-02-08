@@ -1,19 +1,4 @@
 
-
-// ==================== SIDEBAR CONTROL ====================
-function toggleSidebar(show) {
-    const sidebar = document.querySelector('.sidebar');
-    const overlay = document.getElementById('sidebarOverlay');
-
-    if (show) {
-        if (sidebar) sidebar.classList.add('open');
-        if (overlay) overlay.classList.add('active');
-    } else {
-        if (sidebar) sidebar.classList.remove('open');
-        if (overlay) overlay.classList.remove('active');
-    }
-}
-
 // ==================== DATA CONSTANTS ====================
 // ==================== DATA CONSTANTS ====================
 // These are factory defaults. We use localStorage for actual master data.
@@ -9887,3 +9872,16 @@ function importOfficerAssignmentsCsv(event) {
 }
 
 
+// ==================== SIDEBAR CONTROL ====================
+function toggleSidebar(show) {
+    const sidebar = document.querySelector('.sidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+
+    if (show) {
+        if (sidebar) sidebar.classList.add('open');
+        if (overlay) overlay.classList.add('active');
+    } else {
+        if (sidebar) sidebar.classList.remove('open');
+        if (overlay) overlay.classList.remove('active');
+    }
+}
