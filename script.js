@@ -1688,6 +1688,9 @@ function setupAttendanceListeners() {
     // Global Touch Handlers for Drag Selection (Smartphones)
     let touchStartPos = null;
     let touchMoveStartedForDrag = false;
+    let touchStartDate = null;
+    let touchStartStudent = null;
+    let touchStartType = null;
 
     window.addEventListener('touchstart', (e) => {
         const touch = e.touches[0];
@@ -1696,14 +1699,43 @@ function setupAttendanceListeners() {
 
         touchStartPos = { x: touch.clientX, y: touch.clientY };
         touchMoveStartedForDrag = false;
+        touchStartDate = target.dataset.date;
+        touchStartStudent = target.dataset.student;
+        touchStartType = target.classList.contains('calendar-day-cell') ? 'attendance' : 'gantt';
 
-        if (target.classList.contains('calendar-day-cell')) {
-            attendanceDragStart = target.dataset.date;
-            attendanceDragEnd = target.dataset.date;
-        } else if (target.classList.contains('gantt-day-cell')) {
-            ganttDragStart = target.dataset.date;
-            ganttDragEnd = target.dataset.date;
-            ganttDragStudent = target.dataset.student;
+        // Check if we touched outside existing multi-day selection to reset immediately
+        if (touchStartType === 'attendance') {
+            const hasRange = attendanceDragStart && attendanceDragEnd && attendanceDragStart !== attendanceDragEnd;
+            if (hasRange) {
+                const s = attendanceDragStart < attendanceDragEnd ? attendanceDragStart : attendanceDragEnd;
+                const end = attendanceDragStart < attendanceDragEnd ? attendanceDragEnd : attendanceDragStart;
+                if (touchStartDate < s || touchStartDate > end) {
+                    attendanceDragStart = touchStartDate;
+                    attendanceDragEnd = touchStartDate;
+                    updateAttendanceDragVisuals();
+                }
+            } else {
+                attendanceDragStart = touchStartDate;
+                attendanceDragEnd = touchStartDate;
+                updateAttendanceDragVisuals();
+            }
+        } else if (touchStartType === 'gantt') {
+            const hasRange = ganttDragStart && ganttDragEnd && ganttDragStart !== ganttDragEnd;
+            if (hasRange) {
+                const s = ganttDragStart < ganttDragEnd ? ganttDragStart : ganttDragEnd;
+                const end = ganttDragStart < ganttDragEnd ? ganttDragEnd : ganttDragStart;
+                if (touchStartStudent !== ganttDragStudent || touchStartDate < s || touchStartDate > end) {
+                    ganttDragStart = touchStartDate;
+                    ganttDragEnd = touchStartDate;
+                    ganttDragStudent = touchStartStudent;
+                    updateGanttDragVisuals();
+                }
+            } else {
+                ganttDragStart = touchStartDate;
+                ganttDragEnd = touchStartDate;
+                ganttDragStudent = touchStartStudent;
+                updateGanttDragVisuals();
+            }
         }
     }, { passive: true });
 
@@ -1717,9 +1749,16 @@ function setupAttendanceListeners() {
         // threshold to distinguish drag-to-select from scrolling
         if (!touchMoveStartedForDrag && dist > 15) {
             touchMoveStartedForDrag = true;
-            if (attendanceDragStart || ganttDragStart) {
-                if (attendanceDragStart) isAttendanceDragging = true;
-                if (ganttDragStart) isGanttDragging = true;
+            // Now we are sure it is a drag. Set the start point to where the touch began.
+            if (touchStartType === 'attendance') {
+                attendanceDragStart = touchStartDate;
+                attendanceDragEnd = touchStartDate;
+                isAttendanceDragging = true;
+            } else if (touchStartType === 'gantt') {
+                ganttDragStart = touchStartDate;
+                ganttDragEnd = touchStartDate;
+                ganttDragStudent = touchStartStudent;
+                isGanttDragging = true;
             }
         }
 
@@ -1744,6 +1783,9 @@ function setupAttendanceListeners() {
             isGanttDragging = false;
         }
         touchStartPos = null;
+        touchStartDate = null;
+        touchStartStudent = null;
+        touchStartType = null;
     });
 }
 

@@ -1310,25 +1310,51 @@
                         <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
                             <button id="fullBackupBtn" class="btn" onclick="exportJson()"
                                 style="background: #10b981; color: white; border: none; font-weight: bold;">
-                                全データ一括バックアップ (Export All)
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor" stroke-width="2" width="20" height="20">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                </svg>
+                                <span>全データ一括バックアップ (Export All)</span>
                             </button>
                             <button id="fullRestoreBtn" class="btn"
                                 onclick="document.getElementById('jsonFileInput').click()"
                                 style="background: #f59e0b; color: white; border: none; font-weight: bold;">
-                                全データ一括復元 (Import All)
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor" stroke-width="2" width="20" height="20">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l4 4m-4-4h12" />
+                                </svg>
+                                <span>全データ一括復元 (Import All)</span>
                             </button>
-                            <div style="width: 2px; background: rgba(255,255,255,0.3); margin: 0 0.5rem;"></div>
+                            <div style="width: 2px; background: rgba(255,255,255,0.3); margin: 0 0.5rem;"
+                                class="no-mobile"></div>
                             <button id="changePassBtn" class="btn"
                                 style="background: rgba(255,255,255,0.2); color: white; border: 1px solid white;">
-                                パスワード変更
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor" stroke-width="2" width="20" height="20">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                                </svg>
+                                <span>パスワード変更</span>
                             </button>
                             <button id="clearAllDataBtn" class="btn"
                                 style="background: #ef4444; color: white; border: 1px solid #b91c1c;">
-                                全データリセット
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor" stroke-width="2" width="20" height="20">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                                <span>全データリセット</span>
                             </button>
                             <button id="restoreDefaultsBtn" class="btn"
                                 style="background: rgba(255,255,255,0.2); color: white; border: 1px solid white;">
-                                科目の初期化 (Subjects Only)
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor" stroke-width="2" width="20" height="20">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                                <span>科目の初期化 (Subjects Only)</span>
                             </button>
                         </div>
                     </div>
@@ -1345,8 +1371,13 @@
                     </div>
                     <div style="margin-top: 1rem; text-align: right;">
                         <button id="finalSaveSettingsBtn" class="btn"
-                            style="background: white; color: var(--primary); font-weight: bold; border: none;">
-                            すべての変更を確定保存 (Global Save)
+                            style="background: white; color: var(--primary); font-weight: bold; border: none; margin-left: auto;">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor" stroke-width="2" width="20" height="20">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                            </svg>
+                            <span>すべての変更を確定保存 (Global Save)</span>
                         </button>
                     </div>
                 </div>
@@ -1386,7 +1417,14 @@
                                     教務主事室発行のCSV形式の名簿を読み込みます。学生の基本情報（番号・コース等）を更新します。</p>
                                 <button class="btn btn-primary"
                                     onclick="document.getElementById('rosterFileInput').click()"
-                                    style="margin-top: auto; justify-content: center; height: 2.8rem; font-weight: 600;">学籍名簿を読み込む</button>
+                                    style="margin-top: auto; justify-content: center; height: 2.8rem; font-weight: 600;">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                        stroke="currentColor" stroke-width="2" width="18" height="18">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                    </svg>
+                                    <span>学籍名簿を読み込む</span>
+                                </button>
                             </div>
 
                             <!-- Faculty Roster -->
@@ -1408,7 +1446,14 @@
                                     指定形式(CSV)の教職員名簿を読み込みます。Teams連絡先やOMU IDの情報を管理します。</p>
                                 <button class="btn btn-primary"
                                     onclick="document.getElementById('facultyFileInput').click()"
-                                    style="margin-top: auto; justify-content: center; background: #4f46e5; height: 2.8rem; font-weight: 600;">教職員名簿を読み込む</button>
+                                    style="margin-top: auto; justify-content: center; background: #4f46e5; height: 2.8rem; font-weight: 600;">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                        stroke="currentColor" stroke-width="2" width="18" height="18">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                    </svg>
+                                    <span>教職員名簿を読み込む</span>
+                                </button>
                             </div>
 
                             <!-- Absence Info -->
@@ -1430,14 +1475,22 @@
                                     教務システムから出力された欠席情報を読み込み、出欠状況ボードに一括反映します。</p>
                                 <button class="btn btn-primary"
                                     onclick="document.getElementById('attendanceCsvFileInput').click()"
-                                    style="margin-top: auto; justify-content: center; background: #10b981; height: 2.8rem; font-weight: 600;">欠席情報を読み込む</button>
+                                    style="margin-top: auto; justify-content: center; background: #10b981; height: 2.8rem; font-weight: 600;">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                        stroke="currentColor" stroke-width="2" width="18" height="18">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                    </svg>
+                                    <span>欠席情報を読み込む</span>
+                                </button>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Data Columns -->
-                <div style="display: grid; grid-template-columns: 320px 1fr; gap: 2rem; margin-top: 2rem;">
+                <div class="settings-grid"
+                    style="display: grid; grid-template-columns: 320px 1fr; gap: 2rem; margin-top: 2rem;">
                     <!-- Left: Student List -->
                     <div style="display: flex; flex-direction: column; gap: 2rem;">
                         <div class="card" style="height: fit-content;">
@@ -1463,7 +1516,13 @@
                                     <input type="text" id="newStudentName" placeholder="学生名"
                                         style="flex: 1; padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 0.4rem; font-size: 0.85rem;">
                                     <button id="addStudentBtn" class="btn btn-primary"
-                                        style="padding: 0.5rem 0.8rem; font-size: 0.85rem;">追加</button>
+                                        style="padding: 0.5rem 0.8rem; font-size: 0.85rem;">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                            stroke="currentColor" stroke-width="2" width="16" height="16">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                                        </svg>
+                                        <span>追加</span>
+                                    </button>
                                 </div>
                             </div>
                             <div id="studentsList"
@@ -1478,7 +1537,7 @@
                                         <path stroke-linecap="round" stroke-linejoin="round"
                                             d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                     </svg>
-                                    学生リストをCSV出力（メタデータ対応）
+                                    <span>学生リストをCSV出力（メタデータ対応）</span>
                                 </button>
                                 <button id="importStudentsCsvBtn" class="btn btn-secondary"
                                     style="width: 100%; justify-content: center; margin-top: 0.5rem;">
@@ -1487,7 +1546,7 @@
                                         <path stroke-linecap="round" stroke-linejoin="round"
                                             d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                                     </svg>
-                                    学生リストをCSV読出
+                                    <span>学生リストをCSV読出</span>
                                 </button>
                                 <input type="file" id="studentsCsvFileInput" accept=".csv" class="hidden">
                             </div>
@@ -1509,7 +1568,7 @@
                                             <path stroke-linecap="round" stroke-linejoin="round"
                                                 d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                         </svg>
-                                        CSV保存
+                                        <span>CSV保存</span>
                                     </button>
                                     <button id="importSubjectsCsvBtn" class="btn btn-secondary"
                                         style="font-size: 0.85rem;">
@@ -1518,7 +1577,7 @@
                                             <path stroke-linecap="round" stroke-linejoin="round"
                                                 d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                                         </svg>
-                                        CSV読出
+                                        <span>CSV読出</span>
                                     </button>
                                     <input type="file" id="subjectsCsvFileInput" accept=".csv" class="hidden">
                                     <!-- Course Filter -->
@@ -1541,7 +1600,13 @@
                                                 d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                                         </svg>
                                     </div>
-                                    <button id="addSubjectBtn" class="btn btn-primary">新規科目追加</button>
+                                    <button id="addSubjectBtn" class="btn btn-primary">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                            stroke="currentColor" stroke-width="2" width="16" height="16">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                                        </svg>
+                                        <span>新規科目追加</span>
+                                    </button>
                                 </div>
                             </div>
 
@@ -1573,7 +1638,8 @@
                                     </div>
                                 </div>
 
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                                <div class="storage-grid"
+                                    style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                                     <div
                                         style="border: 1px solid #e2e8f0; border-radius: 0.5rem; padding: 1rem; background: #f8fafc;">
                                         <div style="font-weight: 600; color: #475569; margin-bottom: 0.25rem;">
@@ -1585,7 +1651,14 @@
                                             <span style="font-weight: 700; color: #334155;" id="storage-roster-size">0
                                                 KB</span>
                                             <button id="clearRosterCacheBtn" class="btn btn-secondary"
-                                                style="font-size: 0.8rem; padding: 0.4rem 0.8rem;">キャッシュ削除</button>
+                                                style="font-size: 0.8rem; padding: 0.4rem 0.8rem;">
+                                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                                    stroke="currentColor" stroke-width="2" width="16" height="16">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                </svg>
+                                                <span>キャッシュ削除</span>
+                                            </button>
                                         </div>
                                     </div>
 
@@ -1601,7 +1674,14 @@
                                             <span style="font-weight: 700; color: #334155;"
                                                 id="storage-attendance-size">0 KB</span>
                                             <button id="clearAttendanceDataBtn" class="btn btn-secondary"
-                                                style="font-size: 0.8rem; padding: 0.4rem 0.8rem; color: #ef4444; border-color: #fecaca;">データ削除</button>
+                                                style="font-size: 0.8rem; padding: 0.4rem 0.8rem; color: #ef4444; border-color: #fecaca;">
+                                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                                    stroke="currentColor" stroke-width="2" width="16" height="16">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                </svg>
+                                                <span>データ削除</span>
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
@@ -1630,7 +1710,7 @@
                                     stroke="currentColor" stroke-width="2" width="16" height="16">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
                                 </svg>
-                                新規役職追加
+                                <span>新規役職追加</span>
                             </button>
                             <div class="divider-v"
                                 style="height: 20px; width: 1px; background: #e2e8f0; margin: 0 0.5rem;"></div>
@@ -1641,7 +1721,7 @@
                                     <path stroke-linecap="round" stroke-linejoin="round"
                                         d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                                 </svg>
-                                デフォルト復元
+                                <span>デフォルト復元</span>
                             </button>
                             <button onclick="exportClassOfficersPdf()" class="btn btn-secondary">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
@@ -1649,7 +1729,7 @@
                                     <path stroke-linecap="round" stroke-linejoin="round"
                                         d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                                 </svg>
-                                PDF
+                                <span>PDF</span>
                             </button>
                             <button onclick="exportOfficerAssignmentsCsv()" class="btn btn-secondary"
                                 title="現在の割当状況(全学年)をCSV出力します">
@@ -1658,7 +1738,7 @@
                                     <path stroke-linecap="round" stroke-linejoin="round"
                                         d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                 </svg>
-                                CSV出力
+                                <span>CSV出力</span>
                             </button>
                             <button onclick="document.getElementById('officerAssignmentsCsvInput').click();"
                                 class="btn btn-secondary" title="CSVから割当状況を読み込みます">
@@ -1667,7 +1747,7 @@
                                     <path stroke-linecap="round" stroke-linejoin="round"
                                         d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                                 </svg>
-                                CSV読込
+                                <span>CSV読込</span>
                             </button>
                             <input type="file" id="officerAssignmentsCsvInput" class="hidden"
                                 accept=".csv,text/csv,text/plain" onchange="importOfficerAssignmentsCsv(event)">

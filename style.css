@@ -363,48 +363,56 @@ main {
         margin: 0;
     }
 
-    /* Button text hidden, icon only - use better method */
-    .btn {
-        padding: 0.5rem !important;
-        min-width: 40px;
-        min-height: 40px;
-        justify-content: center;
-        white-space: nowrap;
-        overflow: hidden;
+    /* Better method for icon-only buttons on mobile */
+    .btn span {
+        display: none !important;
     }
 
-    /* Hide button text but keep SVG visible */
+    .btn {
+        padding: 0.5rem !important;
+        min-width: 44px;
+        min-height: 44px;
+        justify-content: center;
+    }
+
     .btn svg {
         margin: 0 !important;
         width: 20px;
         height: 20px;
-        display: block !important;
-    }
-
-    /* Hide text nodes in buttons */
-    .btn {
-        font-size: 0 !important;
-        line-height: 0;
-    }
-
-    .btn svg {
-        font-size: initial;
     }
 
     /* Force single column for seating and settings grids on mobile */
-    .seating-wrapper {
+    .seating-wrapper,
+    .settings-grid,
+    .storage-grid {
         grid-template-columns: 1fr !important;
+        gap: 1rem !important;
     }
 
-    /* Settings page: student list and subject management */
-    #settings-content>div>div[style*="grid-template-columns: 320px 1fr"],
-    #settings-content>div>div[style*="grid-template-columns: 280px 1fr"] {
-        grid-template-columns: 1fr !important;
+    /* Settings tab refinements */
+    #settings-content .card-header {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 1rem !important;
     }
 
-    /* Storage management cards */
-    #storage-mgmt-card div[style*="grid-template-columns: 1fr 1fr"] {
-        grid-template-columns: 1fr !important;
+    #settings-content .card-header>div[style*="display: flex"] {
+        flex-wrap: wrap !important;
+        gap: 0.5rem !important;
+    }
+
+    /* Make subject filter and search full width on mobile */
+    #subjectCourseFilter,
+    #subjectSearchInput {
+        width: 100% !important;
+    }
+
+    #settings-content .card-title {
+        font-size: 1rem !important;
+    }
+
+    .no-mobile {
+        display: none !important;
     }
 }
 
