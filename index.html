@@ -2085,8 +2085,8 @@
                     <div style="line-height: 1.8; color: #334155;">
                         <ol style="margin-left: 1.5rem; display: flex; flex-direction: column; gap: 1rem;">
                             <li><strong>1. 初期設定とマスタ管理:</strong><br>
-                                「各種設定 (Settings)」タブで、学生名簿と各学年の科目定義（単位数・種別・DP等）を登録します。CSVの流し込みや個別の編集が可能です。変更後は「Global
-                                Save」で確定させてください。
+                                「各種設定
+                                (Settings)」タブで、学生名簿と各学年の科目定義（単位数・種別・DP等）を登録します。名簿ファイル（csv/txt）のドラッグ＆ドロップ読込にも対応しています。
                             </li>
                             <li><strong>2. 成績データの入力:</strong><br>
                                 「成績一覧 (Grades)」タブで、対象学年と学生を選択します。各テスト点数を直接入力するか、表上部の<span class="paste-icon"
@@ -2108,11 +2108,16 @@
                                 Requirements)」では、現在の取得単位がDP（A~E）やSDGs、一般/専門科目、必修科目の基準をどの程度満たしているか自動集計します（コース選択が必要です）。
                             </li>
                             <li><strong>5. クラス帳票と要注意抽出:</strong><br>
-                                「クラス統計 (Class Stats)」で全員の順位表を作成できます。また「要注意抽出 (At-Risk)」機能により、成績不振科目が複数ある学生を瞬時に特定します。
+                                「クラス状況のまとめ (Class Stats)」で全員の成績一覧・GPA一覧を作成できます。「要注意抽出
+                                (At-Risk)」機能により、成績不振科目が複数ある学生を瞬時に特定します。
                             </li>
                             <li><strong>6. 名簿・出欠・役員管理:</strong><br>
-                                「名簿管理 (Roster)」で学生情報を更新、「教職員名簿 (Faculty)」で連絡先管理、「出欠状況 (Attendance)」で欠課集計、「クラス委員
-                                (Officers)」で役職決めをサポートします。
+                                「名簿管理 (Roster)」で学生情報を更新、「教職員名簿 (Faculty)」で連絡先管理、「出欠状況 (Attendance)」で欠課集計・管理、「クラス委員
+                                (Officers)」で役職決め・記録をサポートします。
+                            </li>
+                            <li><strong>7. 出欠メモとガントチャート:</strong><br>
+                                「クラス出欠状況 (Class Attendance
+                                Gantt)」でクラス全体の長期的な出欠を一目で確認できます。セルをクリックまたは右クリックで欠席理由などのメモ（★）を記録・編集できます。
                             </li>
                         </ol>
                     </div>
@@ -2227,6 +2232,28 @@
                         </table>
                     </div>
                 </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">出欠管理機能 (Attendance)</h2>
+                    </div>
+                    <div style="line-height: 1.8; color: #334155;">
+                        <ul style="margin-left: 1.5rem; list-style-type: disc;">
+                            <li><strong>個人出欠カレンダー:</strong> カレンダー上で欠席・遅刻・早退・忌引等の記録を確認・編集できます。メモ機能で理由なども記録可能です。</li>
+                            <li><strong>クラス出欠ガントチャート:</strong>
+                                長期的な視点でクラス全体の出欠状況を一覧表示します。
+                                <ul>
+                                    <li>ドラッグ操作で複数日の範囲選択が可能</li>
+                                    <li>右クリックで「期間予定（長期欠席など）」の一括登録</li>
+                                    <li>セルをクリックまたは右クリックで「メモ（★）」の編集が可能</li>
+                                    <li>A4用紙に最適化された印刷レイアウト対応</li>
+                                </ul>
+                            </li>
+                            <li><strong>教務システム連携:</strong> 教務システムから出力される「出欠ログCSV」を取り込むことで、最新の出欠データを一括反映できます。</li>
+                        </ul>
+                    </div>
+                </div>
+
 
                 <div class="card" style="border-left: 5px solid #f59e0b;">
                     <div class="card-header">
