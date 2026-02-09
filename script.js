@@ -8445,6 +8445,17 @@ function renderClassAttendanceStats() {
     body.innerHTML = '';
     const students = getClassStudents(parseInt(state.currentYear), state.currentCourse);
 
+    // Sort students by attendance number (出席番号)
+    students.sort((a, b) => {
+        const ma = getStudentMetadataSafe(a);
+        const mb = getStudentMetadataSafe(b);
+        const noA = parseInt(getMetaValue(ma, ['出席番号', 'no', '番号'])) || 999;
+        const noB = parseInt(getMetaValue(mb, ['出席番号', 'no', '番号'])) || 999;
+        // If same number or both 999, fall back to name
+        if (noA === noB) return a.localeCompare(b, 'ja');
+        return noA - noB;
+    });
+
     if (students.length === 0) {
         const row = document.createElement('tr');
         const td = document.createElement('td');
@@ -8587,6 +8598,28 @@ function renderClassAttendanceStats() {
                         }
                     }
                 ];
+
+                // Find events in the selected/clicked range for this student
+                const eventsInRange = (state.attendance.periodEvents || []).filter(pev =>
+                    pev.student === stu &&
+                    !(normalizeDateStr(pev.end) < s || normalizeDateStr(pev.start) > end)
+                );
+
+                if (eventsInRange.length > 0) {
+                    items.push({ label: '---', action: null }); // Separator
+                    eventsInRange.forEach(pev => {
+                        items.push({
+                            label: `編集: ${pev.text}`,
+                            action: () => openAttendanceEventModal(pev)
+                        });
+                        items.push({
+                            label: `削除: ${pev.text}`,
+                            danger: true,
+                            action: () => confirmAndDeletePeriodEvent(pev)
+                        });
+                    });
+                }
+
                 showCustomContextMenu(e, items);
                 return false;
             };
@@ -9192,6 +9225,28 @@ function renderAttendanceCalendar() {
                     }
                 }
             ];
+
+            // Find events in the selected/clicked range for this student
+            const eventsInRange = (state.attendance.periodEvents || []).filter(pev =>
+                pev.student === studentName &&
+                !(normalizeDateStr(pev.end) < s || normalizeDateStr(pev.start) > end)
+            );
+
+            if (eventsInRange.length > 0) {
+                items.push({ label: '---', action: null }); // Separator
+                eventsInRange.forEach(pev => {
+                    items.push({
+                        label: `編集: ${pev.text}`,
+                        action: () => openAttendanceEventModal(pev)
+                    });
+                    items.push({
+                        label: `削除: ${pev.text}`,
+                        danger: true,
+                        action: () => confirmAndDeletePeriodEvent(pev)
+                    });
+                });
+            }
+
             showCustomContextMenu(e, items);
             return false;
         };
@@ -11273,6 +11328,15 @@ function showCustomContextMenu(e, items) {
     menu.innerHTML = '';
 
     items.forEach(item => {
+        if (item.label === '---') {
+            const hr = document.createElement('div');
+            hr.style.height = '1px';
+            hr.style.background = '#e2e8f0';
+            hr.style.margin = '0.4rem 0';
+            menu.appendChild(hr);
+            return;
+        }
+
         const div = document.createElement('div');
         div.textContent = item.label;
         div.style.padding = '0.75rem 1rem';
@@ -11284,7 +11348,6 @@ function showCustomContextMenu(e, items) {
 
         if (item.danger) {
             div.style.color = '#ef4444';
-            div.style.borderTop = '1px solid #f1f5f9';
         } else {
             div.style.color = item.color || '#334155';
         }
@@ -11299,14 +11362,13 @@ function showCustomContextMenu(e, items) {
             ev.stopPropagation();
             menu.style.display = 'none';
             if (typeof item.action === 'function') {
-                // Use setTimeout to ensure the menu is closed and event chain is clean
                 setTimeout(() => {
                     item.action();
                 }, 10);
             }
         };
 
-        // For touch devices, ensure it responds quickly
+        // For touch devices
         div.ontouchend = (ev) => {
             ev.preventDefault();
             ev.stopPropagation();
