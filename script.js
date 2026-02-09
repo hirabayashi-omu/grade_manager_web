@@ -1611,56 +1611,14 @@ function setupAttendanceListeners() {
     window.onmouseup = (event) => {
         if (isAttendanceDragging) {
             isAttendanceDragging = false;
-            if (attendanceDragStart && attendanceDragEnd) {
-                const s = attendanceDragStart < attendanceDragEnd ? attendanceDragStart : attendanceDragEnd;
-                const e = attendanceDragStart < attendanceDragEnd ? attendanceDragEnd : attendanceDragStart;
-                const start = s;
-                const end = e;
-                setTimeout(() => {
-                    openAttendanceEventModal({
-                        start: start,
-                        end: end,
-                        category: '体調不良',
-                        note: '',
-                        dailyNotes: {}
-                    });
-                    attendanceDragStart = null;
-                    attendanceDragEnd = null;
-                    renderAttendanceCalendar();
-                }, 10);
-            } else {
-                attendanceDragStart = null;
-                attendanceDragEnd = null;
-                updateAttendanceDragVisuals();
-            }
+            // Do not open modal automatically.
+            // Keep drag start/end for context menu action.
+            // Visuals remain until cleared by new click.
         } else if (isGanttDragging) {
             isGanttDragging = false;
-            if (ganttDragStart && ganttDragEnd && ganttDragStudent) {
-                const s = ganttDragStart < ganttDragEnd ? ganttDragStart : ganttDragEnd;
-                const e = ganttDragStart < ganttDragEnd ? ganttDragEnd : ganttDragStart;
-                state.currentStudent = ganttDragStudent;
-                if (typeof populateControls === 'function') populateControls();
-
-                setTimeout(() => {
-                    openAttendanceEventModal({
-                        start: s,
-                        end: e,
-                        category: '体調不良',
-                        note: '',
-                        dailyNotes: {}
-                    });
-
-                    ganttDragStart = null;
-                    ganttDragEnd = null;
-                    ganttDragStudent = null;
-                    updateGanttDragVisuals();
-                }, 10);
-            } else {
-                ganttDragStart = null;
-                ganttDragEnd = null;
-                ganttDragStudent = null;
-                updateGanttDragVisuals();
-            }
+            // Do not open modal automatically.
+            // Keep drag start/end for context menu action.
+            // Visuals remain until cleared by new click.
         }
     };
 }
@@ -8576,8 +8534,21 @@ function renderClassAttendanceStats() {
             };
 
             td.onclick = () => {
+                // If it was a multi-day selection drag, clicking should NOT auto-open the single cell modal
+                // This allows the user to see the selection and then right-click.
+                if (ganttDragStart && ganttDragEnd && ganttDragStart !== ganttDragEnd && ganttDragStudent === stu) {
+                    return;
+                }
+
                 state.currentStudent = stu;
                 if (typeof populateControls === 'function') populateControls();
+
+                // Normal click (or same-cell drag release): clear visuals and open modal for single day
+                ganttDragStart = null;
+                ganttDragEnd = null;
+                ganttDragStudent = null;
+                updateGanttDragVisuals();
+
                 openAttendanceEventModal({
                     start: nDate,
                     end: nDate,
@@ -8586,6 +8557,39 @@ function renderClassAttendanceStats() {
                     dailyNotes: {}
                 });
             };
+
+            td.oncontextmenu = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+
+                state.currentStudent = stu;
+                if (typeof populateControls === 'function') populateControls();
+
+                let s = nDate;
+                let end = nDate;
+                if (ganttDragStart && ganttDragEnd && ganttDragStudent === stu) {
+                    s = ganttDragStart < ganttDragEnd ? ganttDragStart : ganttDragEnd;
+                    end = ganttDragStart < ganttDragEnd ? ganttDragEnd : ganttDragStart;
+                }
+
+                const items = [
+                    {
+                        label: '新規期間予定',
+                        action: () => {
+                            openAttendanceEventModal({
+                                start: s,
+                                end: end,
+                                category: '体調不良',
+                                note: '',
+                                dailyNotes: {}
+                            });
+                        }
+                    }
+                ];
+                showCustomContextMenu(e, items);
+                return false;
+            };
+            addLongPressTrigger(td);
 
             if (isToday) {
                 td.style.background = '#fffbef';
@@ -8620,17 +8624,54 @@ function renderClassAttendanceStats() {
                 bar.onclick = (e) => {
                     e.stopPropagation();
                     e.preventDefault();
-                    // Disable left click edit
-                };
-
-                bar.oncontextmenu = (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
                     state.currentStudent = stu;
                     if (typeof populateControls === 'function') populateControls();
                     openAttendanceEventModal(pev);
-                    return false;
                 };
+
+                bar.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+
+                    state.currentStudent = stu;
+                    if (typeof populateControls === 'function') populateControls();
+
+                    let s = nDate;
+                    let end = nDate;
+                    if (attendanceDragStart && attendanceDragEnd) {
+                        s = attendanceDragStart < attendanceDragEnd ? attendanceDragStart : attendanceDragEnd;
+                        end = attendanceDragStart < attendanceDragEnd ? attendanceDragEnd : attendanceDragStart;
+                    } else if (ganttDragStart && ganttDragEnd && ganttDragStudent === stu) {
+                        s = ganttDragStart < ganttDragEnd ? ganttDragStart : ganttDragEnd;
+                        end = ganttDragStart < ganttDragEnd ? ganttDragEnd : ganttDragStart;
+                    }
+
+                    const items = [
+                        {
+                            label: '新規期間予定',
+                            action: () => {
+                                openAttendanceEventModal({
+                                    start: s,
+                                    end: end,
+                                    category: '体調不良',
+                                    note: '',
+                                    dailyNotes: {}
+                                });
+                            }
+                        },
+                        { label: '編集', action: () => openAttendanceEventModal(pev) },
+                        { label: '削除', danger: true, action: () => confirmAndDeletePeriodEvent(pev) }
+                    ];
+                    showCustomContextMenu(e, items);
+                    return false;
+                });
+
+                // Prevent default touch actions that might trigger menus
+                bar.style.touchAction = 'none';
+                bar.style.webkitTouchCallout = 'none';
+                bar.style.userSelect = 'none';
+                bar.style.webkitUserSelect = 'none';
 
                 addLongPressTrigger(bar); // Support mobile long-press
 
@@ -9016,20 +9057,51 @@ function renderAttendanceCalendar() {
                 bar.style.userSelect = 'none'; // Improve long-press on mobile
                 bar.style.webkitUserSelect = 'none';
 
-                // Explicitly disable left click bubbling and default
+                // Use click, right click (or long press) for edit
                 bar.onclick = (e) => {
                     e.stopPropagation();
                     e.preventDefault();
+                    openAttendanceEventModal(pev);
                 };
 
-                // Use right click (or long press) for edit
+                // Use addEventListener for better reliability
                 // Use addEventListener for better reliability
                 bar.addEventListener('contextmenu', (e) => {
                     e.preventDefault(); // 確実にデフォルトメニューを抑制
                     e.stopPropagation();
-                    openAttendanceEventModal(pev);
+                    e.stopImmediatePropagation();
+
+                    // Determine range for "New"
+                    let s = dateStr;
+                    let end = dateStr;
+                    if (attendanceDragStart && attendanceDragEnd) {
+                        s = attendanceDragStart < attendanceDragEnd ? attendanceDragStart : attendanceDragEnd;
+                        end = attendanceDragStart < attendanceDragEnd ? attendanceDragEnd : attendanceDragStart;
+                    }
+
+                    const items = [
+                        {
+                            label: '新規期間予定',
+                            action: () => {
+                                openAttendanceEventModal({
+                                    start: s,
+                                    end: end,
+                                    category: '体調不良',
+                                    note: '',
+                                    dailyNotes: {}
+                                });
+                            }
+                        },
+                        { label: '編集', action: () => openAttendanceEventModal(pev) },
+                        { label: '削除', danger: true, action: () => confirmAndDeletePeriodEvent(pev) }
+                    ];
+                    showCustomContextMenu(e, items);
                     return false;
                 });
+
+                // Prevent default touch actions that might trigger menus
+                bar.style.touchAction = 'none';
+                bar.style.webkitTouchCallout = 'none';
 
                 // Note: We do NOT stop mousedown propagation here because
                 // the parent cell's mousedown handler has a check:
@@ -9074,9 +9146,51 @@ function renderAttendanceCalendar() {
         });
 
         cell.onclick = (e) => {
-            if (isAttendanceDragging) return;
+            // Keep selection if it was a multi-day drag
+            if (attendanceDragStart && attendanceDragEnd && attendanceDragStart !== attendanceDragEnd) {
+                return;
+            }
+
+            state.currentStudent = studentName; // Ensure correct student context
+            if (typeof populateControls === 'function') populateControls();
+
+            // Normal click: open memo and clear previous drag selection
+            attendanceDragStart = null;
+            attendanceDragEnd = null;
+            updateAttendanceDragVisuals();
+
             openAttendanceMemoDialog(studentName, dateStr);
         };
+
+        cell.oncontextmenu = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            let s = dateStr;
+            let end = dateStr;
+            if (attendanceDragStart && attendanceDragEnd) {
+                s = attendanceDragStart < attendanceDragEnd ? attendanceDragStart : attendanceDragEnd;
+                end = attendanceDragStart < attendanceDragEnd ? attendanceDragEnd : attendanceDragStart;
+            }
+
+            const items = [
+                {
+                    label: '新規期間予定',
+                    action: () => {
+                        openAttendanceEventModal({
+                            start: s,
+                            end: end,
+                            category: '体調不良',
+                            note: '',
+                            dailyNotes: {}
+                        });
+                    }
+                }
+            ];
+            showCustomContextMenu(e, items);
+            return false;
+        };
+        addLongPressTrigger(cell); // Support mobile long-press
         grid.appendChild(cell);
     }
 
@@ -11093,6 +11207,128 @@ function addLongPressTrigger(target) {
 
 // ==================== APP INITIALIZATION ====================
 // init() is called via DOMContentLoaded listener at line 5421.
+
+
+// ==================== CUSTOM CONTEXT MENU HELPERS ====================
+
+function createCustomContextMenu() {
+    let menu = document.getElementById('customContextMenu');
+    if (!menu) {
+        menu = document.createElement('div');
+        menu.id = 'customContextMenu';
+        menu.className = 'card'; // Use card style for consistency
+        Object.assign(menu.style, {
+            position: 'fixed',
+            zIndex: '100000',
+            background: 'white',
+            border: '1px solid #cbd5e1',
+            borderRadius: '0.5rem',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            padding: '0.5rem 0',
+            minWidth: '180px',
+            fontFamily: '"Inter", system-ui, sans-serif',
+            fontSize: '0.9rem',
+            userSelect: 'none',
+            display: 'none',
+            color: '#334155'
+        });
+
+        document.body.appendChild(menu);
+
+        // Global click to close
+        const closeMenu = () => {
+            if (menu.style.display === 'block') {
+                menu.style.display = 'none';
+            }
+        };
+        // Use capture phase to ensure it runs before others if needed, but standard bubble is fine usually.
+        // Actually, we want to close if clicking outside.
+        document.addEventListener('click', (e) => {
+            if (!menu.contains(e.target)) {
+                closeMenu();
+            }
+        });
+
+        // Prevent context menu on the menu itself
+        menu.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+        });
+    }
+    return menu;
+}
+
+function showCustomContextMenu(e, items) {
+    if (!items || items.length === 0) return;
+
+    // Create menu if needed
+    const menu = createCustomContextMenu();
+    menu.innerHTML = '';
+
+    items.forEach(item => {
+        const div = document.createElement('div');
+        div.textContent = item.label;
+        div.style.padding = '0.75rem 1rem';
+        div.style.cursor = 'pointer';
+        div.style.display = 'flex';
+        div.style.alignItems = 'center';
+        div.style.gap = '0.5rem';
+        div.style.transition = 'background 0.1s';
+
+        if (item.danger) {
+            div.style.color = '#ef4444';
+            div.style.borderTop = '1px solid #f1f5f9';
+        } else {
+            div.style.color = item.color || '#334155';
+        }
+
+        // Hover effect
+        div.onmouseenter = () => { div.style.background = '#f1f5f9'; };
+        div.onmouseleave = () => { div.style.background = 'transparent'; };
+
+        // Click action
+        div.onclick = (ev) => {
+            // Important: stop propagation so document click doesn't fire immediately if not handled
+            ev.stopPropagation();
+            menu.style.display = 'none';
+            if (item.action) item.action();
+        };
+
+        menu.appendChild(div);
+    });
+
+    // Position logic
+    const menuWidth = 180;
+    // Estimate height
+    const menuHeight = items.length * 45 + 20;
+
+    let x = e.clientX;
+    let y = e.clientY;
+
+    // Adjust if off screen
+    if (x + menuWidth > window.innerWidth) x = window.innerWidth - menuWidth - 10;
+    if (y + menuHeight > window.innerHeight) y = window.innerHeight - menuHeight - 10;
+
+    menu.style.left = `${x}px`;
+    menu.style.top = `${y}px`;
+    menu.style.display = 'block';
+}
+
+function confirmAndDeletePeriodEvent(pev) {
+    if (!pev) return;
+    // Simple confirm
+    if (confirm(`本当に「${pev.text}」を削除しますか？`)) {
+        if (pev.id) {
+            state.attendance.periodEvents = state.attendance.periodEvents.filter(ev => ev.id !== pev.id);
+        } else {
+            // Fallback match
+            state.attendance.periodEvents = state.attendance.periodEvents.filter(ev => ev !== pev);
+        }
+        saveSessionState();
+        renderAttendanceCalendar();
+        renderClassAttendanceStats();
+    }
+}
+
 
 
 
