@@ -1635,6 +1635,7 @@ function switchTab(tabName) {
     // Safety: close any open modals when switching tabs
     document.getElementById('subjectModal')?.classList.remove('open');
     document.getElementById('pasteModal')?.classList.remove('open');
+    document.getElementById('attendanceEventModal')?.classList.remove('open');
 
     // Add tab-specific class to body for CSS targeting (especially for print)
     document.body.className = `tab-${tabName}`;
@@ -8639,10 +8640,8 @@ function renderClassAttendanceStats() {
 
                     let s = nDate;
                     let end = nDate;
-                    if (attendanceDragStart && attendanceDragEnd) {
-                        s = attendanceDragStart < attendanceDragEnd ? attendanceDragStart : attendanceDragEnd;
-                        end = attendanceDragStart < attendanceDragEnd ? attendanceDragEnd : attendanceDragStart;
-                    } else if (ganttDragStart && ganttDragEnd && ganttDragStudent === stu) {
+                    // Fix: Use ganttDragStart/End for Gantt view, not attendanceDragStart
+                    if (ganttDragStart && ganttDragEnd && ganttDragStudent === stu) {
                         s = ganttDragStart < ganttDragEnd ? ganttDragStart : ganttDragEnd;
                         end = ganttDragStart < ganttDragEnd ? ganttDragEnd : ganttDragStart;
                     }
@@ -9067,9 +9066,12 @@ function renderAttendanceCalendar() {
                 // Use addEventListener for better reliability
                 // Use addEventListener for better reliability
                 bar.addEventListener('contextmenu', (e) => {
-                    e.preventDefault(); // 確実にデフォルトメニューを抑制
+                    e.preventDefault();
                     e.stopPropagation();
                     e.stopImmediatePropagation();
+
+                    state.currentStudent = studentName; // Ensure student context
+                    if (typeof populateControls === 'function') populateControls();
 
                     // Determine range for "New"
                     let s = dateStr;
@@ -9166,6 +9168,9 @@ function renderAttendanceCalendar() {
             e.preventDefault();
             e.stopPropagation();
 
+            state.currentStudent = studentName; // Ensure student context is updated
+            if (typeof populateControls === 'function') populateControls();
+
             let s = dateStr;
             let end = dateStr;
             if (attendanceDragStart && attendanceDragEnd) {
@@ -9198,9 +9203,12 @@ function renderAttendanceCalendar() {
 }
 
 function openAttendanceEventModal(pev = null) {
+    if (!pev) return; // Guard against null call
+
     // Every clicked event should be editable/deletable if it's already in the records
-    const isEdit = pev && (pev.id || state.attendance.periodEvents.includes(pev));
+    const isEdit = pev && (pev.id || (state.attendance.periodEvents && state.attendance.periodEvents.includes(pev)));
     const modal = document.getElementById('attendanceEventModal');
+    if (!modal) return;
 
     // Fill basic fields
     document.getElementById('attEventModalTitle').textContent = isEdit ? 'イベントの編集' : 'イベントの追加';
@@ -9213,8 +9221,8 @@ function openAttendanceEventModal(pev = null) {
     }
 
     // Convert YYYY/MM/DD to YYYY-MM-DD for input[type=date]
-    document.getElementById('attEventStartDate').value = pev.start.replace(/\//g, '-');
-    document.getElementById('attEventEndDate').value = pev.end.replace(/\//g, '-');
+    if (pev.start) document.getElementById('attEventStartDate').value = pev.start.replace(/\//g, '-');
+    if (pev.end) document.getElementById('attEventEndDate').value = pev.end.replace(/\//g, '-');
     document.getElementById('attEventDeleteBtn').style.display = isEdit ? 'flex' : 'none';
 
     // Internal state for daily notes from original pev
@@ -11287,10 +11295,27 @@ function showCustomContextMenu(e, items) {
 
         // Click action
         div.onclick = (ev) => {
-            // Important: stop propagation so document click doesn't fire immediately if not handled
+            ev.preventDefault();
             ev.stopPropagation();
             menu.style.display = 'none';
-            if (item.action) item.action();
+            if (typeof item.action === 'function') {
+                // Use setTimeout to ensure the menu is closed and event chain is clean
+                setTimeout(() => {
+                    item.action();
+                }, 10);
+            }
+        };
+
+        // For touch devices, ensure it responds quickly
+        div.ontouchend = (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            menu.style.display = 'none';
+            if (typeof item.action === 'function') {
+                setTimeout(() => {
+                    item.action();
+                }, 10);
+            }
         };
 
         menu.appendChild(div);
