@@ -1349,95 +1349,97 @@
                             すべての変更を確定保存 (Global Save)
                         </button>
                     </div>
+                </div>
 
-                    <!-- System Resource Files Card -->
-                    <div class="card" style="margin-top: 2rem; border: 2px solid #eef2ff;">
-                        <div class="card-header" style="background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
-                            <div class="card-title"
-                                style="color: #1e40af; display: flex; align-items: center; gap: 0.5rem;">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                    stroke="currentColor" stroke-width="2" width="20" height="20">
-                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                </svg>
-                                システム構成ファイルの読み込み (External Data Import)
-                            </div>
+                <!-- System Resource Files Card -->
+                <div class="card" style="margin-top: 2rem; border: 2px solid #eef2ff;">
+                    <div class="card-header" style="background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+                        <div class="card-title"
+                            style="color: #1e40af; display: flex; align-items: center; gap: 0.5rem;">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor" stroke-width="2" width="20" height="20">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            システム構成ファイルの読み込み (External Data Import)
                         </div>
-                        <div class="card-body">
+                    </div>
+                    <div class="card-body">
+                        <div
+                            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem;">
+                            <!-- Student Roster -->
                             <div
-                                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem;">
-                                <!-- Student Roster -->
-                                <div
-                                    style="background: #fff; padding: 1.25rem; border-radius: 0.8rem; border: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-                                    <div style="display: flex; align-items: center; gap: 0.75rem;">
-                                        <div
-                                            style="width: 32px; height: 32px; background: #eef2ff; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #4f46e5;">
-                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                                stroke="currentColor" stroke-width="2" width="18" height="18">
-                                                <path stroke-linecap="round" stroke-linejoin="round"
-                                                    d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                                            </svg>
-                                        </div>
-                                        <h4 style="font-size: 1rem; font-weight: 600; color: #334155; margin: 0;">
-                                            学籍名簿ファイル</h4>
+                                style="background: #fff; padding: 1.25rem; border-radius: 0.8rem; border: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                    <div
+                                        style="width: 32px; height: 32px; background: #eef2ff; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #4f46e5;">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                            stroke="currentColor" stroke-width="2" width="18" height="18">
+                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                                        </svg>
                                     </div>
-                                    <p style="font-size: 0.85rem; color: #64748b; margin: 0; line-height: 1.5;">
-                                        教務主事室発行のCSV形式の名簿を読み込みます。学生の基本情報（番号・コース等）を更新します。</p>
-                                    <button class="btn btn-primary"
-                                        onclick="document.getElementById('rosterFileInput').click()"
-                                        style="margin-top: auto; justify-content: center; height: 2.8rem; font-weight: 600;">学籍名簿を読み込む</button>
+                                    <h4 style="font-size: 1rem; font-weight: 600; color: #334155; margin: 0;">
+                                        学籍名簿ファイル</h4>
                                 </div>
+                                <p style="font-size: 0.85rem; color: #64748b; margin: 0; line-height: 1.5;">
+                                    教務主事室発行のCSV形式の名簿を読み込みます。学生の基本情報（番号・コース等）を更新します。</p>
+                                <button class="btn btn-primary"
+                                    onclick="document.getElementById('rosterFileInput').click()"
+                                    style="margin-top: auto; justify-content: center; height: 2.8rem; font-weight: 600;">学籍名簿を読み込む</button>
+                            </div>
 
-                                <!-- Faculty Roster -->
-                                <div
-                                    style="background: #fff; padding: 1.25rem; border-radius: 0.8rem; border: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-                                    <div style="display: flex; align-items: center; gap: 0.75rem;">
-                                        <div
-                                            style="width: 32px; height: 32px; background: #f5f3ff; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #7c3aed;">
-                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                                stroke="currentColor" stroke-width="2" width="18" height="18">
-                                                <path stroke-linecap="round" stroke-linejoin="round"
-                                                    d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                                            </svg>
-                                        </div>
-                                        <h4 style="font-size: 1rem; font-weight: 600; color: #334155; margin: 0;">
-                                            教員名簿ファイル</h4>
+                            <!-- Faculty Roster -->
+                            <div
+                                style="background: #fff; padding: 1.25rem; border-radius: 0.8rem; border: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                    <div
+                                        style="width: 32px; height: 32px; background: #f5f3ff; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #7c3aed;">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                            stroke="currentColor" stroke-width="2" width="18" height="18">
+                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                        </svg>
                                     </div>
-                                    <p style="font-size: 0.85rem; color: #64748b; margin: 0; line-height: 1.5;">
-                                        指定形式(CSV)の教職員名簿を読み込みます。Teams連絡先やOMU IDの情報を管理します。</p>
-                                    <button class="btn btn-primary"
-                                        onclick="document.getElementById('facultyFileInput').click()"
-                                        style="margin-top: auto; justify-content: center; background: #4f46e5; height: 2.8rem; font-weight: 600;">教職員名簿を読み込む</button>
+                                    <h4 style="font-size: 1rem; font-weight: 600; color: #334155; margin: 0;">
+                                        教員名簿ファイル</h4>
                                 </div>
+                                <p style="font-size: 0.85rem; color: #64748b; margin: 0; line-height: 1.5;">
+                                    指定形式(CSV)の教職員名簿を読み込みます。Teams連絡先やOMU IDの情報を管理します。</p>
+                                <button class="btn btn-primary"
+                                    onclick="document.getElementById('facultyFileInput').click()"
+                                    style="margin-top: auto; justify-content: center; background: #4f46e5; height: 2.8rem; font-weight: 600;">教職員名簿を読み込む</button>
+                            </div>
 
-                                <!-- Absence Info -->
-                                <div
-                                    style="background: #fff; padding: 1.25rem; border-radius: 0.8rem; border: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-                                    <div style="display: flex; align-items: center; gap: 0.75rem;">
-                                        <div
-                                            style="width: 32px; height: 32px; background: #f0fdf4; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #16a34a;">
-                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                                stroke="currentColor" stroke-width="2" width="18" height="18">
-                                                <path stroke-linecap="round" stroke-linejoin="round"
-                                                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                            </svg>
-                                        </div>
-                                        <h4 style="font-size: 1rem; font-weight: 600; color: #334155; margin: 0;">
-                                            欠席情報ファイル</h4>
+                            <!-- Absence Info -->
+                            <div
+                                style="background: #fff; padding: 1.25rem; border-radius: 0.8rem; border: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                    <div
+                                        style="width: 32px; height: 32px; background: #f0fdf4; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #16a34a;">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                            stroke="currentColor" stroke-width="2" width="18" height="18">
+                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                        </svg>
                                     </div>
-                                    <p style="font-size: 0.85rem; color: #64748b; margin: 0; line-height: 1.5;">
-                                        教務システムから出力された欠席情報を読み込み、出欠状況ボードに一括反映します。</p>
-                                    <button class="btn btn-primary"
-                                        onclick="document.getElementById('attendanceCsvFileInput').click()"
-                                        style="margin-top: auto; justify-content: center; background: #10b981; height: 2.8rem; font-weight: 600;">欠席情報を読み込む</button>
+                                    <h4 style="font-size: 1rem; font-weight: 600; color: #334155; margin: 0;">
+                                        欠席情報ファイル</h4>
                                 </div>
+                                <p style="font-size: 0.85rem; color: #64748b; margin: 0; line-height: 1.5;">
+                                    教務システムから出力された欠席情報を読み込み、出欠状況ボードに一括反映します。</p>
+                                <button class="btn btn-primary"
+                                    onclick="document.getElementById('attendanceCsvFileInput').click()"
+                                    style="margin-top: auto; justify-content: center; background: #10b981; height: 2.8rem; font-weight: 600;">欠席情報を読み込む</button>
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    <!-- Right: Subject List & Storage Management -->
-                    <div style="display: flex; flex-direction: column; gap: 2rem; margin-top: 2rem;">
-                        <!-- Left: Student List -->
+                <!-- Data Columns -->
+                <div style="display: grid; grid-template-columns: 320px 1fr; gap: 2rem; margin-top: 2rem;">
+                    <!-- Left: Student List -->
+                    <div style="display: flex; flex-direction: column; gap: 2rem;">
                         <div class="card" style="height: fit-content;">
                             <div class="card-header"
                                 style="flex-direction: column; align-items: flex-start; gap: 0.8rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 1rem;">
@@ -1490,393 +1492,390 @@
                                 <input type="file" id="studentsCsvFileInput" accept=".csv" class="hidden">
                             </div>
                         </div>
+                    </div>
 
-                        <!-- Right: Subject List & Storage Management -->
-                        <div style="display: flex; flex-direction: column; gap: 2rem;">
-                            <div class="card">
-                                <div class="card-header"
-                                    style="justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 1rem; margin-bottom: 1.5rem;">
-                                    <div class="card-title">全学年科目定義</div>
-                                    <div style="display: flex; gap: 0.8rem; align-items: center;">
-                                        <button id="exportSubjectsCsvBtn" class="btn btn-secondary"
-                                            style="font-size: 0.85rem;">
-                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                                stroke="currentColor" stroke-width="2" width="16" height="16">
-                                                <path stroke-linecap="round" stroke-linejoin="round"
-                                                    d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                            </svg>
-                                            CSV保存
-                                        </button>
-                                        <button id="importSubjectsCsvBtn" class="btn btn-secondary"
-                                            style="font-size: 0.85rem;">
-                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                                stroke="currentColor" stroke-width="2" width="16" height="16">
-                                                <path stroke-linecap="round" stroke-linejoin="round"
-                                                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                                            </svg>
-                                            CSV読出
-                                        </button>
-                                        <input type="file" id="subjectsCsvFileInput" accept=".csv" class="hidden">
-                                        <!-- Course Filter -->
-                                        <select id="subjectCourseFilter"
-                                            style="padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 0.4rem; font-size: 0.85rem; margin-right: 0.5rem;">
-                                            <option value="">未選択</option>
-                                            <option value="エネルギー機械">エネルギー機械 (M)</option>
-                                            <option value="プロダクトデザイン">プロダクトデザイン (D)</option>
-                                            <option value="エレクトロニクス">エレクトロニクス (E)</option>
-                                            <option value="知能情報">知能情報 (I)</option>
-                                        </select>
-                                        <div style="position: relative;">
-                                            <input type="text" id="subjectSearchInput" placeholder="科目を検索..."
-                                                style="padding: 0.5rem 1rem 0.5rem 2.2rem; border: 1px solid #cbd5e1; border-radius: 9999px; font-size: 0.85rem; width: 220px;">
-                                            <svg xmlns="http://www.w3.org/2000/svg"
-                                                style="position: absolute; left: 0.8rem; top: 50%; transform: translateY(-50%); color: #94a3b8;"
-                                                fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
-                                                width="16" height="16">
-                                                <path stroke-linecap="round" stroke-linejoin="round"
-                                                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                            </svg>
-                                        </div>
-                                        <button id="addSubjectBtn" class="btn btn-primary">新規科目追加</button>
+                    <!-- Right: Subject List & Storage Management -->
+                    <div style="display: flex; flex-direction: column; gap: 2rem;">
+                        <!-- Subject Definition Card -->
+                        <div class="card">
+                            <div class="card-header"
+                                style="justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 1rem; margin-bottom: 1.5rem;">
+                                <div class="card-title">全学年科目定義</div>
+                                <div style="display: flex; gap: 0.8rem; align-items: center;">
+                                    <button id="exportSubjectsCsvBtn" class="btn btn-secondary"
+                                        style="font-size: 0.85rem;">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                            stroke="currentColor" stroke-width="2" width="16" height="16">
+                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                        </svg>
+                                        CSV保存
+                                    </button>
+                                    <button id="importSubjectsCsvBtn" class="btn btn-secondary"
+                                        style="font-size: 0.85rem;">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                            stroke="currentColor" stroke-width="2" width="16" height="16">
+                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                        </svg>
+                                        CSV読出
+                                    </button>
+                                    <input type="file" id="subjectsCsvFileInput" accept=".csv" class="hidden">
+                                    <!-- Course Filter -->
+                                    <select id="subjectCourseFilter"
+                                        style="padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 0.4rem; font-size: 0.85rem; margin-right: 0.5rem;">
+                                        <option value="">未選択</option>
+                                        <option value="エネルギー機械">エネルギー機械 (M)</option>
+                                        <option value="プロダクトデザイン">プロダクトデザイン (D)</option>
+                                        <option value="エレクトロニクス">エレクトロニクス (E)</option>
+                                        <option value="知能情報">知能情報 (I)</option>
+                                    </select>
+                                    <div style="position: relative;">
+                                        <input type="text" id="subjectSearchInput" placeholder="科目を検索..."
+                                            style="padding: 0.5rem 1rem 0.5rem 2.2rem; border: 1px solid #cbd5e1; border-radius: 9999px; font-size: 0.85rem; width: 220px;">
+                                        <svg xmlns="http://www.w3.org/2000/svg"
+                                            style="position: absolute; left: 0.8rem; top: 50%; transform: translateY(-50%); color: #94a3b8;"
+                                            fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
+                                            width="16" height="16">
+                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                        </svg>
                                     </div>
-                                </div>
-
-                                <div id="subjectsGroupedList"
-                                    style="display: flex; flex-direction: column; gap: 2.5rem;">
-                                    <!-- Grouped by Year list will be rendered here -->
+                                    <button id="addSubjectBtn" class="btn btn-primary">新規科目追加</button>
                                 </div>
                             </div>
 
-                            <!-- Storage Management Card -->
-                            <div class="card" id="storage-mgmt-card">
-                                <div class="card-header" style="border-bottom: 1px solid #e2e8f0; margin-bottom: 1rem;">
-                                    <div class="card-title">ストレージ容量管理 (Storage Management)</div>
-                                </div>
-                                <div class="card-body">
-                                    <p style="font-size: 0.9rem; color: #64748b; margin-bottom: 1.5rem;">
-                                        ブラウザの保存容量（localStorage）の使用状況を確認し、不要な一時データを削除して空き容量を増やせます。<br>
-                                        <span style="color: #ef4444; font-weight: 600;">※iPadなどモバイル端末では約5MBが上限です。</span>
-                                    </p>
+                            <div id="subjectsGroupedList" style="display: flex; flex-direction: column; gap: 2.5rem;">
+                                <!-- Grouped by Year list will be rendered here -->
+                            </div>
+                        </div>
 
-                                    <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 2rem;">
-                                        <div
-                                            style="flex: 1; height: 1.5rem; background: #e2e8f0; border-radius: 1rem; overflow: hidden; display: flex;">
-                                            <div id="storage-usage-bar"
-                                                style="width: 0%; background: #3b82f6; transition: width 0.5s ease;">
-                                            </div>
+                        <!-- Storage Management Card -->
+                        <div class="card" id="storage-mgmt-card">
+                            <div class="card-header" style="border-bottom: 1px solid #e2e8f0; margin-bottom: 1rem;">
+                                <div class="card-title">ストレージ容量管理 (Storage Management)</div>
+                            </div>
+                            <div class="card-body">
+                                <p style="font-size: 0.9rem; color: #64748b; margin-bottom: 1.5rem;">
+                                    ブラウザの保存容量（localStorage）の使用状況を確認し、不要な一時データを削除して空き容量を増やせます。<br>
+                                    <span style="color: #ef4444; font-weight: 600;">※iPadなどモバイル端末では約5MBが上限です。</span>
+                                </p>
+
+                                <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 2rem;">
+                                    <div
+                                        style="flex: 1; height: 1.5rem; background: #e2e8f0; border-radius: 1rem; overflow: hidden; display: flex;">
+                                        <div id="storage-usage-bar"
+                                            style="width: 0%; background: #3b82f6; transition: width 0.5s ease;">
                                         </div>
+                                    </div>
+                                    <div style="font-weight: 700; color: #1e293b; font-size: 1.1rem; min-width: 100px;">
+                                        <span id="storage-usage-text">0.00</span> MB / 5 MB
+                                    </div>
+                                </div>
+
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                                    <div
+                                        style="border: 1px solid #e2e8f0; border-radius: 0.5rem; padding: 1rem; background: #f8fafc;">
+                                        <div style="font-weight: 600; color: #475569; margin-bottom: 0.25rem;">
+                                            名簿ドキュメント一時データ</div>
+                                        <div style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 0.8rem;">
+                                            「名簿取り込み」で読み込んだCSVの一時キャッシュです。削除しても既存の学生名簿は消えません。</div>
                                         <div
-                                            style="font-weight: 700; color: #1e293b; font-size: 1.1rem; min-width: 100px;">
-                                            <span id="storage-usage-text">0.00</span> MB / 5 MB
+                                            style="display: flex; justify-content: space-between; align-items: center;">
+                                            <span style="font-weight: 700; color: #334155;" id="storage-roster-size">0
+                                                KB</span>
+                                            <button id="clearRosterCacheBtn" class="btn btn-secondary"
+                                                style="font-size: 0.8rem; padding: 0.4rem 0.8rem;">キャッシュ削除</button>
                                         </div>
                                     </div>
 
-                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                                        <div
-                                            style="border: 1px solid #e2e8f0; border-radius: 0.5rem; padding: 1rem; background: #f8fafc;">
-                                            <div style="font-weight: 600; color: #475569; margin-bottom: 0.25rem;">
-                                                名簿ドキュメント一時データ</div>
-                                            <div style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 0.8rem;">
-                                                「名簿取り込み」で読み込んだCSVの一時キャッシュです。削除しても既存の学生名簿は消えません。</div>
-                                            <div
-                                                style="display: flex; justify-content: space-between; align-items: center;">
-                                                <span style="font-weight: 700; color: #334155;"
-                                                    id="storage-roster-size">0
-                                                    KB</span>
-                                                <button id="clearRosterCacheBtn" class="btn btn-secondary"
-                                                    style="font-size: 0.8rem; padding: 0.4rem 0.8rem;">キャッシュ削除</button>
-                                            </div>
+                                    <div
+                                        style="border: 1px solid #e2e8f0; border-radius: 0.5rem; padding: 1rem; background: #f8fafc;">
+                                        <div style="font-weight: 600; color: #475569; margin-bottom: 0.25rem;">
+                                            出欠記録データ
                                         </div>
-
+                                        <div style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 0.8rem;">
+                                            読み込んだすべての出欠ログデータです。削除するとカレンダーや統計が表示されなくなります。</div>
                                         <div
-                                            style="border: 1px solid #e2e8f0; border-radius: 0.5rem; padding: 1rem; background: #f8fafc;">
-                                            <div style="font-weight: 600; color: #475569; margin-bottom: 0.25rem;">
-                                                出欠記録データ
-                                            </div>
-                                            <div style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 0.8rem;">
-                                                読み込んだすべての出欠ログデータです。削除するとカレンダーや統計が表示されなくなります。</div>
-                                            <div
-                                                style="display: flex; justify-content: space-between; align-items: center;">
-                                                <span style="font-weight: 700; color: #334155;"
-                                                    id="storage-attendance-size">0 KB</span>
-                                                <button id="clearAttendanceDataBtn" class="btn btn-secondary"
-                                                    style="font-size: 0.8rem; padding: 0.4rem 0.8rem; color: #ef4444; border-color: #fecaca;">データ削除</button>
-                                            </div>
+                                            style="display: flex; justify-content: space-between; align-items: center;">
+                                            <span style="font-weight: 700; color: #334155;"
+                                                id="storage-attendance-size">0 KB</span>
+                                            <button id="clearAttendanceDataBtn" class="btn btn-secondary"
+                                                style="font-size: 0.8rem; padding: 0.4rem 0.8rem; color: #ef4444; border-color: #fecaca;">データ削除</button>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-
                     </div>
                 </div>
+            </div>
 
-                <!-- Attendance (出欠状況) View -->
-                <!-- Class Officers View -->
-                <div id="class_officers-content" class="tab-content hidden fade-in">
-                    <div class="card" style="margin-bottom: 1.5rem;">
-                        <div class="card-header" style="justify-content: space-between; align-items: center;">
-                            <div class="card-title" style="display:flex; align-items:center; gap:0.6rem;">
+            <!-- Attendance (出欠状況) View -->
+            <!-- Class Officers View -->
+            <div id="class_officers-content" class="tab-content hidden fade-in">
+                <div class="card" style="margin-bottom: 1.5rem;">
+                    <div class="card-header" style="justify-content: space-between; align-items: center;">
+                        <div class="card-title" style="display:flex; align-items:center; gap:0.6rem;">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor" stroke-width="2" width="20" height="20">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                            </svg>
+                            クラス委員・係選出 (Class Officers)
+                        </div>
+                        <div style="display:flex; gap:0.5rem; align-items: center;">
+                            <button onclick="showAddOfficerRoleModal()" class="btn btn-primary">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                    stroke="currentColor" stroke-width="2" width="20" height="20">
-                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                        d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                    stroke="currentColor" stroke-width="2" width="16" height="16">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
                                 </svg>
-                                クラス委員・係選出 (Class Officers)
-                            </div>
-                            <div style="display:flex; gap:0.5rem; align-items: center;">
-                                <button onclick="showAddOfficerRoleModal()" class="btn btn-primary">
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                        stroke="currentColor" stroke-width="2" width="16" height="16">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-                                    </svg>
-                                    新規役職追加
-                                </button>
-                                <div class="divider-v"
-                                    style="height: 20px; width: 1px; background: #e2e8f0; margin: 0 0.5rem;"></div>
-                                <button onclick="resetOfficerRolesToDefault()" class="btn btn-secondary"
-                                    style="color: #64748b;">
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                        stroke="currentColor" stroke-width="2" width="16" height="16">
-                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                    </svg>
-                                    デフォルト復元
-                                </button>
-                                <button onclick="exportClassOfficersPdf()" class="btn btn-secondary">
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                        stroke="currentColor" stroke-width="2" width="16" height="16">
-                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                            d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                                    </svg>
-                                    PDF
-                                </button>
-                                <button onclick="exportOfficerAssignmentsCsv()" class="btn btn-secondary"
-                                    title="現在の割当状況(全学年)をCSV出力します">
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                        stroke="currentColor" stroke-width="2" width="16" height="16">
-                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                            d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                    </svg>
-                                    CSV出力
-                                </button>
-                                <button onclick="document.getElementById('officerAssignmentsCsvInput').click();"
-                                    class="btn btn-secondary" title="CSVから割当状況を読み込みます">
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                        stroke="currentColor" stroke-width="2" width="16" height="16">
-                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                            d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                                    </svg>
-                                    CSV読込
-                                </button>
-                                <input type="file" id="officerAssignmentsCsvInput" class="hidden"
-                                    accept=".csv,text/csv,text/plain" onchange="importOfficerAssignmentsCsv(event)">
-                            </div>
-                        </div>
-                    </div>
-
-                    <div style="display: flex; gap: 1.5rem; align-items: flex-start;">
-                        <!-- Left Sidebar: Student List for dragging -->
-                        <div class="card"
-                            style="width: 280px; flex-shrink: 0; position: sticky; top: 1rem; max-height: calc(100vh - 12rem); display: flex; flex-direction: column;">
-                            <div class="card-header" style="padding: 0.8rem 1rem;">
-                                <h3 class="card-title"
-                                    style="font-size: 0.9rem; display: flex; align-items: center; gap: 0.5rem;">
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                        stroke="currentColor" stroke-width="2" width="16" height="16">
-                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                            d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                                    </svg>
-                                    学生リスト (Drag)
-                                </h3>
-                            </div>
-                            <div id="officerStudentList"
-                                style="padding: 0.5rem; overflow-y: auto; display: flex; flex-direction: column; gap: 0.3rem;">
-                                <!-- Populated by JS -->
-                            </div>
-                        </div>
-
-                        <!-- Right Main: Role Categories -->
-                        <div style="flex-grow: 1;">
-                            <div id="officerCategoriesGrid"
-                                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
-                                <!-- Populated by JS -->
-                            </div>
-
-
+                                新規役職追加
+                            </button>
+                            <div class="divider-v"
+                                style="height: 20px; width: 1px; background: #e2e8f0; margin: 0 0.5rem;"></div>
+                            <button onclick="resetOfficerRolesToDefault()" class="btn btn-secondary"
+                                style="color: #64748b;">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor" stroke-width="2" width="16" height="16">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                                デフォルト復元
+                            </button>
+                            <button onclick="exportClassOfficersPdf()" class="btn btn-secondary">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor" stroke-width="2" width="16" height="16">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                                </svg>
+                                PDF
+                            </button>
+                            <button onclick="exportOfficerAssignmentsCsv()" class="btn btn-secondary"
+                                title="現在の割当状況(全学年)をCSV出力します">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor" stroke-width="2" width="16" height="16">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                CSV出力
+                            </button>
+                            <button onclick="document.getElementById('officerAssignmentsCsvInput').click();"
+                                class="btn btn-secondary" title="CSVから割当状況を読み込みます">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor" stroke-width="2" width="16" height="16">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                </svg>
+                                CSV読込
+                            </button>
+                            <input type="file" id="officerAssignmentsCsvInput" class="hidden"
+                                accept=".csv,text/csv,text/plain" onchange="importOfficerAssignmentsCsv(event)">
                         </div>
                     </div>
                 </div>
 
-                <div id="attendance-content" class="tab-content hidden fade-in">
-                    <div class="card">
-                        <div class="card-header" style="justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
-                            <div class="card-title">出欠カレンダー (Attendance Calendar)</div>
-                            <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;"
-                                class="no-print">
-                                <div class="control-group">
-                                    <label for="attendanceMonthSelect">年月:</label>
-                                    <select id="attendanceMonthSelect" style="width: 140px;">
-                                        <!-- Populated by JS -->
-                                    </select>
-                                </div>
-                                <div class="control-group">
-                                    <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer;">
-                                        <input type="checkbox" id="attFilterBadOnly"
-                                            onchange="toggleAttendanceBadOnlyMode()" style="width: 16px; height: 16px;">
-                                        <span style="font-size: 0.85rem; color: #475569;">欠席・遅刻のみ</span>
-                                    </label>
-                                </div>
-                                <div class="divider-v"></div>
-                                <input type="file" id="attendanceCsvFileInput" accept=".csv,text/csv,text/plain"
-                                    class="hidden">
-                            </div>
+                <div style="display: flex; gap: 1.5rem; align-items: flex-start;">
+                    <!-- Left Sidebar: Student List for dragging -->
+                    <div class="card"
+                        style="width: 280px; flex-shrink: 0; position: sticky; top: 1rem; max-height: calc(100vh - 12rem); display: flex; flex-direction: column;">
+                        <div class="card-header" style="padding: 0.8rem 1rem;">
+                            <h3 class="card-title"
+                                style="font-size: 0.9rem; display: flex; align-items: center; gap: 0.5rem;">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor" stroke-width="2" width="16" height="16">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                                </svg>
+                                学生リスト (Drag)
+                            </h3>
                         </div>
-
-                        <div id="attendanceInfoBar"
-                            style="background: #f1f5f9; padding: 0.75rem 1rem; border-radius: 0.5rem; margin-bottom: 1rem; display: flex; justify-content: space-between; font-size: 0.85rem; color: #475569; border: 1px solid #e2e8f0;">
-                            <div id="attendancePeriodInfo">期間：未設定</div>
-                            <div id="attendanceFileInfo">ファイル：未読込</div>
+                        <div id="officerStudentList"
+                            style="padding: 0.5rem; overflow-y: auto; display: flex; flex-direction: column; gap: 0.3rem;">
+                            <!-- Populated by JS -->
                         </div>
-
-                        <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: #e2e8f0; border: 1px solid #e2e8f0; border-radius: 0.5rem; overflow: hidden;"
-                            id="attendanceCalendarHeader">
-                            <div
-                                style="background: #f8fafc; padding: 0.5rem; text-align: center; font-weight: 600; font-size: 0.8rem; color: #64748b;">
-                                月</div>
-                            <div
-                                style="background: #f8fafc; padding: 0.5rem; text-align: center; font-weight: 600; font-size: 0.8rem; color: #64748b;">
-                                火</div>
-                            <div
-                                style="background: #f8fafc; padding: 0.5rem; text-align: center; font-weight: 600; font-size: 0.8rem; color: #64748b;">
-                                水</div>
-                            <div
-                                style="background: #f8fafc; padding: 0.5rem; text-align: center; font-weight: 600; font-size: 0.8rem; color: #64748b;">
-                                木</div>
-                            <div
-                                style="background: #f8fafc; padding: 0.5rem; text-align: center; font-weight: 600; font-size: 0.8rem; color: #64748b;">
-                                金</div>
-                            <div
-                                style="background: #f8fafc; padding: 0.5rem; text-align: center; font-weight: 600; font-size: 0.8rem; color: #3b82f6;">
-                                土</div>
-                            <div
-                                style="background: #f8fafc; padding: 0.5rem; text-align: center; font-weight: 600; font-size: 0.8rem; color: #ef4444;">
-                                日</div>
-                        </div>
-                        <div id="attendanceCalendarGrid"
-                            style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: #e2e8f0; border-bottom-left-radius: 0.5rem; border-bottom-right-radius: 0.5rem; border-left: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; overflow: hidden;">
-                            <!-- Grid cells populated by JS -->
-                        </div>
-
-                        <div class="card" style="margin-top: 1.5rem; padding: 1.2rem;">
-                            <div class="card-title" style="font-size: 1rem; margin-bottom: 1rem;">累積出欠推移 (Cumulative
-                                Attendance Trend)</div>
-                            <div style="height: 300px; position: relative;">
-                                <canvas id="cumulativeAttendanceChart"></canvas>
-                            </div>
-                        </div>
-
-                        <div class="card" style="margin-top: 1.5rem; padding: 1.2rem;">
-                            <div
-                                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                                <div class="card-title" style="font-size: 1rem; margin-bottom: 0;">科目別出欠推移 (Subject
-                                    Attendance Trend)</div>
-                                <div class="control-group">
-                                    <label for="attendanceSubjectFilter">科目:</label>
-                                    <select id="attendanceSubjectFilter" style="width: 200px;">
-                                        <option value="">-- 科目を選択 --</option>
-                                        <!-- Populated by JS -->
-                                    </select>
-                                </div>
-                            </div>
-                            <div style="height: 300px; position: relative;">
-                                <canvas id="subjectAttendanceChart"></canvas>
-                            </div>
-                        </div>
-
-                        <div class="card" style="margin-top: 1.5rem; padding: 1.2rem;">
-                            <div
-                                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                                <div class="card-title" style="font-size: 1rem; margin-bottom: 0;">曜日別出欠推移 (Day of Week
-                                    Attendance Trend)</div>
-                                <div class="control-group">
-                                    <label for="attendanceDayFilter">曜日:</label>
-                                    <select id="attendanceDayFilter" style="width: 140px;">
-                                        <option value="1">月曜日</option>
-                                        <option value="2">火曜日</option>
-                                        <option value="3">水曜日</option>
-                                        <option value="4">木曜日</option>
-                                        <option value="5">金曜日</option>
-                                        <option value="6">土曜日</option>
-                                        <option value="0">日曜日</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div style="height: 300px; position: relative;">
-                                <canvas id="dayAttendanceChart"></canvas>
-                            </div>
-                        </div>
-
-                        <div class="card" style="margin-top: 1.5rem; padding: 1.2rem;">
-                            <div
-                                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                                <div class="card-title" style="font-size: 1rem; margin-bottom: 0;">時限別出欠推移 (Period
-                                    Attendance Trend)</div>
-                                <div class="control-group">
-                                    <label for="attendancePeriodFilter">時限:</label>
-                                    <select id="attendancePeriodFilter" style="width: 120px;">
-                                        <option value="1">1限</option>
-                                        <option value="2">2限</option>
-                                        <option value="3">3限</option>
-                                        <option value="4">4限</option>
-                                        <option value="5">5限</option>
-                                        <option value="6">6限</option>
-                                        <option value="7">7限</option>
-                                        <option value="8">8限</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div style="height: 300px; position: relative;">
-                                <canvas id="periodAttendanceChart"></canvas>
-                            </div>
-                        </div>
-
                     </div>
 
-                    <div id="attendanceDailyStats" class="card" style="margin-top: 2rem; padding: 1rem;">
-                        <div class="card-title" style="font-size: 1rem; margin-bottom: 1rem;">月間統計 (Monthly Statistics)
+                    <!-- Right Main: Role Categories -->
+                    <div style="flex-grow: 1;">
+                        <div id="officerCategoriesGrid"
+                            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+                            <!-- Populated by JS -->
                         </div>
-                        <div class="table-container">
-                            <table id="attendanceStatsTable">
-                                <thead>
-                                    <tr style="background: #f1f5f9;">
-                                        <th rowspan="2" style="width: 180px; vertical-align: middle;">授業科目</th>
-                                        <th rowspan="2" style="width: 110px; vertical-align: middle;">担当者</th>
-                                        <th colspan="4"
-                                            style="text-align: center; border-bottom: 2px solid #e2e8f0; background: #f0f9ff; color: #1e40af;">
-                                            月間統計 (Monthly)</th>
-                                        <th colspan="4"
-                                            style="text-align: center; border-bottom: 2px solid #e2e8f0; border-left: 2px solid #e2e8f0; background: #fdfaf0; color: #92400e;">
-                                            全期間統計 (Cumulative)</th>
-                                    </tr>
-                                    <tr style="background: #f8fafc; font-size: 0.75rem;">
-                                        <th style="text-align: center; border-left: 1px solid #e2e8f0;">欠</th>
-                                        <th style="text-align: center;">遅</th>
-                                        <th style="text-align: center;">早</th>
-                                        <th style="text-align: center; font-weight: bold; background: #e0f2fe;">計</th>
-                                        <th style="text-align: center; border-left: 2px solid #e2e8f0;">欠</th>
-                                        <th style="text-align: center;">遅</th>
-                                        <th style="text-align: center;">早</th>
-                                        <th style="text-align: center; font-weight: bold; background: #fef3c7;">計</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="attendanceStatsBody">
+
+
+                    </div>
+                </div>
+            </div>
+
+            <div id="attendance-content" class="tab-content hidden fade-in">
+                <div class="card">
+                    <div class="card-header" style="justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+                        <div class="card-title">出欠カレンダー (Attendance Calendar)</div>
+                        <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;" class="no-print">
+                            <div class="control-group">
+                                <label for="attendanceMonthSelect">年月:</label>
+                                <select id="attendanceMonthSelect" style="width: 140px;">
                                     <!-- Populated by JS -->
-                                </tbody>
-                            </table>
+                                </select>
+                            </div>
+                            <div class="control-group">
+                                <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer;">
+                                    <input type="checkbox" id="attFilterBadOnly"
+                                        onchange="toggleAttendanceBadOnlyMode()" style="width: 16px; height: 16px;">
+                                    <span style="font-size: 0.85rem; color: #475569;">欠席・遅刻のみ</span>
+                                </label>
+                            </div>
+                            <div class="divider-v"></div>
+                            <input type="file" id="attendanceCsvFileInput" accept=".csv,text/csv,text/plain"
+                                class="hidden">
                         </div>
                     </div>
+
+                    <div id="attendanceInfoBar"
+                        style="background: #f1f5f9; padding: 0.75rem 1rem; border-radius: 0.5rem; margin-bottom: 1rem; display: flex; justify-content: space-between; font-size: 0.85rem; color: #475569; border: 1px solid #e2e8f0;">
+                        <div id="attendancePeriodInfo">期間：未設定</div>
+                        <div id="attendanceFileInfo">ファイル：未読込</div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: #e2e8f0; border: 1px solid #e2e8f0; border-radius: 0.5rem; overflow: hidden;"
+                        id="attendanceCalendarHeader">
+                        <div
+                            style="background: #f8fafc; padding: 0.5rem; text-align: center; font-weight: 600; font-size: 0.8rem; color: #64748b;">
+                            月</div>
+                        <div
+                            style="background: #f8fafc; padding: 0.5rem; text-align: center; font-weight: 600; font-size: 0.8rem; color: #64748b;">
+                            火</div>
+                        <div
+                            style="background: #f8fafc; padding: 0.5rem; text-align: center; font-weight: 600; font-size: 0.8rem; color: #64748b;">
+                            水</div>
+                        <div
+                            style="background: #f8fafc; padding: 0.5rem; text-align: center; font-weight: 600; font-size: 0.8rem; color: #64748b;">
+                            木</div>
+                        <div
+                            style="background: #f8fafc; padding: 0.5rem; text-align: center; font-weight: 600; font-size: 0.8rem; color: #64748b;">
+                            金</div>
+                        <div
+                            style="background: #f8fafc; padding: 0.5rem; text-align: center; font-weight: 600; font-size: 0.8rem; color: #3b82f6;">
+                            土</div>
+                        <div
+                            style="background: #f8fafc; padding: 0.5rem; text-align: center; font-weight: 600; font-size: 0.8rem; color: #ef4444;">
+                            日</div>
+                    </div>
+                    <div id="attendanceCalendarGrid"
+                        style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: #e2e8f0; border-bottom-left-radius: 0.5rem; border-bottom-right-radius: 0.5rem; border-left: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; overflow: hidden;">
+                        <!-- Grid cells populated by JS -->
+                    </div>
+
+                    <div class="card" style="margin-top: 1.5rem; padding: 1.2rem;">
+                        <div class="card-title" style="font-size: 1rem; margin-bottom: 1rem;">累積出欠推移 (Cumulative
+                            Attendance Trend)</div>
+                        <div style="height: 300px; position: relative;">
+                            <canvas id="cumulativeAttendanceChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="card" style="margin-top: 1.5rem; padding: 1.2rem;">
+                        <div
+                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                            <div class="card-title" style="font-size: 1rem; margin-bottom: 0;">科目別出欠推移 (Subject
+                                Attendance Trend)</div>
+                            <div class="control-group">
+                                <label for="attendanceSubjectFilter">科目:</label>
+                                <select id="attendanceSubjectFilter" style="width: 200px;">
+                                    <option value="">-- 科目を選択 --</option>
+                                    <!-- Populated by JS -->
+                                </select>
+                            </div>
+                        </div>
+                        <div style="height: 300px; position: relative;">
+                            <canvas id="subjectAttendanceChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="card" style="margin-top: 1.5rem; padding: 1.2rem;">
+                        <div
+                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                            <div class="card-title" style="font-size: 1rem; margin-bottom: 0;">曜日別出欠推移 (Day of Week
+                                Attendance Trend)</div>
+                            <div class="control-group">
+                                <label for="attendanceDayFilter">曜日:</label>
+                                <select id="attendanceDayFilter" style="width: 140px;">
+                                    <option value="1">月曜日</option>
+                                    <option value="2">火曜日</option>
+                                    <option value="3">水曜日</option>
+                                    <option value="4">木曜日</option>
+                                    <option value="5">金曜日</option>
+                                    <option value="6">土曜日</option>
+                                    <option value="0">日曜日</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div style="height: 300px; position: relative;">
+                            <canvas id="dayAttendanceChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="card" style="margin-top: 1.5rem; padding: 1.2rem;">
+                        <div
+                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                            <div class="card-title" style="font-size: 1rem; margin-bottom: 0;">時限別出欠推移 (Period
+                                Attendance Trend)</div>
+                            <div class="control-group">
+                                <label for="attendancePeriodFilter">時限:</label>
+                                <select id="attendancePeriodFilter" style="width: 120px;">
+                                    <option value="1">1限</option>
+                                    <option value="2">2限</option>
+                                    <option value="3">3限</option>
+                                    <option value="4">4限</option>
+                                    <option value="5">5限</option>
+                                    <option value="6">6限</option>
+                                    <option value="7">7限</option>
+                                    <option value="8">8限</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div style="height: 300px; position: relative;">
+                            <canvas id="periodAttendanceChart"></canvas>
+                        </div>
+                    </div>
+
                 </div>
+
+                <div id="attendanceDailyStats" class="card" style="margin-top: 2rem; padding: 1rem;">
+                    <div class="card-title" style="font-size: 1rem; margin-bottom: 1rem;">月間統計 (Monthly Statistics)
+                    </div>
+                    <div class="table-container">
+                        <table id="attendanceStatsTable">
+                            <thead>
+                                <tr style="background: #f1f5f9;">
+                                    <th rowspan="2" style="width: 180px; vertical-align: middle;">授業科目</th>
+                                    <th rowspan="2" style="width: 110px; vertical-align: middle;">担当者</th>
+                                    <th colspan="4"
+                                        style="text-align: center; border-bottom: 2px solid #e2e8f0; background: #f0f9ff; color: #1e40af;">
+                                        月間統計 (Monthly)</th>
+                                    <th colspan="4"
+                                        style="text-align: center; border-bottom: 2px solid #e2e8f0; border-left: 2px solid #e2e8f0; background: #fdfaf0; color: #92400e;">
+                                        全期間統計 (Cumulative)</th>
+                                </tr>
+                                <tr style="background: #f8fafc; font-size: 0.75rem;">
+                                    <th style="text-align: center; border-left: 1px solid #e2e8f0;">欠</th>
+                                    <th style="text-align: center;">遅</th>
+                                    <th style="text-align: center;">早</th>
+                                    <th style="text-align: center; font-weight: bold; background: #e0f2fe;">計</th>
+                                    <th style="text-align: center; border-left: 2px solid #e2e8f0;">欠</th>
+                                    <th style="text-align: center;">遅</th>
+                                    <th style="text-align: center;">早</th>
+                                    <th style="text-align: center; font-weight: bold; background: #fef3c7;">計</th>
+                                </tr>
+                            </thead>
+                            <tbody id="attendanceStatsBody">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
             </div>
 
             <!-- Help & Security View -->
