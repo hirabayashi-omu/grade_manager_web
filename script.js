@@ -323,7 +323,8 @@ let state = {
         periodEvents: [] // Array of { student: string, start: "YYYY/MM/DD", end: "YYYY/MM/DD", text: "...", color: "blue" }
     },
     officerRoles: JSON.parse(localStorage.getItem('gm_state_officerRoles') || 'null'), // Default in init
-    officers: JSON.parse(localStorage.getItem('gm_state_officers') || '{}') // Key: year, Value: { roleId: [name1, name2], ... }
+    officers: JSON.parse(localStorage.getItem('gm_state_officers') || '{}'), // Key: year, Value: { roleId: [name1, name2], ... }
+    sourceInfo: JSON.parse(localStorage.getItem('gm_state_sourceInfo') || '{}') // Metadata for imported files
 };
 
 /**
@@ -597,6 +598,7 @@ function saveSessionState() {
         localStorage.setItem('gm_master_subjects_json', JSON.stringify(state.subjects));
         localStorage.setItem('grade_manager_scores', JSON.stringify(state.scores));
 
+        localStorage.setItem('gm_state_sourceInfo', JSON.stringify(state.sourceInfo));
         localStorage.setItem('gm_roster_candidates', JSON.stringify(importState.candidates));
         localStorage.setItem('gm_faculty_candidates', JSON.stringify(facultyImportState.candidates));
 
@@ -2079,6 +2081,9 @@ function clearStorageType(type) {
 }
 
 function renderSettings() {
+    // 0. Refresh imported file summaries
+    updateSourceSummaryDisplay();
+
     // 1. Render Students (List style)
     const studentsList = document.getElementById('studentsList');
     if (studentsList) {
@@ -3254,6 +3259,7 @@ function handleRosterSelect(e) {
         try {
             const rows = parseCSV(text).filter(row => row.length > 0);
             if (rows.length < 2) throw new Error("Empty or invalid CSV");
+            importState.filename = file.name; // Store filename temporarily
             const header = rows[0];
             processRosterCSV(rows, header);
         } catch (err) {
@@ -7978,11 +7984,21 @@ function confirmImportFromBoard() {
 
     saveSessionState();
 
+    // Update Source Info for Roster
+    state.sourceInfo.roster = {
+        count: state.students.length,
+        date: new Date().toISOString(),
+        filename: importState.filename || 'roster.csv'
+    };
+    // Re-save with source info
+    saveSessionState();
+
     // Clear the candidate cache after successful import to save storage space
     importState.candidates = [];
     localStorage.removeItem('gm_roster_candidates');
 
     populateControls();
+    updateSourceSummaryDisplay();
 
     alert(`取り込みが完了しました。\n(${state.students.length} 名登録)`);
 
@@ -8265,7 +8281,15 @@ function handleFacultyRosterSelect(e) {
             renderFacultyFilters();
             renderFacultyTable();
 
+            // Update Source Info for Faculty
+            state.sourceInfo.faculty = {
+                count: candidates.length,
+                date: new Date().toISOString(),
+                filename: file.name
+            };
+
             saveSessionState();
+            updateSourceSummaryDisplay();
 
             const statusEl = document.getElementById('facultyBoardStatus');
             if (statusEl) {
@@ -8725,6 +8749,22 @@ function renderClassAttendanceStats() {
             td.style.minHeight = '42px';
             td.style.cursor = 'pointer';
             td.style.transition = 'background 0.1s';
+            td.style.position = 'relative'; // For positioning memo star
+
+            // Render Memo Star if exists
+            const memoKey = stu + '_' + nDate;
+            if (state.attendance.memos && state.attendance.memos[memoKey]) {
+                const star = document.createElement('div');
+                star.textContent = '★';
+                star.style.position = 'absolute';
+                star.style.top = '0';
+                star.style.right = '1px';
+                star.style.fontSize = '0.7rem';
+                star.style.lineHeight = '1';
+                star.style.color = state.attendance.memos[memoKey].color || 'blue';
+                star.title = state.attendance.memos[memoKey].text;
+                td.appendChild(star);
+            }
 
             td.onmousedown = (e) => {
                 if (e.button !== 0) return;
@@ -8768,13 +8808,8 @@ function renderClassAttendanceStats() {
                 ganttDragStudent = null;
                 updateGanttDragVisuals();
 
-                openAttendanceEventModal({
-                    start: nDate,
-                    end: nDate,
-                    category: '体調不良',
-                    note: '',
-                    dailyNotes: {}
-                });
+                // Open Memo Dialog instead of Period Event Modal on click
+                openAttendanceMemoDialog(stu, nDate);
             };
 
             td.oncontextmenu = (e) => {
@@ -8792,6 +8827,11 @@ function renderClassAttendanceStats() {
                 }
 
                 const items = [
+                    {
+                        label: 'メモを編集 (★)',
+                        action: () => openAttendanceMemoDialog(stu, nDate)
+                    },
+                    { label: '---', action: null },
                     {
                         label: '新規期間予定',
                         action: () => {
@@ -9117,9 +9157,19 @@ function handleAttendanceFileUpload(e) {
                 if (typeof populateControls === 'function') populateControls();
             }
 
+            // Update Source Info for Attendance
+            state.sourceInfo.attendance = {
+                startDate: state.attendance.periodInfo.start,
+                endDate: state.attendance.periodInfo.end,
+                count: Object.keys(records).length,
+                date: new Date().toISOString(),
+                filename: file.name
+            };
+
             saveSessionState();
             console.log('Attendance data saved, initializing...');
             initAttendance();
+            updateSourceSummaryDisplay();
             alert('出欠データを読み込みました。');
         } catch (err) {
             console.error('CSV parsing error:', err);
@@ -9752,6 +9802,9 @@ function openAttendanceMemoDialog(studentName, dateStr) {
 
     saveSessionState();
     renderAttendanceCalendar();
+    if (state.currentTab === 'class_attendance_stats') {
+        renderClassAttendanceStats();
+    }
 }
 
 function renderAttendanceStats() {
