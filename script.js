@@ -8628,6 +8628,12 @@ function renderClassAttendanceStats() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
+    // Set print attribute for header
+    const container = document.getElementById('class_attendance_stats-content');
+    if (container) {
+        container.setAttribute('data-print-date', `${startDate.getFullYear()}/${startDate.getMonth() + 1}/${startDate.getDate()} ～`);
+    }
+
     // Prepare Header
     header.innerHTML = '';
     const thName = document.createElement('th');
@@ -8705,14 +8711,15 @@ function renderClassAttendanceStats() {
 
     students.forEach((stu, sIdx) => {
         const row = document.createElement('tr');
-        row.style.background = sIdx % 2 === 0 ? 'white' : '#f8fafc';
+        // Increase contrast for alternating rows
+        row.style.background = sIdx % 2 === 0 ? 'white' : '#f1f5f9';
 
         // Student Column (Sticky)
         const tdName = document.createElement('td');
         tdName.style.position = 'sticky';
         tdName.style.left = '0';
         tdName.style.zIndex = '20';
-        tdName.style.background = sIdx % 2 === 0 ? 'white' : '#f8fafc';
+        tdName.style.background = sIdx % 2 === 0 ? 'white' : '#f1f5f9';
         tdName.style.fontWeight = '600';
         tdName.style.fontSize = '0.9rem';
         tdName.style.padding = '0.75rem 1rem';
@@ -8742,9 +8749,11 @@ function renderClassAttendanceStats() {
             td.classList.add('gantt-day-cell');
             td.dataset.date = nDate;
             td.dataset.student = stu;
+            td.dataset.student = stu;
             td.style.padding = '4px 0';
-            td.style.borderRight = '1px solid #f1f5f9';
-            td.style.borderBottom = '1px solid #f1f5f9';
+            // Darker border for better visibility
+            td.style.borderRight = '1px solid #cbd5e1';
+            td.style.borderBottom = '1px solid #cbd5e1';
             td.style.verticalAlign = 'top';
             td.style.minHeight = '42px';
             td.style.cursor = 'pointer';

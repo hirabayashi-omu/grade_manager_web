@@ -1,0 +1,107 @@
+/* Class Attendance Gantt Print Styles */
+
+@media print {
+    body.tab-class_attendance_stats {
+        /* Reset layout for full page print */
+        overflow: visible !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: white !important;
+    }
+
+    body.tab-class_attendance_stats .content {
+        padding: 0 !important;
+        margin: 0 !important;
+        width: 100% !important;
+        overflow: visible !important;
+    }
+
+    /* Hide sidebar and other non-essentials */
+    body.tab-class_attendance_stats .sidebar,
+    body.tab-class_attendance_stats .nav-item,
+    body.tab-class_attendance_stats header,
+    body.tab-class_attendance_stats #classAttendanceControls {
+        display: none !important;
+    }
+
+    /* Ensure the Gantt chart container takes full width */
+    body.tab-class_attendance_stats #classAttendanceGanttWrapper {
+        display: block !important;
+        width: 100% !important;
+        overflow: visible !important;
+        border: none !important;
+        box-shadow: none !important;
+        max-height: none !important;
+        /* Allow growing vertically */
+    }
+
+    /* Table Adjustments */
+    body.tab-class_attendance_stats table {
+        width: 100% !important;
+        table-layout: auto !important;
+        /* Let column widths adjust naturally */
+        border-collapse: collapse !important;
+        font-size: 9pt !important;
+        /* Smaller font for fitting more */
+    }
+
+    body.tab-class_attendance_stats th,
+    body.tab-class_attendance_stats td {
+        border: 0.5pt solid #000 !important;
+        padding: 2px 4px !important;
+        white-space: nowrap !important;
+        /* Prevent wrapping if possible */
+        height: auto !important;
+    }
+
+    /* Sticky headers mess up print sometimes, reset them */
+    body.tab-class_attendance_stats th {
+        position: static !important;
+        background: #eee !important;
+        color: black !important;
+        box-shadow: none !important;
+    }
+
+    body.tab-class_attendance_stats td:first-child {
+        position: static !important;
+        background: white !important;
+        box-shadow: none !important;
+        font-weight: bold !important;
+    }
+
+    /* Adjust Cell Colors for B&W or High Contrast */
+    body.tab-class_attendance_stats .gantt-day-cell {
+        background: white !important;
+        /* Default background */
+    }
+
+    /* Highlight weekends lightly */
+    body.tab-class_attendance_stats th:nth-child(n+2):nth-child(7n),
+    body.tab-class_attendance_stats th:nth-child(n+2):nth-child(7n+1) {
+        background: #f0f0f0 !important;
+    }
+
+    /* Bars - Ensure visibility */
+    body.tab-class_attendance_stats .period-event-bar {
+        border: 1pt solid #000 !important;
+        color: black !important;
+        /* Force background print */
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    /* Page Breaks */
+    body.tab-class_attendance_stats tr {
+        page-break-inside: avoid;
+    }
+
+    /* Header for print */
+    body.tab-class_attendance_stats #class_attendance_stats-content::before {
+        content: "クラス出欠状況一覧 (" attr(data-print-date) ")";
+        display: block;
+        font-size: 14pt;
+        font-weight: bold;
+        text-align: center;
+        margin-bottom: 10px;
+    }
+}
