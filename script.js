@@ -13,6 +13,16 @@ function toggleSidebar(show) {
     }
 }
 
+function normalizeDateStr(s) {
+    if (!s) return "";
+    const parts = s.split('/');
+    if (parts.length < 3) return s;
+    const y = parts[0];
+    const m = parts[1].padStart(2, '0');
+    const d = parts[2].padStart(2, '0');
+    return `${y}/${m}/${d}`;
+}
+
 // ==================== DATA CONSTANTS ====================
 // These are factory defaults. We use localStorage for actual master data.
 const DEFAULT_STUDENTS_RAW = `
@@ -309,7 +319,8 @@ let state = {
         records: {}, // Key: StudentName, Value: { "YYYY/MM/DD": [ { p:1, subj:"Math", status:"欠", teacher:"Tanaka" }, ... ] }
         periodInfo: { start: '', end: '' },
         fileName: '',
-        memos: {} // Key: "StudentName_YYYY/MM/DD", Value: { text: "...", color: "blue" }
+        memos: {}, // Key: "StudentName_YYYY/MM/DD", Value: { text: "...", color: "blue" }
+        periodEvents: [] // Array of { student: string, start: "YYYY/MM/DD", end: "YYYY/MM/DD", text: "...", color: "blue" }
     },
     officerRoles: JSON.parse(localStorage.getItem('gm_state_officerRoles') || 'null'), // Default in init
     officers: JSON.parse(localStorage.getItem('gm_state_officers') || '{}') // Key: year, Value: { roleId: [name1, name2], ... }
@@ -319,8 +330,7 @@ let state = {
  * Generates a sortable key for a student based on metadata (Year-Class-Number).
  */
 function getStudentSortKey(studentName) {
-    if (!state.studentMetadata) return studentName;
-    const meta = state.studentMetadata[studentName] || {};
+    const meta = getStudentMetadataSafe(studentName) || {};
 
     const getVal = (m, keys) => {
         for (const k of keys) {
@@ -371,6 +381,17 @@ const SCORE_KEYS_EN = ["earlyMid", "earlyFinal", "lateMid", "lateFinal"]; // map
 // Current pasting target
 let currentPasteKey = null;
 
+// Attendance Drag State (Calendar)
+let attendanceDragStart = null;
+let attendanceDragEnd = null;
+let isAttendanceDragging = false;
+
+// Attendance Drag State (Gantt)
+let ganttDragStart = null;
+let ganttDragEnd = null;
+let ganttDragStudent = null;
+let isGanttDragging = false;
+
 // Import State
 let importState = {
     candidates: [], // { name, sortKey, metadata }
@@ -390,6 +411,81 @@ let facultyImportState = {
     sortKey: 'original',
     sortOrder: 'asc'
 };
+
+// ==================== PERFORMANCE OPTIMIZATION (CACHE) ====================
+let candidateLookupCache = {
+    allRegistered: null,    // Memoized union list of names
+    metadataMap: new Map(),  // Map: Name -> Metadata Object
+    normMetadataMap: new Map(), // Map: NormalizedName -> Metadata Object
+    version: 0               // Incremented when invalidated
+};
+
+function invalidateCandidateCache() {
+    candidateLookupCache.allRegistered = null;
+    candidateLookupCache.metadataMap.clear();
+    candidateLookupCache.normMetadataMap.clear();
+    candidateLookupCache.version++;
+}
+
+/**
+ * Ensures the candidate lookup cache is populated for O(1) performance.
+ */
+function ensureCandidateCache() {
+    if (candidateLookupCache.allRegistered) return; // Already cached
+
+    const manualNames = state.students || [];
+    const rosterCandidates = importState.candidates || [];
+
+    // 1. Build Metadata Maps (Priority: Manual Settings > Roster Candidates)
+    // We process Roster first, then Manual Overwrites it
+    rosterCandidates.forEach(c => {
+        if (!c.name) return;
+        if (c.metadata) {
+            candidateLookupCache.metadataMap.set(c.name, c.metadata);
+            candidateLookupCache.normMetadataMap.set(normalizeStudentName(c.name), c.metadata);
+        }
+    });
+
+    // 2. Integration with existing state metadata
+    if (state.studentMetadata) {
+        Object.entries(state.studentMetadata).forEach(([name, meta]) => {
+            candidateLookupCache.metadataMap.set(name, meta);
+            candidateLookupCache.normMetadataMap.set(normalizeStudentName(name), meta);
+        });
+    }
+
+    // 3. Memoize the union list
+    const rosterNames = rosterCandidates.map(c => c.name);
+    candidateLookupCache.allRegistered = Array.from(new Set([...manualNames, ...rosterNames]));
+}
+
+/**
+ * Returns strictly the students registered in the application's core settings.
+ */
+function getRegisteredStudents() {
+    return state.students || [];
+}
+
+/**
+ * Returns a union of students from System Settings and the Master Roster.
+ * Used primarily for name resolution and identification.
+ */
+function getAllPossibleStudents() {
+    ensureCandidateCache();
+    const manualNames = state.students || [];
+    const rosterNames = (importState.candidates || []).map(c => c.name);
+    return Array.from(new Set([...manualNames, ...rosterNames]));
+}
+
+function normalizeStudentName(s) {
+    return (s || "").toString().trim()
+        .toLowerCase()
+        .replace(/\s+/g, '')
+        .replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+        .replace(/^\d+[\.\-\s]/, '')
+        .replace(/[\(\)（）]/g, '');
+}
+// =========================================================================
 
 // ==================== STATE PERSISTENCE ====================
 // ==================== STATE PERSISTENCE ====================
@@ -551,8 +647,9 @@ function init() {
 
     // OPTIMIZATION: Clean up orphaned scores if they accumulate too much
     const scoreCount = Object.keys(state.scores).length;
-    if (scoreCount > 1000 && scoreCount > state.students.length * 2) {
-        const validNames = new Set(state.students);
+    const allRegistered = getRegisteredStudents();
+    if (scoreCount > 1000 && scoreCount > allRegistered.length * 2) {
+        const validNames = new Set(allRegistered);
         let removed = 0;
         for (const name in state.scores) {
             if (!validNames.has(name)) {
@@ -898,6 +995,7 @@ function refreshMasterData() {
 
     // Ensure state.students is sorted by roster order (Year-Class-No)
     state.students = sortStudentsByRoster(state.students);
+    invalidateCandidateCache(); // Ensure cache is ready with fresh data
 
     // B. Subjects
     state.subjects = [];
@@ -1013,7 +1111,9 @@ function populateControls() {
     const studentSelect = document.getElementById('studentSelect');
     if (studentSelect) {
         studentSelect.innerHTML = '';
-        const sortedStudents = sortStudentsByRoster(state.students);
+        const allStudents = getRegisteredStudents();
+        const filteredStudents = getClassStudents(state.currentYear, state.currentCourse, allStudents);
+        const sortedStudents = sortStudentsByRoster(filteredStudents);
         sortedStudents.forEach(s => {
             const opt = document.createElement('option');
             opt.value = s;
@@ -1314,7 +1414,6 @@ function setupEventListeners() {
     });
     document.getElementById('randomAssignBtn')?.addEventListener('click', randomAssignSeats);
     document.getElementById('clearSeatingBtn')?.addEventListener('click', clearSeatingAssignments);
-    document.getElementById('printSeatingBtn')?.addEventListener('click', () => window.print());
     document.getElementById('seatingColorMode')?.addEventListener('change', (e) => {
         state.seating.colorMode = e.target.value;
         const methodWrapper = document.getElementById('seatingGradeMethodWrapper');
@@ -1451,6 +1550,18 @@ function setupEventListeners() {
 
 function setupAttendanceListeners() {
     document.getElementById('attendanceMonthSelect')?.addEventListener('change', (e) => {
+        // Sync with Class Attendance Target Date
+        const targetInput = document.getElementById('classAttendanceTargetDate');
+        if (targetInput) {
+            const mStr = e.target.value; // "4月" etc
+            const mNum = parseInt(mStr.replace('月', ''));
+            const year = parseInt(state.currentYear || new Date().getFullYear());
+            let realYear = year;
+            if (mNum <= 3) realYear = year + 1;
+            const y = realYear;
+            const m = String(mNum).padStart(2, '0');
+            targetInput.value = `${y}-${m}-01`;
+        }
         renderAttendanceCalendar();
         renderAttendanceStats();
     });
@@ -1473,7 +1584,85 @@ function setupAttendanceListeners() {
         renderPeriodAttendanceChart();
     });
 
-    document.getElementById('attendanceExportPdfBtn')?.addEventListener('click', () => window.print());
+
+    document.getElementById('classAttendanceTargetDate')?.addEventListener('change', (e) => {
+        // Sync with Individual Attendance Month selector
+        const mainSelect = document.getElementById('attendanceMonthSelect');
+        if (mainSelect) {
+            const date = new Date(e.target.value);
+            if (!isNaN(date.getTime())) {
+                const mNum = date.getMonth() + 1;
+                // April=0, ..., March=11 in the dropdown
+                const idx = mNum >= 4 ? mNum - 4 : mNum + 8;
+                mainSelect.selectedIndex = idx;
+
+                renderAttendanceCalendar();
+                renderAttendanceStats();
+            }
+        }
+        renderClassAttendanceStats();
+    });
+
+    document.getElementById('classAttendanceRangeSelect')?.addEventListener('change', () => {
+        renderClassAttendanceStats();
+    });
+
+    // Global Mouse Handlers for Drag Selection (Calendar & Gantt)
+    window.onmouseup = (event) => {
+        if (isAttendanceDragging) {
+            isAttendanceDragging = false;
+            if (attendanceDragStart && attendanceDragEnd) {
+                const s = attendanceDragStart < attendanceDragEnd ? attendanceDragStart : attendanceDragEnd;
+                const e = attendanceDragStart < attendanceDragEnd ? attendanceDragEnd : attendanceDragStart;
+                const start = s;
+                const end = e;
+                setTimeout(() => {
+                    openAttendanceEventModal({
+                        start: start,
+                        end: end,
+                        category: '体調不良',
+                        note: '',
+                        dailyNotes: {}
+                    });
+                    attendanceDragStart = null;
+                    attendanceDragEnd = null;
+                    renderAttendanceCalendar();
+                }, 10);
+            } else {
+                attendanceDragStart = null;
+                attendanceDragEnd = null;
+                updateAttendanceDragVisuals();
+            }
+        } else if (isGanttDragging) {
+            isGanttDragging = false;
+            if (ganttDragStart && ganttDragEnd && ganttDragStudent) {
+                const s = ganttDragStart < ganttDragEnd ? ganttDragStart : ganttDragEnd;
+                const e = ganttDragStart < ganttDragEnd ? ganttDragEnd : ganttDragStart;
+                state.currentStudent = ganttDragStudent;
+                if (typeof populateControls === 'function') populateControls();
+
+                setTimeout(() => {
+                    openAttendanceEventModal({
+                        start: s,
+                        end: e,
+                        category: '体調不良',
+                        note: '',
+                        dailyNotes: {}
+                    });
+
+                    ganttDragStart = null;
+                    ganttDragEnd = null;
+                    ganttDragStudent = null;
+                    updateGanttDragVisuals();
+                }, 10);
+            } else {
+                ganttDragStart = null;
+                ganttDragEnd = null;
+                ganttDragStudent = null;
+                updateGanttDragVisuals();
+            }
+        }
+    };
 }
 
 function switchTab(tabName) {
@@ -1503,32 +1692,40 @@ function switchTab(tabName) {
         renderGradesTable();
     } else if (tabName === 'stats') {
         renderStats();
+    } else if (tabName === 'attendance') {
+        initAttendance();
+    } else if (tabName === 'class_attendance_stats') {
+        initClassAttendanceStats();
+        renderClassAttendanceStats();
+    } else if (tabName === 'class_stats') {
+        initClassStats();
     } else if (tabName === 'stats2') {
         renderStats2();
     } else if (tabName === 'grad_requirements') {
         setDefaultYear();
         renderGraduationRequirements();
-    } else if (tabName === 'class_stats') {
-        initClassStats();
     } else if (tabName === 'at_risk') {
-        // Just switch, user clicks button
-    } else if (tabName === 'settings') {
-        renderSettings();
+        renderAtRiskReport();
     } else if (tabName === 'seating') {
         initSeating();
+        renderSeatingChart();
+    } else if (tabName === 'class_officers') {
+        renderClassOfficers();
+    } else if (tabName === 'subject_management') {
+        renderSubjectManagement();
+    } else if (tabName === 'metadata_editor') {
+        renderMetadataEditor();
+    } else if (tabName === 'settings') {
+        renderSettings();
     } else if (tabName === 'roster_board') {
         renderRosterBoardFilters();
         renderRosterBoardTable();
     } else if (tabName === 'faculty_roster') {
         renderFacultyFilters();
         renderFacultyTable();
-    } else if (tabName === 'attendance') {
-        initAttendance();
     } else if (tabName === 'student_summary') {
-        populateControls(); // Refresh dropdown
+        populateControls();
         renderStudentSummary();
-    } else if (tabName === 'class_officers') {
-        renderClassOfficers();
     }
 }
 
@@ -1537,7 +1734,9 @@ function saveData() {
     const customSubjects = state.subjects.filter(s => s.name.startsWith('特・'));
     localStorage.setItem('grade_manager_scores', JSON.stringify(state.scores));
     localStorage.setItem('grade_manager_custom_subjects', JSON.stringify(customSubjects));
+    invalidateCandidateCache();
     localStorage.setItem('grade_manager_students', JSON.stringify(state.students));
+    saveSessionState();
     alert('データが保存されました (Data Saved)');
 }
 
@@ -3336,41 +3535,43 @@ const getTargetSubjects = (predicate) => {
 };
 
 /**
+ * Returns strictly the students registered in the application's core settings.
+ */
+function getRegisteredStudents() {
+    return state.students || [];
+}
+
+/**
  * Standardized way to get the list of students for a specific year and course.
  */
 // Helper to safely get metadata even if name is slightly different or encrypted
 function getStudentMetadataSafe(rawName) {
     if (!rawName) return null;
+    ensureCandidateCache();
 
-    // Normalization helper (lowercase, trim, half-width, remove leading numbers)
-    const norm = (s) => (s || "").toString().trim()
-        .toLowerCase()
-        .replace(/\s+/g, '')
-        .replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
-        .replace(/^\d+[\.\-\s]/, '') // Remove "1. " or "1-"
-        .replace(/[\(\)（）]/g, '');
-
-    const targetNorm = norm(rawName);
-
-    // 1. Direct match (Preferred)
-    if (state.studentMetadata[rawName]) return state.studentMetadata[rawName];
-
-    // 2. Normalized mapping
-    const keys = Object.keys(state.studentMetadata);
-    for (const k of keys) {
-        if (norm(k) === targetNorm) return state.studentMetadata[k];
+    // 1. Direct match (O(1))
+    if (candidateLookupCache.metadataMap.has(rawName)) {
+        return candidateLookupCache.metadataMap.get(rawName);
     }
 
-    // 3. Display Name / Alias resolution
+    // 2. Normalized match (O(1))
+    const targetNorm = normalizeStudentName(rawName);
+    if (candidateLookupCache.normMetadataMap.has(targetNorm)) {
+        return candidateLookupCache.normMetadataMap.get(targetNorm);
+    }
+
+    // 3. Deep search for alias/encrypted name (Fallback - slightly slower but rare)
+    // This is only needed if the metadata key doesn't match the name AND normalized name
+    const keys = Array.from(candidateLookupCache.metadataMap.keys());
     for (const k of keys) {
-        const meta = state.studentMetadata[k] || {};
+        const meta = candidateLookupCache.metadataMap.get(k);
         const aliases = [
             getDisplayName(k),
             meta['暗号化氏名1'], meta['暗号化氏名'], meta['EncryptedName'],
             meta['氏名'], meta['名前'], meta['Name'],
             meta['学籍番号'], meta['id'], meta['studentId']
         ];
-        if (aliases.some(a => a && norm(a) === targetNorm)) return state.studentMetadata[k];
+        if (aliases.some(a => a && normalizeStudentName(a) === targetNorm)) return meta;
     }
 
     return null;
@@ -3398,10 +3599,14 @@ function getMetaValue(meta, possibleKeys) {
 /**
  * Standardized way to get the list of students for a specific year and course.
  */
-function getClassStudents(year, course) {
+function getClassStudents(year, course, sourceList = null) {
     const currentName = state.currentStudent;
+    const targetYear = parseInt(year);
 
-    const result = state.students.filter(s => {
+    // Use provided list or union of all registered students
+    const studentList = sourceList || getRegisteredStudents();
+
+    const result = studentList.filter(s => {
         let stYear = 1;
         let stCourse = "";
 
@@ -3414,33 +3619,34 @@ function getClassStudents(year, course) {
         } else {
             // Fallback for current student
             if (s === currentName || s.trim() === currentName) {
-                stYear = state.currentYear;
+                stYear = parseInt(state.currentYear);
                 stCourse = state.currentCourse;
             } else {
-                // If it's a peer but no metadata, assume same year if it fits a numbering pattern or just default to target year?
-                // To avoid '1/1' ranking, we should be MORE inclusive.
-                // If year is the target year, and someone exists in the student list, they are likely a peer.
                 const yearMatch = s.match(/(\d)年/);
                 if (yearMatch) stYear = parseInt(yearMatch[1]);
-                else stYear = year; // Leniency: Assume same year as target if metadata is missing.
+                else stYear = targetYear;
             }
         }
 
-        if (stYear !== year) return false;
+        if (stYear !== targetYear) return false;
 
         // Course Filter:
         if (!course || course === "" || course === "全体 (All Courses)") return true;
-        if (stCourse === "" || stCourse === course || course.includes(stCourse) || stCourse.includes(course)) return true;
+
+        // Robust match (includes, same, etc.)
+        const normC = (course || "").trim();
+        const normStC = (stCourse || "").trim();
+        if (normStC === "" || normStC === normC || normC.includes(normStC) || normStC.includes(normC)) return true;
 
         return false;
     });
 
-    // Ensure identity resolution for includes check
+    // Ensure the CURRENT student is always reachable if they match the year
     if (currentName && !result.some(s => s === currentName || getStudentMetadataSafe(s) === getStudentMetadataSafe(currentName))) {
         const m = getStudentMetadataSafe(currentName);
         const yStr = m ? getMetaValue(m, ['年', '学年', 'year', 'Grade', '年次']) : "";
-        const curY = parseInt(yStr) || state.currentYear;
-        if (curY === year) result.push(currentName);
+        const curY = parseInt(yStr) || parseInt(state.currentYear);
+        if (curY === targetYear) result.push(currentName);
     }
 
     return result;
@@ -4240,7 +4446,8 @@ function validateInput(input, value, subjectName) {
  */
 function syncSpecialActivitiesForAll() {
     const years = [1, 2, 3, 4, 5];
-    state.students.forEach(student => {
+    const allStudents = getRegisteredStudents();
+    allStudents.forEach(student => {
         const studentScores = state.scores[student];
         if (!studentScores) return;
 
@@ -4703,14 +4910,15 @@ function renderBoxPlot() {
             const years = [5, 4, 3, 2, 1];
             const tests = [...SCORE_KEYS].reverse(); // 学年末 -> 前期中間
 
-            // Find the latest test that has ANY data
+            // Find the latest test that has ANY data among ACTIVE students
+            const activeStudents = getRegisteredStudents();
             yearLoop: for (const y of years) {
                 const subs = state.subjects.filter(s => s.year === y && !s.name.startsWith('特・'));
                 if (subs.length === 0) continue;
 
                 for (const t of tests) {
                     let hasData = false;
-                    for (const s of state.students) {
+                    for (const s of activeStudents) {
                         for (const sub of subs) {
                             const sc = getScore(s, sub.name, t);
                             if (typeof sc === 'number') {
@@ -4769,10 +4977,12 @@ function renderBoxPlot() {
 
         const subjectLabels = subjects.map(s => s.name);
 
+        const targetStudents = getClassStudents(latestYear, state.currentCourse);
+
         // Data: Array of arrays.
         const boxData = subjects.map(sub => {
             const scores = [];
-            state.students.forEach(s => {
+            targetStudents.forEach(s => {
                 const sc = getScore(s, sub.name, latestTest);
                 if (typeof sc === 'number') scores.push(sc);
             });
@@ -5000,8 +5210,18 @@ function renderTrendChart() {
                 const myAvg = myTotal / count;
 
                 // Calculate Rank among valid students
+                // Determine cohort: Use current student's enrollment year to find classmates
+                let cohortYear = parseInt(state.currentYear);
+                const m = getStudentMetadataSafe(state.currentStudent);
+                if (m) {
+                    const yStr = getMetaValue(m, ['年', '学年', 'year', 'Grade', '年次']);
+                    if (yStr) cohortYear = parseInt(yStr);
+                }
+
+                const studentsToRank = getClassStudents(cohortYear, courseFilter);
+
                 // 1. Get avg for all students
-                const allAvgs = state.students.map(s => {
+                const allAvgs = studentsToRank.map(s => {
                     let t = 0, c = 0;
                     subs.forEach(sub => {
                         const v = getScore(s, sub.name, test);
@@ -5011,7 +5231,7 @@ function renderTrendChart() {
                 }); // list of avgs or null
 
                 // Pair with name
-                const ranked = state.students.map((name, i) => ({ name, avg: allAvgs[i] }))
+                const ranked = studentsToRank.map((name, i) => ({ name, avg: allAvgs[i] }))
                     .filter(x => x.avg !== null)
                     .sort((a, b) => b.avg - a.avg);
 
@@ -5503,7 +5723,8 @@ function renderAtRiskReport() {
         if (!reportArea) return;
 
         // Defensive check for state structure
-        if (!state.subjects || !state.students) {
+        const allStudents = getRegisteredStudents();
+        if (!state.subjects || allStudents.length === 0) {
             reportArea.innerHTML = '<div style="color:red; padding:1rem;">データが読み込まれていません。</div>';
             return;
         }
@@ -5515,7 +5736,10 @@ function renderAtRiskReport() {
         const absLimitTotal = parseInt(document.getElementById('atRiskAbsLimit')?.value || 10);
         const latLimitTotal = parseInt(document.getElementById('atRiskLatLimit')?.value || 15);
 
-        state.students.forEach(studentName => {
+        // Limit to students of current year/course for better precision
+        const classStudents = getClassStudents(year, state.currentCourse, allStudents);
+
+        classStudents.forEach(studentName => {
             try {
                 if (type === 'attendance_abs' || type === 'attendance_lat' || type === 'attendance_pattern') {
                     // --- NEW PRECISION ATTENDANCE MODE (3-WAY SPLIT) ---
@@ -6014,25 +6238,8 @@ function renderSeatingRoster() {
     const list = document.getElementById('seatingRosterList');
     if (!list) return;
 
-    // Reliability Fix: If students list is empty, try to reload from storage or defaults
-    if (!state.students || state.students.length === 0) {
-        const stored = localStorage.getItem('grade_manager_students');
-        if (stored) {
-            try {
-                const parsed = JSON.parse(stored);
-                if (Array.isArray(parsed) && parsed.length > 0) {
-                    state.students = parsed;
-                }
-            } catch (e) {
-                console.error('Json parse error in roster render', e);
-            }
-        }
-
-        // If still empty, load defaults (prevents empty sidebar)
-        if (!state.students || state.students.length === 0) {
-            state.students = DEFAULT_STUDENTS_RAW.replace(/\n/g, '').split(',').map(s => s.trim()).filter(s => s);
-        }
-    }
+    // Use filtered students for current class
+    const classStudents = getClassStudents(state.currentYear, state.currentCourse);
 
     list.innerHTML = '';
 
@@ -6044,7 +6251,7 @@ function renderSeatingRoster() {
     const assignedStudents = new Set(Object.values(state.seating.assignments));
 
     // Calculate seat statistics
-    const totalStudents = state.students.length;
+    const totalStudents = classStudents.length;
     const assignedCount = assignedStudents.size;
     const { cols, rows, disabled } = state.seating;
     const totalSeats = cols * rows;
@@ -6072,7 +6279,7 @@ function renderSeatingRoster() {
             </div>
         `;
         // Sort students by roster before rendering
-        const sortedRoster = sortStudentsByRoster(state.students);
+        const sortedRoster = sortStudentsByRoster(classStudents);
 
         sortedRoster.forEach(student => {
             const item = document.createElement('div');
@@ -7085,6 +7292,7 @@ function initRosterBoard() {
 // Logic called after CSV parsing
 function openRosterBoard(candidates) {
     importState.candidates = candidates;
+    invalidateCandidateCache(); // Critical for performance after new import
     importState.selected = new Set(); // Start with NONE selected to avoid accidental full import
     importState.filters = {};
     importState.searchText = '';
@@ -7601,6 +7809,7 @@ function confirmImportFromBoard() {
     // Let's replace metadata for THOSE students, but keep others if we were appending.
     // Since we are replacing state.students, we just use newMetadata.
     state.studentMetadata = newMetadata;
+    invalidateCandidateCache(); // Update cache after import
 
     if (!state.students.includes(state.currentStudent)) {
         state.currentStudent = state.students[0];
@@ -7791,26 +8000,40 @@ function getDisplayName(originalName) {
     if (!originalName) return '-';
     if (state.nameDisplayMode === 'name') return originalName;
 
-    // Try to find encrypted name in metadata
-    const meta = state.studentMetadata[originalName] || {};
-    const encrypted = meta['暗号化氏名1'] || meta['暗号化氏名'] || meta['EncryptedName'];
+    const meta = getStudentMetadataSafe(originalName) || {};
 
+    // 1. Check for explicit encrypted name if exists
+    const encrypted = getMetaValue(meta, ['暗号化氏名1', '暗号化氏名', 'EncryptedName', 'ニックネーム', 'Nickname']);
     if (encrypted) return encrypted;
 
-    // Fallback if no encrypted name: Attendance No.
-    const no = meta['出席番号'] || meta['no'];
-    if (no) return `No.${no}`;
+    // 2. Try to build identity from Metadata (Grade-Class Number)
+    const grade = getMetaValue(meta, ['年', '学年', 'year', 'Grade', '年次']);
+    const cls = getMetaValue(meta, ['組', 'クラス', 'class', 'Section', 'HR', '区分']);
+    const num = getMetaValue(meta, ['出席番号', 'no', 'Number', '番号']);
 
-    // Fallback if no encrypted name: Initial extraction (Simple)
-    if (/^[a-zA-Z\s]+$/.test(originalName)) {
-        const parts = originalName.trim().split(/\s+/);
-        if (parts.length >= 2) {
+    if (num) {
+        let label = "";
+        if (grade && cls) label = `${grade}-${cls} `;
+        else if (grade) label = `${grade}年 `;
+
+        return `${label}No.${num}`;
+    }
+
+    // 3. Fallback: Full-width or Half-width space detection for name-based initials
+    const trimmed = originalName.trim();
+    const parts = trimmed.split(/[\s　]+/);
+
+    if (parts.length >= 2) {
+        // e.g. "Tanaka Taro" -> "T.T." or "田中 太郎" -> "田 太"
+        if (/^[a-zA-Z]+$/.test(parts[0]) && /^[a-zA-Z]+$/.test(parts[1])) {
             return parts.map(p => p[0].toUpperCase()).join('.') + '.';
+        } else {
+            return parts.map(p => p[0]).join(' ');
         }
     }
 
-    // Kanji/Other: First character + ...
-    return originalName.substring(0, 1) + '...';
+    // 4. Ultimate Fallback: First character + ...
+    return trimmed.substring(0, 1) + '...';
 }
 
 /**
@@ -8143,6 +8366,337 @@ function initAttendance() {
     renderSubjectAttendanceChart();
     renderDayAttendanceChart();
     renderPeriodAttendanceChart();
+
+    // Sync class stats if it exists
+    initClassAttendanceStats();
+    renderClassAttendanceStats();
+}
+
+function initClassAttendanceStats() {
+    const targetInput = document.getElementById('classAttendanceTargetDate');
+    if (!targetInput) return;
+
+    // Default to today if not set
+    if (!targetInput.value) {
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        const d = String(now.getDate()).padStart(2, '0');
+        targetInput.value = `${y}-${m}-${d}`;
+    }
+}
+
+function jumpToTodayClassAttendanceGantt() {
+    const targetInput = document.getElementById('classAttendanceTargetDate');
+    if (!targetInput) return;
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    targetInput.value = `${y}-${m}-${d}`;
+    renderClassAttendanceStats();
+}
+
+function navigateClassAttendanceGantt(direction) {
+    const targetInput = document.getElementById('classAttendanceTargetDate');
+    const rangeSelect = document.getElementById('classAttendanceRangeSelect');
+    if (!targetInput || !rangeSelect) return;
+
+    const current = new Date(targetInput.value);
+    const range = parseInt(rangeSelect.value) || 30;
+
+    // Move by half the range amount (common in gantt nav)
+    current.setDate(current.getDate() + (direction * Math.ceil(range / 2)));
+
+    const y = current.getFullYear();
+    const m = String(current.getMonth() + 1).padStart(2, '0');
+    const d = String(current.getDate()).padStart(2, '0');
+    targetInput.value = `${y}-${m}-${d}`;
+    renderClassAttendanceStats();
+}
+
+function renderClassAttendanceStats() {
+    const gridWrapper = document.getElementById('classAttendanceGanttWrapper');
+    const header = document.getElementById('classAttendanceGanttHeader');
+    const body = document.getElementById('classAttendanceGanttBody');
+    const targetInput = document.getElementById('classAttendanceTargetDate');
+    const rangeSelect = document.getElementById('classAttendanceRangeSelect');
+    if (!header || !body || !targetInput || !rangeSelect) return;
+
+    if (!targetInput.value) {
+        targetInput.value = new Date().toISOString().split('T')[0];
+    }
+    const targetDateStr = targetInput.value;
+    const targetDate = new Date(targetDateStr);
+    if (isNaN(targetDate.getTime())) return;
+    targetDate.setHours(0, 0, 0, 0);
+    const range = parseInt(rangeSelect.value) || 30;
+
+    const startDate = new Date(targetDate);
+    startDate.setDate(startDate.getDate() - Math.floor(range / 2));
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Prepare Header
+    header.innerHTML = '';
+    const thName = document.createElement('th');
+    thName.textContent = '学生名 / 日付';
+    thName.style.position = 'sticky';
+    thName.style.left = '0';
+    thName.style.zIndex = '40';
+    thName.style.minWidth = '160px';
+    thName.style.width = '160px';
+    thName.style.background = '#f1f5f9';
+    thName.style.borderRight = '2px solid #cbd5e1';
+    thName.style.borderBottom = '2px solid #cbd5e1';
+    thName.style.boxShadow = '2px 0 4px rgba(0,0,0,0.05)';
+    header.appendChild(thName);
+
+    for (let i = 0; i < range; i++) {
+        const date = new Date(startDate);
+        date.setDate(date.getDate() + i);
+        const dayOfWeek = date.getDay();
+        const d = date.getDate();
+        const isToday = date.getTime() === today.getTime();
+
+        const th = document.createElement('th');
+        th.style.minWidth = '70px';
+        th.style.width = '70px';
+        th.style.padding = '0.75rem 0.25rem';
+        th.style.textAlign = 'center';
+        th.style.fontSize = '0.8rem';
+        th.style.fontWeight = 'bold';
+        th.style.background = isToday ? '#fffbeb' : (dayOfWeek === 0 || dayOfWeek === 6) ? '#f1f5f9' : '#f8fafc';
+        th.style.borderRight = '1px solid #e2e8f0';
+        th.style.borderBottom = isToday ? '3px solid #f59e0b' : '1px solid #cbd5e1';
+
+        if (isToday) th.style.boxShadow = 'inset 0 -2px 0 #f59e0b';
+
+        let monthLabel = '';
+        if (d === 1 || i === 0) {
+            monthLabel = `<div style="font-size: 0.6rem; color: #94a3b8; margin-bottom: 2px;">${date.getMonth() + 1}月</div>`;
+        }
+
+        th.innerHTML = `${monthLabel}<div>${d}</div><div style="font-size: 0.7rem; color: ${dayOfWeek === 0 ? '#ef4444' : dayOfWeek === 6 ? '#3b82f6' : '#64748b'};">${['日', '月', '火', '水', '木', '金', '土'][dayOfWeek]}</div>`;
+        header.appendChild(th);
+    }
+
+    // Prepare Body
+    body.innerHTML = '';
+    const students = getClassStudents(parseInt(state.currentYear), state.currentCourse);
+
+    if (students.length === 0) {
+        const row = document.createElement('tr');
+        const td = document.createElement('td');
+        td.setAttribute('colspan', range + 1);
+        td.style.padding = '3rem';
+        td.style.textAlign = 'center';
+        td.style.color = '#94a3b8';
+        td.innerHTML = `
+            <div style="font-size: 1.1rem; font-weight: bold; color: #475569; margin-bottom: 0.5rem;">表示対象の学生がいません</div>
+            <div style="font-size: 0.85rem;">学年（現在: ${state.currentYear}年）やコースのフィルター設定を確認してください。</div>
+        `;
+        row.appendChild(td);
+        body.appendChild(row);
+        return;
+    }
+
+    students.forEach((stu, sIdx) => {
+        const row = document.createElement('tr');
+        row.style.background = sIdx % 2 === 0 ? 'white' : '#f8fafc';
+
+        // Student Column (Sticky)
+        const tdName = document.createElement('td');
+        tdName.style.position = 'sticky';
+        tdName.style.left = '0';
+        tdName.style.zIndex = '20';
+        tdName.style.background = sIdx % 2 === 0 ? 'white' : '#f8fafc';
+        tdName.style.fontWeight = '600';
+        tdName.style.fontSize = '0.9rem';
+        tdName.style.padding = '0.75rem 1rem';
+        tdName.style.borderRight = '2px solid #cbd5e1';
+        tdName.style.borderBottom = '1px solid #e2e8f0';
+        tdName.style.boxShadow = '2px 0 4px rgba(0,0,0,0.02)';
+
+        const displayName = getDisplayName(stu);
+        const nameInner = document.createElement('div');
+        nameInner.style.display = 'flex';
+        nameInner.style.alignItems = 'center';
+        nameInner.style.gap = '0.5rem';
+        nameInner.innerHTML = `<span style="color: #94a3b8; font-size: 0.7rem; font-weight: normal;">${sIdx + 1}</span> ${displayName}`;
+        tdName.appendChild(nameInner);
+        row.appendChild(tdName);
+
+        // Day Columns
+        for (let i = 0; i < range; i++) {
+            const date = new Date(startDate);
+            date.setDate(date.getDate() + i);
+            const dayOfWeek = date.getDay();
+            const dateStr = date.getFullYear() + '/' + (date.getMonth() + 1).toString().padStart(2, '0') + '/' + date.getDate().toString().padStart(2, '0');
+            const nDate = normalizeDateStr(dateStr);
+            const isToday = date.getTime() === today.getTime();
+
+            const td = document.createElement('td');
+            td.classList.add('gantt-day-cell');
+            td.dataset.date = nDate;
+            td.dataset.student = stu;
+            td.style.padding = '4px 0';
+            td.style.borderRight = '1px solid #f1f5f9';
+            td.style.borderBottom = '1px solid #f1f5f9';
+            td.style.verticalAlign = 'top';
+            td.style.minHeight = '42px';
+            td.style.cursor = 'pointer';
+            td.style.transition = 'background 0.1s';
+
+            td.onmousedown = (e) => {
+                if (e.button !== 0) return;
+                isGanttDragging = true;
+                ganttDragStart = nDate;
+                ganttDragEnd = nDate;
+                ganttDragStudent = stu;
+                updateGanttDragVisuals();
+                e.preventDefault();
+            };
+
+            td.onmouseenter = () => {
+                if (isGanttDragging && ganttDragStudent === stu) {
+                    ganttDragEnd = nDate;
+                    updateGanttDragVisuals();
+                } else if (!isGanttDragging) {
+                    if (!isToday) td.style.background = '#f1f5f9';
+                }
+            };
+
+            td.onmouseout = () => {
+                if (isGanttDragging) return;
+                if (isToday) td.style.background = '#fffbef';
+                else if (dayOfWeek === 0 || dayOfWeek === 6) td.style.background = sIdx % 2 === 0 ? '#fcfcfc' : '#f5f7f9';
+                else td.style.background = '';
+            };
+
+            td.onclick = () => {
+                state.currentStudent = stu;
+                if (typeof populateControls === 'function') populateControls();
+                openAttendanceEventModal({
+                    start: nDate,
+                    end: nDate,
+                    category: '体調不良',
+                    note: '',
+                    dailyNotes: {}
+                });
+            };
+
+            if (isToday) {
+                td.style.background = '#fffbef';
+            } else if (dayOfWeek === 0 || dayOfWeek === 6) {
+                td.style.background = sIdx % 2 === 0 ? '#fcfcfc' : '#f5f7f9';
+            }
+
+            const container = document.createElement('div');
+            container.style.display = 'flex';
+            container.style.flexDirection = 'column';
+            container.style.gap = '2px';
+            container.style.minHeight = '36px';
+
+            const pevList = (state.attendance.periodEvents || []).filter(pev =>
+                pev.student === stu && nDate >= normalizeDateStr(pev.start) && nDate <= normalizeDateStr(pev.end)
+            );
+
+            pevList.forEach(pev => {
+                const bar = document.createElement('div');
+                bar.className = 'period-event-bar';
+                bar.style.height = '14px';
+                bar.style.lineHeight = '14px';
+                bar.style.fontSize = '0.65rem';
+                bar.style.color = 'white';
+                bar.style.background = pev.color || '#3b82f6';
+                bar.style.marginTop = '2px';
+                bar.style.marginBottom = '2px';
+                bar.style.overflow = 'hidden';
+                bar.style.whiteSpace = 'nowrap';
+                bar.style.borderRadius = '2px';
+
+                bar.onclick = (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    // Disable left click edit
+                };
+
+                bar.oncontextmenu = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    state.currentStudent = stu;
+                    if (typeof populateControls === 'function') populateControls();
+                    openAttendanceEventModal(pev);
+                    return false;
+                };
+
+                addLongPressTrigger(bar); // Support mobile long-press
+
+                const nStart = normalizeDateStr(pev.start);
+                const nEnd = normalizeDateStr(pev.end);
+
+                if (nDate === nStart || i === 0) {
+                    bar.textContent = pev.text;
+                    bar.style.paddingLeft = '4px';
+                }
+
+                if (nDate === nStart) {
+                    bar.style.borderTopLeftRadius = '4px';
+                    bar.style.borderBottomLeftRadius = '4px';
+                    bar.style.marginLeft = '4px';
+                }
+                if (nDate === nEnd) {
+                    bar.style.borderTopRightRadius = '4px';
+                    bar.style.borderBottomRightRadius = '4px';
+                    bar.style.marginRight = '4px';
+                }
+
+                bar.title = `${pev.text}${pev.note ? ': ' + pev.note : ''}`;
+                container.appendChild(bar);
+            });
+
+            // Show Absences/Lates (1-8限)
+            const bArea = document.createElement('div');
+            bArea.style.padding = '0 4px';
+            bArea.style.display = 'flex';
+            bArea.style.flexDirection = 'column';
+            bArea.style.gap = '1px';
+
+            const stuRecords = (state.attendance.records[stu] || {})[nDate] || [];
+            stuRecords.forEach(rec => {
+                if (rec.status === "欠" || rec.status === "遅") {
+                    const badge = document.createElement('div');
+                    badge.style.fontSize = '0.62rem';
+                    badge.style.padding = '1px 2px';
+                    badge.style.borderRadius = '2px';
+                    badge.style.textAlign = 'center';
+                    badge.style.whiteSpace = 'nowrap';
+                    badge.style.overflow = 'hidden';
+                    badge.style.fontWeight = 'bold';
+
+                    if (rec.status === "欠") {
+                        badge.style.background = '#fef2f2';
+                        badge.style.color = '#ef4444';
+                        badge.style.border = '1px solid #fecaca';
+                        badge.textContent = `${rec.p}欠`;
+                    } else {
+                        badge.style.background = '#fffbeb';
+                        badge.style.color = '#f59e0b';
+                        badge.style.border = '1px solid #fef3c7';
+                        badge.textContent = `${rec.p}遅`;
+                    }
+                    bArea.appendChild(badge);
+                }
+            });
+
+            container.appendChild(bArea);
+            td.appendChild(container);
+            row.appendChild(td);
+        }
+        body.appendChild(row);
+    });
 }
 
 function populateAttendanceSubjectFilter() {
@@ -8233,16 +8787,16 @@ function handleAttendanceFileUpload(e) {
                     const dp = headerRow[i].trim();
                     if (!dp) continue;
                     const parts = dp.split(/\s+/);
-                    const dateStr = parts[0];
+                    const normalizedDate = normalizeDateStr(parts[0]);
                     const period = (parts.length > 1) ? parseInt(parseFloat(parts[1])) : 0;
                     const subject = (subjectRow[i] || "").trim();
                     const teacher = (teacherRow[i] || "").trim();
                     const status = (row[i] || "").trim();
 
-                    if (!dateRegex.test(dateStr)) continue;
+                    if (!dateRegex.test(normalizedDate)) continue;
 
-                    if (!records[studentName][dateStr]) records[studentName][dateStr] = [];
-                    records[studentName][dateStr].push({
+                    if (!records[studentName][normalizedDate]) records[studentName][normalizedDate] = [];
+                    records[studentName][normalizedDate].push({
                         p: period,
                         subj: subject,
                         status: status,
@@ -8250,7 +8804,7 @@ function handleAttendanceFileUpload(e) {
                     });
 
                     // Track date range
-                    const d = new Date(dateStr);
+                    const d = new Date(normalizedDate);
                     if (!isNaN(d)) {
                         if (!globalMinDate || d < globalMinDate) globalMinDate = d;
                         if (!globalMaxDate || d > globalMaxDate) globalMaxDate = d;
@@ -8305,6 +8859,14 @@ function renderAttendanceCalendar() {
     if (!grid) return;
     grid.innerHTML = '';
 
+    // Cleanup drag state on new render
+    grid.onmouseleave = () => {
+        if (!isAttendanceDragging) {
+            attendanceDragStart = null;
+            attendanceDragEnd = null;
+        }
+    };
+
     const studentName = state.currentStudent;
     if (!studentName || !state.attendance.records[studentName]) {
         grid.innerHTML = '<div style="grid-column: span 7; padding: 3rem; text-align: center; color: #94a3b8; background: white;">学生を選択するか、データを読み込んでください。</div>';
@@ -8339,13 +8901,17 @@ function renderAttendanceCalendar() {
     }
 
     const records = state.attendance.records[studentName] || {};
+    const periodEvents = (state.attendance.periodEvents || []).filter(ev => ev.student === studentName);
 
     for (let d = 1; d <= lastDay.getDate(); d++) {
         const dateStr = `${year}/${monthNum.toString().padStart(2, '0')}/${d.toString().padStart(2, '0')}`;
         const dayEvents = records[dateStr] || [];
         const dayOfWeek = new Date(year, monthNum - 1, d).getDay(); // 0:Sun
+        const currentDate = new Date(year, monthNum - 1, d);
 
         const cell = document.createElement('div');
+        cell.className = 'calendar-day-cell';
+        cell.dataset.date = dateStr;
         cell.style.background = 'white';
         if (dayOfWeek === 6) cell.style.background = '#eff6ff'; // Sat
         if (dayOfWeek === 0) cell.style.background = '#fef2f2'; // Sun
@@ -8356,22 +8922,123 @@ function renderAttendanceCalendar() {
         cell.style.flexDirection = 'column';
         cell.style.gap = '2px';
         cell.style.cursor = 'pointer';
+        cell.style.position = 'relative';
+
+        // Drag events
+        cell.onmousedown = (e) => {
+            if (e.target.closest('.period-event-bar')) return; // Don't drag if clicking event bar
+            if (e.button !== 0) return; // Only left click
+            isAttendanceDragging = true;
+            attendanceDragStart = dateStr;
+            attendanceDragEnd = dateStr;
+            updateAttendanceDragVisuals();
+            e.preventDefault();
+        };
+        cell.onmouseenter = () => {
+            if (isAttendanceDragging) {
+                attendanceDragEnd = dateStr;
+                updateAttendanceDragVisuals();
+            }
+        };
 
         // Date Header
         const header = document.createElement('div');
         header.style.fontSize = '0.75rem';
         header.style.fontWeight = 'bold';
         header.style.marginBottom = '2px';
-        header.textContent = d;
-        if (dayOfWeek === 6) header.style.color = '#3b82f6';
-        if (dayOfWeek === 0) header.style.color = '#ef4444';
+        header.style.display = 'flex';
+        header.style.justifyContent = 'space-between';
+        header.style.alignItems = 'center';
+
+        const dateLabel = document.createElement('span');
+        dateLabel.textContent = d;
+        if (dayOfWeek === 6) dateLabel.style.color = '#3b82f6';
+        if (dayOfWeek === 0) dateLabel.style.color = '#ef4444';
+        header.appendChild(dateLabel);
 
         // Memo Star
         const memoKey = `${studentName}_${dateStr}`;
         if (state.attendance.memos[memoKey]) {
-            header.innerHTML += ` <span style="color:${state.attendance.memos[memoKey].color || 'blue'}">★</span>`;
+            const star = document.createElement('span');
+            star.style.color = state.attendance.memos[memoKey].color || 'blue';
+            star.textContent = '★';
+            star.title = state.attendance.memos[memoKey].text;
+            header.appendChild(star);
         }
         cell.appendChild(header);
+
+        // Render Period Events
+        periodEvents.forEach((pev, pidx) => {
+            const startStr = pev.start;
+            const endStr = pev.end;
+
+            // Normalize for comparison
+            const realStart = startStr < endStr ? startStr : endStr;
+            const realEnd = startStr < endStr ? endStr : startStr;
+
+            if (dateStr >= realStart && dateStr <= realEnd) {
+                const bar = document.createElement('div');
+                bar.className = 'period-event-bar';
+                bar.style.height = '14px';
+                bar.style.background = pev.color || '#3b82f6';
+                bar.style.color = 'white';
+                bar.style.fontSize = '0.65rem';
+                bar.style.padding = '0 4px';
+                bar.style.borderRadius = '2px';
+                bar.style.marginBottom = '2px';
+                bar.style.display = 'flex';
+                bar.style.alignItems = 'center';
+                bar.style.position = 'relative';
+                bar.style.zIndex = '1';
+                bar.style.overflow = 'hidden';
+                bar.style.textOverflow = 'ellipsis';
+                bar.style.whiteSpace = 'nowrap';
+
+                // Show text only on first day or if space allows
+                if (dateStr === realStart) {
+                    bar.textContent = pev.text;
+                    bar.style.borderTopLeftRadius = '4px';
+                    bar.style.borderBottomLeftRadius = '4px';
+                }
+
+                if (dateStr === realEnd) {
+                    bar.style.borderTopRightRadius = '4px';
+                    bar.style.borderBottomRightRadius = '4px';
+                    // Arrow character or shape
+                    const arrow = document.createElement('span');
+                    arrow.innerHTML = '&nbsp;&#9654;'; // Triangle right
+                    arrow.style.marginLeft = 'auto';
+                    bar.appendChild(arrow);
+                }
+
+                addLongPressTrigger(bar); // Enable mobile long-press support
+
+                bar.style.userSelect = 'none'; // Improve long-press on mobile
+                bar.style.webkitUserSelect = 'none';
+
+                // Explicitly disable left click bubbling and default
+                bar.onclick = (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                };
+
+                // Use right click (or long press) for edit
+                // Use addEventListener for better reliability
+                bar.addEventListener('contextmenu', (e) => {
+                    e.preventDefault(); // 確実にデフォルトメニューを抑制
+                    e.stopPropagation();
+                    openAttendanceEventModal(pev);
+                    return false;
+                });
+
+                // Note: We do NOT stop mousedown propagation here because
+                // the parent cell's mousedown handler has a check:
+                // if (e.target.closest('.period-event-bar')) return;
+                // Stopping it might interfere with browser context-menu generation logic in some envs.
+                if (pev.note) bar.title = pev.note;
+                cell.appendChild(bar);
+            }
+        });
 
         // Sort events by period
         dayEvents.sort((a, b) => a.p - b.p);
@@ -8380,6 +9047,7 @@ function renderAttendanceCalendar() {
             if (ev.status === "-") return; // Skip if no record (-)
 
             const item = document.createElement('div');
+            item.className = 'att-record-item';
             item.style.fontSize = '0.7rem';
             item.style.lineHeight = '1.1';
             item.style.whiteSpace = 'nowrap';
@@ -8387,10 +9055,17 @@ function renderAttendanceCalendar() {
             item.style.textOverflow = 'ellipsis';
 
             let color = '#475569';
-            if (ev.status === "欠") color = '#ef4444';
-            else if (ev.status === "遅") color = '#f59e0b';
-            else if (ev.status === "早") color = '#10b981';
-            else if (ev.status === "休講") color = '#94a3b8';
+            if (ev.status === "欠") {
+                color = '#ef4444';
+                item.classList.add('status-bad');
+            } else if (ev.status === "遅") {
+                color = '#f59e0b';
+                item.classList.add('status-bad');
+            } else if (ev.status === "早") {
+                color = '#10b981';
+            } else if (ev.status === "休講") {
+                color = '#94a3b8';
+            }
 
             item.style.color = color;
             const statusDisp = ev.status ? `(${ev.status})` : '';
@@ -8398,8 +9073,282 @@ function renderAttendanceCalendar() {
             cell.appendChild(item);
         });
 
-        cell.onclick = () => openAttendanceMemoDialog(studentName, dateStr);
+        cell.onclick = (e) => {
+            if (isAttendanceDragging) return;
+            openAttendanceMemoDialog(studentName, dateStr);
+        };
         grid.appendChild(cell);
+    }
+
+    // Global mouseup consolidated in setupEventListeners
+}
+
+function openAttendanceEventModal(pev = null) {
+    // Every clicked event should be editable/deletable if it's already in the records
+    const isEdit = pev && (pev.id || state.attendance.periodEvents.includes(pev));
+    const modal = document.getElementById('attendanceEventModal');
+
+    // Fill basic fields
+    document.getElementById('attEventModalTitle').textContent = isEdit ? 'イベントの編集' : 'イベントの追加';
+    document.getElementById('attEventId').value = isEdit ? (pev.id || 'temp-' + Date.now()) : '';
+
+    // Show student name (respecting display mode)
+    const nameEl = document.getElementById('attEventStudentNameValue');
+    if (nameEl) {
+        nameEl.textContent = getDisplayName(state.currentStudent);
+    }
+
+    // Convert YYYY/MM/DD to YYYY-MM-DD for input[type=date]
+    document.getElementById('attEventStartDate').value = pev.start.replace(/\//g, '-');
+    document.getElementById('attEventEndDate').value = pev.end.replace(/\//g, '-');
+    document.getElementById('attEventDeleteBtn').style.display = isEdit ? 'flex' : 'none';
+
+    // Internal state for daily notes from original pev
+    window.currentAttEventDailyNotes = pev.dailyNotes || {};
+
+    updateAttEventModalDates(false); // Update count and notes container
+
+    // Category and Notes
+    const category = pev.category || '体調不良';
+    document.getElementById('attEventCategory').value = category;
+    document.getElementById('attEventNote').value = pev.note || '';
+
+    // Custom Label Logic
+    const customArea = document.getElementById('attEventCustomLabelArea');
+    if (category === 'その他') {
+        customArea.style.display = 'block';
+        document.getElementById('attEventCustomLabel').value = pev.text || '';
+    } else {
+        customArea.style.display = 'none';
+        document.getElementById('attEventCustomLabel').value = '';
+    }
+
+    modal.classList.add('open');
+}
+
+function updateAttEventModalDates(preserveInputs = true) {
+    const startStr = document.getElementById('attEventStartDate').value;
+    const endStr = document.getElementById('attEventEndDate').value;
+    if (!startStr || !endStr) return;
+
+    // Preserve already typed notes in current session
+    if (preserveInputs) {
+        document.querySelectorAll('.daily-note-input').forEach(input => {
+            if (!window.currentAttEventDailyNotes) window.currentAttEventDailyNotes = {};
+            window.currentAttEventDailyNotes[input.dataset.date] = input.value.trim();
+        });
+    }
+
+    const sDate = new Date(startStr);
+    const eDate = new Date(endStr);
+    const dMin = sDate < eDate ? sDate : eDate;
+    const dMax = sDate < eDate ? eDate : sDate;
+
+    // Calculate days
+    const diffTime = Math.abs(dMax - dMin);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    document.getElementById('attEventDaysCount').textContent = `${diffDays} 日`;
+
+    // Regenerate daily notes
+    const container = document.getElementById('attEventDailyNotesContainer');
+    container.innerHTML = '';
+
+    let current = new Date(dMin);
+    const dailyData = window.currentAttEventDailyNotes || {};
+
+    for (let i = 0; i < diffDays; i++) {
+        const dStr = current.getFullYear() + '/' + (current.getMonth() + 1).toString().padStart(2, '0') + '/' + current.getDate().toString().padStart(2, '0');
+        const noteVal = dailyData[dStr] || '';
+
+        const row = document.createElement('div');
+        row.style.display = 'grid';
+        row.style.gridTemplateColumns = '100px 1fr';
+        row.style.gap = '0.5rem';
+        row.style.alignItems = 'center';
+
+        const label = document.createElement('div');
+        label.style.fontSize = '0.85rem';
+        label.style.color = '#475569';
+        label.textContent = dStr.split('/').slice(1).join('/') + ' (' + ['日', '月', '火', '水', '木', '金', '土'][current.getDay()] + ')';
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'input-field daily-note-input';
+        input.dataset.date = dStr;
+        input.value = noteVal;
+        input.placeholder = 'メモ...';
+        input.style.padding = '0.4rem';
+
+        row.appendChild(label);
+        row.appendChild(input);
+        container.appendChild(row);
+
+        current.setDate(current.getDate() + 1);
+    }
+}
+
+function updateAttEventColorHint() {
+    const select = document.getElementById('attEventCategory');
+    const customArea = document.getElementById('attEventCustomLabelArea');
+    const preview = document.getElementById('attEventColorPreview');
+
+    // Update color preview circle
+    const color = select.options[select.selectedIndex].dataset.color;
+    if (preview && color) {
+        preview.style.background = color;
+    }
+
+    if (select.value === 'その他') {
+        customArea.style.display = 'block';
+    } else {
+        customArea.style.display = 'none';
+    }
+}
+
+function saveAttendancePeriodEvent() {
+    const studentName = state.currentStudent;
+    if (!studentName) return;
+
+    const id = document.getElementById('attEventId').value;
+    const startInput = document.getElementById('attEventStartDate').value;
+    const endInput = document.getElementById('attEventEndDate').value;
+    if (!startInput || !endInput) return;
+
+    // Normalize YYYY-MM-DD to YYYY/MM/DD
+    const start = startInput.replace(/-/g, '/');
+    const end = endInput.replace(/-/g, '/');
+    const actualStart = start < end ? start : end;
+    const actualEnd = start < end ? end : start;
+
+    const category = document.getElementById('attEventCategory').value;
+    const customLabel = document.getElementById('attEventCustomLabel').value.trim();
+    const note = document.getElementById('attEventNote').value.trim();
+
+    // Collect daily notes
+    const dailyNotes = {};
+    document.querySelectorAll('.daily-note-input').forEach(input => {
+        if (input.value.trim()) {
+            dailyNotes[input.dataset.date] = input.value.trim();
+        }
+    });
+
+    if (!start || !end) return;
+
+    const select = document.getElementById('attEventCategory');
+    const color = select.options[select.selectedIndex].dataset.color || '#3b82f6';
+
+    let text = category;
+    if (category === 'その他' && customLabel) {
+        text = customLabel;
+    }
+
+    if (!state.attendance.periodEvents) state.attendance.periodEvents = [];
+
+    const eventData = {
+        id: id || Date.now().toString(),
+        student: studentName,
+        start: actualStart,
+        end: actualEnd,
+        text: text,
+        category: category,
+        color: color,
+        note: note,
+        dailyNotes: dailyNotes
+    };
+
+    if (id) {
+        // Edit
+        // Find by ID or by object reference if ID was missing
+        let idx = state.attendance.periodEvents.findIndex(ev => ev.id === id);
+        if (idx === -1) {
+            // Fallback for old events without IDs
+            idx = state.attendance.periodEvents.findIndex(ev => ev.student === studentName && ev.start === eventData.start && ev.text === eventData.text);
+        }
+        if (idx !== -1) state.attendance.periodEvents[idx] = eventData;
+        else state.attendance.periodEvents.push(eventData);
+    } else {
+        // Add
+        state.attendance.periodEvents.push(eventData);
+    }
+
+    saveSessionState();
+    document.getElementById('attendanceEventModal').classList.remove('open');
+    renderAttendanceCalendar();
+    renderClassAttendanceStats();
+}
+
+function deleteAttendancePeriodEvent() {
+    const id = document.getElementById('attEventId').value;
+    const start = document.getElementById('attEventStartDate').value.replace(/-/g, '/');
+    const studentName = state.currentStudent;
+
+    if (confirm('この期間予定を完全に削除しますか？')) {
+        if (id) {
+            state.attendance.periodEvents = state.attendance.periodEvents.filter(ev => ev.id !== id);
+        } else {
+            // Fallback for old events without IDs
+            state.attendance.periodEvents = state.attendance.periodEvents.filter(ev =>
+                !(ev.student === studentName && ev.start === start)
+            );
+        }
+        saveSessionState();
+        document.getElementById('attendanceEventModal').classList.remove('open');
+        renderAttendanceCalendar();
+        renderClassAttendanceStats();
+    }
+}
+
+function updateAttendanceDragVisuals() {
+    const cells = document.querySelectorAll('.calendar-day-cell');
+    if (!attendanceDragStart || !attendanceDragEnd) {
+        cells.forEach(c => c.classList.remove('dragging-range'));
+        return;
+    }
+    const s = attendanceDragStart < attendanceDragEnd ? attendanceDragStart : attendanceDragEnd;
+    const e = attendanceDragStart < attendanceDragEnd ? attendanceDragEnd : attendanceDragStart;
+
+    cells.forEach(cell => {
+        const d = cell.dataset.date;
+        if (d >= s && d <= e) {
+            cell.classList.add('dragging-range');
+        } else {
+            cell.classList.remove('dragging-range');
+        }
+    });
+}
+
+function updateGanttDragVisuals() {
+    const cells = document.querySelectorAll('.gantt-day-cell');
+    if (!ganttDragStart || !ganttDragEnd || !ganttDragStudent) {
+        cells.forEach(c => c.classList.remove('dragging-range'));
+        return;
+    }
+    const s = ganttDragStart < ganttDragEnd ? ganttDragStart : ganttDragEnd;
+    const e = ganttDragStart < ganttDragEnd ? ganttDragEnd : ganttDragStart;
+
+    cells.forEach(cell => {
+        if (cell.dataset.student === ganttDragStudent) {
+            const d = cell.dataset.date;
+            if (d >= s && d <= e) {
+                cell.classList.add('dragging-range');
+            } else {
+                cell.classList.remove('dragging-range');
+            }
+        } else {
+            cell.classList.remove('dragging-range');
+        }
+    });
+}
+
+function toggleAttendanceBadOnlyMode() {
+    const isChecked = document.getElementById('attFilterBadOnly').checked;
+    const grid = document.getElementById('attendanceCalendarGrid');
+    if (grid) {
+        if (isChecked) {
+            grid.classList.add('filter-bad-only');
+        } else {
+            grid.classList.remove('filter-bad-only');
+        }
     }
 }
 
@@ -8937,7 +9886,7 @@ function generateClassAttendanceStats() {
     container.innerHTML = '<div style="padding: 2rem; text-align: center; color: #64748b;">集計中...</div>';
 
     setTimeout(() => {
-        const studentList = state.students;
+        const studentList = getClassStudents(state.currentYear, state.currentCourse);
         const attendanceData = state.attendance.records;
 
         if (studentList.length === 0) {
@@ -9681,8 +10630,9 @@ function renderClassOfficers() {
         });
     });
 
-    // Render Student List (Draggable) - Use Sorted Roster
-    const rosterStudents = sortStudentsByRoster(state.students);
+    // Render Student List (Draggable) - Use Sorted Roster matching current filters
+    const yearStudents = getClassStudents(year, state.currentCourse);
+    const rosterStudents = sortStudentsByRoster(yearStudents);
     rosterStudents.forEach(name => {
         const count = assignedCounts[name] || 0;
         const checkMark = '<span style="color: #10b981; font-weight: bold; margin-left: auto;">' + '✔'.repeat(count) + '</span>';
@@ -10100,27 +11050,31 @@ function importOfficerAssignmentsCsv(event) {
 
 // ==================== MOBILE LONG PRESS SUPPORT ====================
 function addLongPressTrigger(target) {
-    let timer;
+    let timer = null;
     const longPressDuration = 500; // 0.5s
 
     const start = (e) => {
-        // Only single touch
         if (e.touches && e.touches.length > 1) return;
+        if (timer) clearTimeout(timer); // Clear any existing
+
+        // Need to capture touch coordinates from the start event
+        const touch = e.touches[0];
+        const clientX = touch.clientX;
+        const clientY = touch.clientY;
 
         timer = setTimeout(() => {
-            if (e.touches && e.touches[0]) {
-                const touch = e.touches[0];
-                // Dispatch synthetic contextmenu event
-                const event = new MouseEvent('contextmenu', {
-                    bubbles: true,
-                    cancelable: true,
-                    view: window,
-                    clientX: touch.clientX,
-                    clientY: touch.clientY
-                });
-                // Find the correct target (target passed in, or the actual element touched)
-                target.dispatchEvent(event);
-            }
+            timer = null;
+            // Create and dispatch
+            const event = new MouseEvent('contextmenu', {
+                bubbles: true,
+                cancelable: true,
+                view: window,
+                clientX: clientX,
+                clientY: clientY,
+                button: 2,
+                buttons: 2
+            });
+            target.dispatchEvent(event);
         }, longPressDuration);
     };
 
@@ -10131,7 +11085,6 @@ function addLongPressTrigger(target) {
         }
     };
 
-    // Use passive: true to allow scrolling if user moves finger
     target.addEventListener('touchstart', start, { passive: true });
     target.addEventListener('touchmove', cancel, { passive: true });
     target.addEventListener('touchend', cancel, { passive: true });

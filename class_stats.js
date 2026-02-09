@@ -52,8 +52,10 @@ function updateClassStatsTestDefault() {
     const priorities = ["前期中間", "前期末", "後期中間", "学年末"];
     let maxFoundIdx = -1;
 
+    const targetStudents = getClassStudents(targetYear, state.currentCourse);
+
     outerLoop:
-    for (const s of state.students) {
+    for (const s of targetStudents) {
         const subjects = state.subjects.filter(sub => sub.year === targetYear && !sub.exclude);
         for (const sub of subjects) {
             for (let idx = 0; idx < priorities.length; idx++) {
@@ -187,7 +189,8 @@ function generateClassStats() {
         return result;
     };
 
-    currentClassStatsData = state.students.map(s => {
+    const targetStudents = getClassStudents(targetYear, state.currentCourse);
+    currentClassStatsData = targetStudents.map(s => {
         const s1 = calcStats1(s);
         let s2 = calcStats2(s);
         if (!s1.hasData) s2 = null;

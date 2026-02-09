@@ -1154,3 +1154,40 @@ th {
     font-size: 0.8rem;
     cursor: help;
 }
+
+.calendar-day-cell {
+    transition: background 0.1s, box-shadow 0.1s;
+}
+
+.calendar-day-cell.dragging-range,
+.gantt-day-cell.dragging-range {
+    box-shadow: inset 0 0 0 2px var(--primary) !important;
+    background-color: rgba(79, 70, 229, 0.1) !important;
+}
+
+.period-event-bar {
+    cursor: pointer;
+    transition: filter 0.2s;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+}
+
+.period-event-bar:hover {
+    filter: brightness(1.1);
+}
+
+/* Attendance Filtering */
+#attendanceCalendarGrid.filter-bad-only .att-record-item:not(.status-bad) {
+    display: none !important;
+}
+
+#attendanceCalendarGrid.filter-bad-only .calendar-day-cell:not(:has(.status-bad)):not(:has(.period-event-bar)) .date-header span:not(:first-child) {
+    opacity: 0.1;
+}
+
+@media print {
+    .period-event-bar {
+        border: none !important;
+        /* Ensure no border interference in print */
+    }
+}
