@@ -1493,16 +1493,8 @@ function setupEventListeners() {
         render();
     });
 
-    document.getElementById('gradCourseFilter')?.addEventListener('change', (e) => {
-        state.currentCourse = e.target.value;
-        // Sync other course selects if they exist
-        ['subjectCourseFilterHeader', 'subjectCourseFilter'].forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.value = state.currentCourse;
-        });
-        saveSessionState();
-        render();
-    });
+    render();
+
 
     document.getElementById('isSpecialSubject')?.addEventListener('change', (e) => {
         const isSpecial = e.target.checked;
@@ -1611,16 +1603,71 @@ function setupAttendanceListeners() {
     window.onmouseup = (event) => {
         if (isAttendanceDragging) {
             isAttendanceDragging = false;
-            // Do not open modal automatically.
-            // Keep drag start/end for context menu action.
-            // Visuals remain until cleared by new click.
         } else if (isGanttDragging) {
             isGanttDragging = false;
-            // Do not open modal automatically.
-            // Keep drag start/end for context menu action.
-            // Visuals remain until cleared by new click.
         }
     };
+
+    // Global Touch Handlers for Drag Selection (Smartphones)
+    let touchStartPos = null;
+    let touchMoveStartedForDrag = false;
+
+    window.addEventListener('touchstart', (e) => {
+        const touch = e.touches[0];
+        const target = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('.calendar-day-cell, .gantt-day-cell');
+        if (!target) return;
+
+        touchStartPos = { x: touch.clientX, y: touch.clientY };
+        touchMoveStartedForDrag = false;
+
+        if (target.classList.contains('calendar-day-cell')) {
+            attendanceDragStart = target.dataset.date;
+            attendanceDragEnd = target.dataset.date;
+        } else if (target.classList.contains('gantt-day-cell')) {
+            ganttDragStart = target.dataset.date;
+            ganttDragEnd = target.dataset.date;
+            ganttDragStudent = target.dataset.student;
+        }
+    }, { passive: true });
+
+    window.addEventListener('touchmove', (e) => {
+        if (!touchStartPos) return;
+        const touch = e.touches[0];
+        const dx = touch.clientX - touchStartPos.x;
+        const dy = touch.clientY - touchStartPos.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        // threshold to distinguish drag-to-select from scrolling
+        if (!touchMoveStartedForDrag && dist > 15) {
+            touchMoveStartedForDrag = true;
+            if (attendanceDragStart || ganttDragStart) {
+                if (attendanceDragStart) isAttendanceDragging = true;
+                if (ganttDragStart) isGanttDragging = true;
+            }
+        }
+
+        if (isAttendanceDragging || isGanttDragging) {
+            if (e.cancelable) e.preventDefault(); // Prevent scrolling while selecting
+            const target = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('.calendar-day-cell, .gantt-day-cell');
+            if (isAttendanceDragging && target?.classList.contains('calendar-day-cell')) {
+                attendanceDragEnd = target.dataset.date;
+                updateAttendanceDragVisuals();
+            } else if (isGanttDragging && target?.classList.contains('gantt-day-cell')) {
+                if (target.dataset.student === ganttDragStudent) {
+                    ganttDragEnd = target.dataset.date;
+                    updateGanttDragVisuals();
+                }
+            }
+        }
+    }, { passive: false });
+
+    window.addEventListener('touchend', (e) => {
+        if (isAttendanceDragging || isGanttDragging) {
+            isAttendanceDragging = false;
+            isGanttDragging = false;
+        }
+        touchStartPos = null;
+    });
 }
 
 function switchTab(tabName) {
@@ -1702,36 +1749,48 @@ function saveData() {
 
 
 function exportJson() {
-    // Prepare data for export
-    const customSubjects = state.subjects.filter(s => s.name.startsWith('特・'));
+    // Generate filename with current date and time
+    const now = new Date();
+    const ts = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
 
+    // Prepare full state backup
+    // We export a subset of state and important import states
     const exportData = {
-        version: '1.0',
-        exportDate: new Date().toISOString(),
-        scores: state.scores,
-        customSubjects: customSubjects
+        version: '2.0',
+        exportDate: now.toISOString(),
+        state: {
+            students: state.students,
+            subjects: state.subjects,
+            scores: state.scores,
+            studentMetadata: state.studentMetadata,
+            attendance: state.attendance,
+            seating: state.seating,
+            seatingPresets: state.seatingPresets,
+            officers: state.officers,
+            officerRoles: state.officerRoles,
+            currentYear: state.currentYear,
+            currentCourse: state.currentCourse,
+            currentClass: state.currentClass,
+            nameDisplayMode: state.nameDisplayMode
+        },
+        importState: {
+            candidates: importState.candidates
+        }
     };
 
-    // Convert to JSON string with pretty formatting
     const jsonString = JSON.stringify(exportData, null, 2);
-
-    // Create blob and download
     const blob = new Blob([jsonString], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-
-    // Generate filename with current date
-    const now = new Date();
-    const dateStr = now.toISOString().split('T')[0]; // YYYY-MM-DD
-    a.download = `grade_manager_data_${dateStr}.json`;
+    a.download = `grade_manager_full_backup_${ts}.json`;
 
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
-    alert('JSONファイルをダウンロードしました (JSON file downloaded)');
+    alert('【全データ・確定保存】\n現在の全システム情報をJSONファイルとして出力しました。\nこのファイルを読み込むことで、全ての状態を完全に復元できます。');
 }
 
 function handleJsonImport(e) {
@@ -1755,32 +1814,50 @@ function handleJsonImport(e) {
                 throw new Error('無効なJSON形式です。');
             }
 
-            if (!confirm('現在の成績データを上書きしますか？\n\n※この操作は元に戻せません。')) {
+            if (!confirm('現在のシステム内の全データを上書きしますか？\n\n※名簿、成績、出欠状況、座席配置など、すべての情報が読み込んだファイルの内容で置き換えられます。')) {
                 return;
             }
 
-            // data restore logic...
-            if (importData.scores) state.scores = importData.scores;
-            if (importData.students) state.students = importData.students;
-            if (importData.subjects) state.subjects = importData.subjects;
-            // Add other state properties as needed
+            // Version 2.0+ Full State Support
+            if (importData.version >= '2.0' && importData.state) {
+                const s = importData.state;
+                if (s.scores) state.scores = s.scores;
+                if (s.students) state.students = s.students;
+                if (s.subjects) state.subjects = s.subjects;
+                if (s.studentMetadata) state.studentMetadata = s.studentMetadata;
+                if (s.attendance) state.attendance = s.attendance;
+                if (s.seating) state.seating = s.seating;
+                if (s.seatingPresets) state.seatingPresets = s.seatingPresets || [];
+                if (s.officers) state.officers = s.officers;
+                if (s.officerRoles) state.officerRoles = s.officerRoles;
+                if (s.currentYear) state.currentYear = s.currentYear;
+                if (s.currentCourse) state.currentCourse = s.currentCourse;
+                if (s.currentClass) state.currentClass = s.currentClass;
+                if (s.nameDisplayMode) state.nameDisplayMode = s.nameDisplayMode;
 
-            // Specific handling for legacy simple score import if structure matches
-            // (The original code only checked for importData.scores)
+                if (importData.importState && importData.importState.candidates) {
+                    importState.candidates = importData.importState.candidates;
+                }
+            } else {
+                // Legacy / Partial Restore logic
+                if (importData.scores) state.scores = importData.scores;
+                if (importData.students) state.students = importData.students;
+                if (importData.subjects) state.subjects = importData.subjects;
 
-            if (importData.customSubjects && Array.isArray(importData.customSubjects)) {
-                const existingNames = new Set(state.subjects.map(s => s.name));
-                importData.customSubjects.forEach(sub => {
-                    if (!existingNames.has(sub.name)) {
-                        state.subjects.push(sub);
-                        existingNames.add(sub.name);
-                    }
-                });
+                if (importData.customSubjects && Array.isArray(importData.customSubjects)) {
+                    const existingNames = new Set(state.subjects.map(sub => sub.name));
+                    importData.customSubjects.forEach(sub => {
+                        if (!existingNames.has(sub.name)) {
+                            state.subjects.push(sub);
+                            existingNames.add(sub.name);
+                        }
+                    });
+                }
             }
 
             saveSessionState();
-            render();
-            alert('データを読み込みました！\n画面を更新して反映します。');
+            alert('全データを正常に読み込みました。アプリケーションを再起動して反映します。');
+            location.reload();
 
         } catch (err) {
             console.error('JSON import error:', err);
@@ -2674,28 +2751,34 @@ function saveFinalSettings() {
         return;
     }
 
-    if (confirm('すべての変更を確定保存して、アプリケーションを再読み込みしますか？')) {
-        // 1. Save students string for master
+    if (confirm('すべての変更情報を確定保存（Global Save）しますか？\n\n・名簿、科目定義、全成績、出欠情報、座席配置をブラウザに固定します。\n・念のためバックアップJSONファイルの出力もおすすめします。')) {
+
+        // 1. Perform a thorough session save
+        saveSessionState();
+
+        // 2. Update Master Data (used for resets)
+        // Students master
         const studentsRaw = state.students.join(',');
         localStorage.setItem('gm_master_students', studentsRaw);
 
-        // 2. Save subjects string for master
-        // Format: Name,Credits,Year,Type1,Type2,Type3,Type4,Exclude
+        // Subjects master (CSV format)
         const header = "授業科目,単位,学年,種別1,種別2,種別3,種別4,除外";
         const rows = state.subjects
             .map(s => `${s.name},${s.credits},${s.year},${s.type1 || ''},${s.type2 || ''},${s.type3 || ''},${s.type4 || ''},${s.exclude ? '1' : ''}`);
         const subjectsRaw = [header, ...rows].join('\n');
         localStorage.setItem('gm_master_subjects', subjectsRaw);
 
-        // 3. Mark as initialized
+        // 3. Mark as fully initialized
         localStorage.setItem('grade_manager_initialized', 'true');
 
-        // 4. Update the actual current session student list
-        localStorage.setItem('grade_manager_students', JSON.stringify(state.students));
-
-        // 5. Success and Reload
-        alert('設定を保存しました。再読み込みします。');
-        location.reload();
+        // 4. Offer JSON Backup
+        if (confirm('ブラウザへのデータ固定が完了しました。\n続けて、PCへのバックアップファイル（JSON）も出力しますか？（強く推奨）')) {
+            exportJson();
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            alert('設定を確定保存しました。再読み込みします。');
+            location.reload();
+        }
     }
 }
 
@@ -3149,12 +3232,7 @@ function renderGraduationRequirements() {
 
     const summaryContainer = document.getElementById('gradRequirementsSummary');
     const detailsBody = document.getElementById('gradRequirementsDetails');
-    const courseFilterSelect = document.getElementById('gradCourseFilter');
     if (!summaryContainer || !detailsBody) return;
-
-    if (courseFilterSelect) {
-        courseFilterSelect.value = state.currentCourse || '';
-    }
 
     summaryContainer.innerHTML = '';
     detailsBody.innerHTML = '';
