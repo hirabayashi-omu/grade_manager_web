@@ -11939,65 +11939,121 @@ function importOfficerAssignmentsCsv(event) {
         const lines = text.split(/\r?\n/);
         if (lines.length < 2) return;
 
-        const newOfficers = {}; // key: year, value: { roleId: [names] }
+        const csvData = {}; // year -> categoryName -> roleName -> [names]
 
         // Skip header
         for (let i = 1; i < lines.length; i++) {
             const line = lines[i].trim();
             if (!line) continue;
 
-            // Handle quoted CSV values
-            const parts = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
-            if (!parts || parts.length < 4) continue;
+            // Simple CSV split (handles quotes roughly)
+            const parts = line.split(',').map(s => s.trim().replace(/^"|"$/g, ''));
+            if (parts.length < 3) continue;
 
-            const year = parts[0].replace(/"/g, '');
-            const categoryName = parts[1].replace(/"/g, '');
-            const roleName = parts[2].replace(/"/g, '');
-            const studentName = parts[3].replace(/"/g, '');
+            const year = parts[0];
+            const categoryName = parts[1];
+            const roleName = parts[2];
+            const studentName = parts[3] || '';
 
-            // Find matching role ID in officerRoles for THIS year
-            let foundRoleId = null;
-            const yearRoles = state.officerRoles[year] || [];
-            yearRoles.forEach(cat => {
-                const role = cat.roles.find(r => r.name === roleName && cat.category === categoryName);
-                if (role) foundRoleId = role.id;
-            });
+            if (!csvData[year]) csvData[year] = {};
+            if (!csvData[year][categoryName]) csvData[year][categoryName] = {};
+            if (!csvData[year][categoryName][roleName]) csvData[year][categoryName][roleName] = [];
 
-            if (foundRoleId) {
-                if (!newOfficers[year]) newOfficers[year] = {};
-                if (!newOfficers[year][foundRoleId]) newOfficers[year][foundRoleId] = [];
-                if (!newOfficers[year][foundRoleId].includes(studentName)) {
-                    newOfficers[year][foundRoleId].push(studentName);
-                }
+            if (studentName && !csvData[year][categoryName][roleName].includes(studentName)) {
+                csvData[year][categoryName][roleName].push(studentName);
             }
         }
 
-        if (Object.keys(newOfficers).length === 0) {
+        if (Object.keys(csvData).length === 0) {
             alert('有効なデータが見つかりませんでした。');
             event.target.value = '';
             return;
         }
 
-        if (confirm('割当データを上書きしますか？\n（CSVに含まれる学年・役割の既存データのみが対象です）')) {
-            // Partial merge or full? Full within the year might be safer if we want to "load"
-            Object.keys(newOfficers).forEach(year => {
-                // Ensure year object exists in state
+        if (confirm('割当データを同期(インポート)しますか？\n（定義がない場合は新規追加し、名前が空の場合は定義自体を削除します）')) {
+            Object.keys(csvData).forEach(year => {
+                // Initialize state for the year if missing
+                if (!state.officerRoles) state.officerRoles = {};
+                if (!state.officerRoles[year]) {
+                    const existingYears = Object.keys(state.officerRoles).map(Number).sort((a, b) => b - a);
+                    const sourceYear = existingYears.find(y => y < year) || existingYears[0];
+                    if (sourceYear != null) {
+                        state.officerRoles[year] = JSON.parse(JSON.stringify(state.officerRoles[sourceYear]));
+                    } else {
+                        state.officerRoles[year] = JSON.parse(JSON.stringify(DEFAULT_OFFICER_ROLES));
+                    }
+                }
+                if (!state.officers) state.officers = {};
                 if (!state.officers[year]) state.officers[year] = {};
 
-                // Merge/Overwrite for specific roles found in CSV
-                Object.keys(newOfficers[year]).forEach(roleId => {
-                    state.officers[year][roleId] = newOfficers[year][roleId];
+                const yearRolesData = state.officerRoles[year];
+
+                Object.keys(csvData[year]).forEach(catName => {
+                    let cat = yearRolesData.find(c => c.category === catName);
+                    if (!cat) {
+                        // Create category if it contains roles with names
+                        const rolesWithNames = Object.keys(csvData[year][catName]).filter(r => csvData[year][catName][r].length > 0);
+                        if (rolesWithNames.length > 0) {
+                            cat = { category: catName, roles: [] };
+                            yearRolesData.push(cat);
+                        } else {
+                            return; // No users to add, ignore empty category
+                        }
+                    }
+
+                    Object.keys(csvData[year][catName]).forEach(roleName => {
+                        const students = csvData[year][catName][roleName];
+                        let roleIndex = cat.roles.findIndex(r => r.name === roleName);
+
+                        if (students.length === 0) {
+                            // If CSV names are empty, DELETE the definition
+                            if (roleIndex > -1) {
+                                const roleId = cat.roles[roleIndex].id;
+                                cat.roles.splice(roleIndex, 1);
+                                delete state.officers[year][roleId];
+                                console.log(`Deleted role definition: ${roleName} (${roleId}) in ${year}`);
+                            }
+                        } else {
+                            // If CSV has names, add definition if missing
+                            let roleId;
+                            if (roleIndex === -1) {
+                                roleId = `custom_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+                                cat.roles.push({
+                                    id: roleId,
+                                    name: roleName,
+                                    limit: 0,
+                                    desc: "(CSVインポート更新)"
+                                });
+                                console.log(`Created new role definition: ${roleName} in ${year}`);
+                            } else {
+                                roleId = cat.roles[roleIndex].id;
+                            }
+                            // Set assignments
+                            state.officers[year][roleId] = students;
+                        }
+                    });
+
+                    // Prune empty categories
+                    if (cat.roles.length === 0) {
+                        const catIdx = yearRolesData.indexOf(cat);
+                        if (catIdx > -1) {
+                            yearRolesData.splice(catIdx, 1);
+                            console.log(`Pruned empty category: ${catName} in ${year}`);
+                        }
+                    }
                 });
             });
+
             saveSessionState();
             renderClassOfficers();
-            alert('CSVの読み込みが完了しました。');
+            alert('同期が完了しました。');
         }
+        event.target.value = '';
     }).catch(err => {
         console.error('CSV import error:', err);
         alert('CSVファイルの読み込みに失敗しました:\n' + err.message);
     }).finally(() => {
-        event.target.value = ''; // Reset input
+        event.target.value = '';
     });
 }
 
