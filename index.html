@@ -14,6 +14,7 @@
     <script src="https://unpkg.com/@sgratzl/chartjs-chart-boxplot@4.2.4/build/index.umd.min.js"></script>
     <link rel="stylesheet" href="style.css?v=3">
     <link rel="stylesheet" href="print_styles.css" media="print">
+    <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
 </head>
 
 <body>
@@ -299,6 +300,15 @@
                         d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                 </svg>
                 教職員名簿
+            </div>
+            <!-- Annual Events Tab -->
+            <div class="nav-item" data-tab="annual_events" title="年間の行事予定を確認します">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                    stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                年間行事予定表
             </div>
             <div class="nav-item" data-tab="help" title="システムのセキュリティと使用上の注意を確認します">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
@@ -1446,6 +1456,65 @@
                 </div>
             </div>
 
+            <!-- Annual Events View -->
+            <div id="annual_events-content" class="tab-content hidden fade-in">
+                <div class="card" style="padding: 1.5rem; display: flex; flex-direction: column; gap: 1.5rem;">
+                    <div class="card-header" style="justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+                        <div>
+                            <h2 class="card-title">年間行事予定表 (Annual Event Calendar)</h2>
+                            <p style="font-size: 0.85rem; color: #64748b; margin-top: 0.25rem;">学校行事・試験予定をカレンダー形式で表示します。
+                            </p>
+                        </div>
+                        <div style="display: flex; gap: 0.75rem; align-items: center;" class="no-print">
+                            <div class="control-group" style="display: flex; gap: 0.25rem;">
+                                <button class="btn btn-secondary" onclick="navigateAnnualEventMonth(-1)"
+                                    style="padding: 0.3rem 0.6rem;" title="前月">◀</button>
+                                <button class="btn btn-primary" onclick="jumpToTodayAnnualEvent()"
+                                    style="padding: 0.3rem 0.8rem; font-size: 0.85rem;">今日 (Today)</button>
+                                <button class="btn btn-secondary" onclick="navigateAnnualEventMonth(1)"
+                                    style="padding: 0.3rem 0.6rem;" title="次月">▶</button>
+                            </div>
+                            <div class="control-group">
+                                <label>表示年度:</label>
+                                <select id="eventYearSelect" onchange="renderAnnualEvents()" style="min-width: 100px;">
+                                    <!-- Populated by JS -->
+                                </select>
+                            </div>
+                            <div class="control-group">
+                                <label>表示月:</label>
+                                <select id="eventMonthSelect" onchange="renderAnnualEvents()" style="min-width: 80px;">
+                                    <option value="4">4月</option>
+                                    <option value="5">5月</option>
+                                    <option value="6">6月</option>
+                                    <option value="7">7月</option>
+                                    <option value="8">8月</option>
+                                    <option value="9">9月</option>
+                                    <option value="10">10月</option>
+                                    <option value="11">11月</option>
+                                    <option value="12">12月</option>
+                                    <option value="1">1月</option>
+                                    <option value="2">2月</option>
+                                    <option value="3">3月</option>
+                                </select>
+                            </div>
+                            <button class="btn btn-secondary" onclick="exportAnnualEventsCsv()" title="CSVとして出力">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor" stroke-width="2" width="16" height="16">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l4-4m-4 4V4" />
+                                </svg>
+                                CSV出力
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="annualEventCalendar" class="calendar-grid-container"
+                        style="background: white; border: 1px solid #e2e8f0; border-radius: 0.5rem; overflow: hidden;">
+                        <!-- Calendar Rendered by JS -->
+                    </div>
+                </div>
+            </div>
+
             <!-- Settings View -->
             <div id="settings-content" class="tab-content hidden fade-in">
                 <!-- Data Management Header -->
@@ -1639,9 +1708,41 @@
                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                                         stroke="currentColor" stroke-width="2" width="18" height="18">
                                         <path stroke-linecap="round" stroke-linejoin="round"
-                                            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                                     </svg>
                                     <span>欠席情報を読み込む</span>
+                                </button>
+                            </div>
+
+                            <!-- Annual Event Calendar -->
+                            <div
+                                style="background: #fff; padding: 1.25rem; border-radius: 0.8rem; border: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                    <div
+                                        style="width: 32px; height: 32px; background: #fff7ed; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #ea580c;">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                            stroke="currentColor" stroke-width="2" width="18" height="18">
+                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                        </svg>
+                                    </div>
+                                    <h4 style="font-size: 1rem; font-weight: 600; color: #334155; margin: 0;">
+                                        年間行事予定表</h4>
+                                </div>
+                                <p style="font-size: 0.85rem; color: #64748b; margin: 0; line-height: 1.5;">
+                                    学校発行の「行事予定表」(XLSX)を読み込みます。年度を自動判定し、各月の予定をカレンダーに表示します。</p>
+                                <div id="annualEventFileSummary"
+                                    style="font-size: 0.8rem; padding: 0.6rem; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 0.4rem; color: #475569;">
+                                    <div style="color: #94a3b8; text-align: center;">データ未読込</div>
+                                </div>
+                                <button class="btn btn-primary" onclick="loadAnnualEventsFileDialog()"
+                                    style="margin-top: auto; justify-content: center; background: #f97316; height: 2.8rem; font-weight: 600;">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                        stroke="currentColor" stroke-width="2" width="18" height="18">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                    </svg>
+                                    <span>行事予定表を読み込む</span>
                                 </button>
                             </div>
                         </div>
@@ -2219,7 +2320,8 @@
                                 style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 0.8rem; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: flex-start; gap: 0.8rem;">
                                 <div style="color: #60a5fa; font-weight: bold;">✓</div>
                                 <div><strong>クラス委員・係 (Officers)</strong><br><span
-                                        style="font-size: 0.85rem; color: #94a3b8;">クラス役員・係の選出と記録・PDF出力</span></div>
+                                        style="font-size: 0.85rem; color: #94a3b8;">クラス役員・係の設定と割当管理。CSV同期、Teamsグループチャット連携、PDF出力に対応</span>
+                                </div>
                             </li>
                         </ul>
                     </div>
@@ -2265,6 +2367,10 @@
                             <li><strong>7. 出欠メモとガントチャート:</strong><br>
                                 「クラス出欠状況 (Class Attendance
                                 Gantt)」でクラス全体の長期的な出欠を一目で確認できます。セルをクリックまたは右クリックで欠席理由などのメモ（★）を記録・編集できます。
+                            </li>
+                            <li><strong>8. 年間行事予定の確認と蓄積:</strong><br>
+                                「年間行事予定表 (Annual
+                                Events)」タブでは、学校発行の行事予定Excelを取り込み、年度・月ごとにカレンダー表示します。年度をまたいでデータを蓄積できるため、過去の試験日程等の参照が可能です。
                             </li>
                         </ol>
                     </div>
@@ -2322,8 +2428,8 @@
                                     <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">JSON</td>
                                     <td style="padding: 10px; border: 1px solid #e2e8f0;">バックアップ・復元</td>
                                     <td style="padding: 10px; border: 1px solid #e2e8f0;">
-                                        <strong>出力:</strong> 全スコアデータと特別学修科目定義を含む完全バックアップ<br>
-                                        <strong>読込:</strong> エクスポートしたJSONファイルから成績データを復元
+                                        <strong>出力:</strong> 成績、科目定義に加え、出欠記録、座席配置、時間割、クラス委員設定等を含む全情報のバックアップ<br>
+                                        <strong>読込:</strong> エクスポートしたJSONファイルから全システム状態を完全に復元
                                     </td>
                                     <td style="padding: 10px; border: 1px solid #e2e8f0;">ヘッダー「JSON/Score」「JSON/Load」ボタン
                                     </td>
@@ -2368,12 +2474,31 @@
                                 </tr>
                                 <tr>
                                     <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">
+                                        CSV<br>(役員)</td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">クラス委員割当同期</td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">
+                                        <strong>読込:</strong> 学年、カテゴリ、役割、氏名の割当リスト。未定義ロールの自動追加および空定義の削除を同期
+                                    </td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">「クラス委員」タブ</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">
                                         JSON<br>(座席)</td>
                                     <td style="padding: 10px; border: 1px solid #e2e8f0;">座席配置保存</td>
                                     <td style="padding: 10px; border: 1px solid #e2e8f0;">
                                         座席レイアウト（行列数、無効席）と学生配置情報のプリセット保存・読込（複数保存可能）
                                     </td>
                                     <td style="padding: 10px; border: 1px solid #e2e8f0;">「席決め」タブ</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">
+                                        XLSX<br>(年間行事)</td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">年間行事予定の管理</td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">
+                                        <strong>読込:</strong>
+                                        学校等で公式発行される年間行事予定表のExcelファイル（「本科」シート）。年度を自動検出し、年度ごとの積層管理（追加・置換）に対応します。
+                                    </td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">「年間行事予定表」タブ</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -2397,6 +2522,8 @@
                                 </ul>
                             </li>
                             <li><strong>教務システム連携:</strong> 教務システムから出力される「出欠ログCSV」を取り込むことで、最新の出欠データを一括反映できます。</li>
+                            <li><strong>出欠統計解析:</strong> クラス全員の累積欠席・遅刻・早退数を一覧表示。項目別のソートにより、指導対象学生の早期発見をサポートします。</li>
+                            <li><strong>要注意学生の抽出:</strong> 成績不振や出欠過多の学生を判定基準に基づき自動抽出。Teams連携により即時のフォローアップが可能です。</li>
                         </ul>
                     </div>
                 </div>
