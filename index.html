@@ -1995,609 +1995,608 @@
                     </div>
                 </div>
 
-                <!-- Attendance (出欠状況) View -->
-                <!-- Class Officers View -->
-                <div id="class_officers-content" class="tab-content hidden fade-in">
-                    <div class="card" style="margin-bottom: 1.5rem;">
-                        <div class="card-header" style="justify-content: space-between; align-items: center;">
-                            <div class="card-title" style="display:flex; align-items:center; gap:0.6rem;">
+            </div>
+
+            <!-- Class Officers View -->
+            <div id="class_officers-content" class="tab-content hidden fade-in">
+                <div class="card" style="margin-bottom: 1.5rem;">
+                    <div class="card-header" style="justify-content: space-between; align-items: center;">
+                        <div class="card-title" style="display:flex; align-items:center; gap:0.6rem;">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor" stroke-width="2" width="20" height="20">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                            </svg>
+                            クラス委員・係選出 (Class Officers)
+                        </div>
+                        <div style="display:flex; gap:0.5rem; align-items: center;">
+                            <button onclick="showAddOfficerRoleModal()" class="btn btn-primary">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                    stroke="currentColor" stroke-width="2" width="20" height="20">
-                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                        d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                    stroke="currentColor" stroke-width="2" width="16" height="16">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
                                 </svg>
-                                クラス委員・係選出 (Class Officers)
-                            </div>
-                            <div style="display:flex; gap:0.5rem; align-items: center;">
-                                <button onclick="showAddOfficerRoleModal()" class="btn btn-primary">
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                        stroke="currentColor" stroke-width="2" width="16" height="16">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-                                    </svg>
-                                    <span>新規役職追加</span>
-                                </button>
-                                <div class="divider-v"
-                                    style="height: 20px; width: 1px; background: #e2e8f0; margin: 0 0.5rem;"></div>
-                                <button onclick="resetOfficerRolesToDefault()" class="btn btn-secondary"
-                                    style="color: #64748b;">
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                        stroke="currentColor" stroke-width="2" width="16" height="16">
-                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                    </svg>
-                                    <span>デフォルト復元</span>
-                                </button>
-                                <button onclick="exportClassOfficersPdf()" class="btn btn-secondary">
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                        stroke="currentColor" stroke-width="2" width="16" height="16">
-                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                            d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                                    </svg>
-                                    <span>PDF</span>
-                                </button>
-                                <button onclick="exportOfficerAssignmentsCsv()" class="btn btn-secondary"
-                                    title="現在の割当状況(全学年)をCSV出力します">
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                        stroke="currentColor" stroke-width="2" width="16" height="16">
-                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                            d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                    </svg>
-                                    <span>CSV出力</span>
-                                </button>
-                                <button onclick="document.getElementById('officerAssignmentsCsvInput').click();"
-                                    class="btn btn-secondary" title="CSVから割当状況を読み込みます">
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                        stroke="currentColor" stroke-width="2" width="16" height="16">
-                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                            d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                                    </svg>
-                                    <span>CSV読込</span>
-                                </button>
-                                <input type="file" id="officerAssignmentsCsvInput" class="hidden"
-                                    accept=".csv,text/csv,text/plain" onchange="importOfficerAssignmentsCsv(event)">
-                            </div>
-                        </div>
-                    </div>
-
-                    <div style="display: flex; gap: 1.5rem; align-items: flex-start;">
-                        <!-- Left Sidebar: Student List for dragging -->
-                        <div class="card"
-                            style="width: 280px; flex-shrink: 0; position: sticky; top: 1rem; max-height: calc(100vh - 12rem); display: flex; flex-direction: column;">
-                            <div class="card-header" style="padding: 0.8rem 1rem;">
-                                <h3 class="card-title"
-                                    style="font-size: 0.9rem; display: flex; align-items: center; gap: 0.5rem;">
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                        stroke="currentColor" stroke-width="2" width="16" height="16">
-                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                            d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                                    </svg>
-                                    学生リスト (Drag)
-                                </h3>
-                            </div>
-                            <div id="officerStudentList"
-                                style="padding: 0.5rem; overflow-y: auto; display: flex; flex-direction: column; gap: 0.3rem;">
-                                <!-- Populated by JS -->
-                            </div>
-                        </div>
-
-                        <!-- Right Main: Role Categories -->
-                        <div style="flex-grow: 1;">
-                            <div id="officerCategoriesGrid"
-                                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
-                                <!-- Populated by JS -->
-                            </div>
-
-
+                                <span>新規役職追加</span>
+                            </button>
+                            <div class="divider-v"
+                                style="height: 20px; width: 1px; background: #e2e8f0; margin: 0 0.5rem;"></div>
+                            <button onclick="resetOfficerRolesToDefault()" class="btn btn-secondary"
+                                style="color: #64748b;">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor" stroke-width="2" width="16" height="16">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                                <span>デフォルト復元</span>
+                            </button>
+                            <button onclick="exportClassOfficersPdf()" class="btn btn-secondary">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor" stroke-width="2" width="16" height="16">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                                </svg>
+                                <span>PDF</span>
+                            </button>
+                            <button onclick="exportOfficerAssignmentsCsv()" class="btn btn-secondary"
+                                title="現在の割当状況(全学年)をCSV出力します">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor" stroke-width="2" width="16" height="16">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                <span>CSV出力</span>
+                            </button>
+                            <button onclick="document.getElementById('officerAssignmentsCsvInput').click();"
+                                class="btn btn-secondary" title="CSVから割当状況を読み込みます">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor" stroke-width="2" width="16" height="16">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                </svg>
+                                <span>CSV読込</span>
+                            </button>
+                            <input type="file" id="officerAssignmentsCsvInput" class="hidden"
+                                accept=".csv,text/csv,text/plain" onchange="importOfficerAssignmentsCsv(event)">
                         </div>
                     </div>
                 </div>
 
-                <div id="attendance-content" class="tab-content hidden fade-in">
-                    <div class="card">
-                        <div class="card-header" style="justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
-                            <div class="card-title">出欠カレンダー (Attendance Calendar)</div>
-                            <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;"
-                                class="no-print">
-                                <div class="control-group">
-                                    <label for="attendanceMonthSelect">年月:</label>
-                                    <select id="attendanceMonthSelect" style="width: 140px;">
-                                        <!-- Populated by JS -->
-                                    </select>
-                                </div>
-                                <div class="control-group">
-                                    <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer;">
-                                        <input type="checkbox" id="attFilterBadOnly"
-                                            onchange="toggleAttendanceBadOnlyMode()" style="width: 16px; height: 16px;">
-                                        <span style="font-size: 0.85rem; color: #475569;">欠席・遅刻のみ</span>
-                                    </label>
-                                </div>
-                                <div class="divider-v"></div>
-                                <input type="file" id="attendanceCsvFileInput" accept=".csv,text/csv,text/plain"
-                                    class="hidden">
-                            </div>
-                        </div>
-
-                        <div id="attendanceInfoBar"
-                            style="background: #f1f5f9; padding: 0.75rem 1rem; border-radius: 0.5rem; margin-bottom: 1rem; display: flex; justify-content: space-between; font-size: 0.85rem; color: #475569; border: 1px solid #e2e8f0;">
-                            <div id="attendancePeriodInfo">期間：未設定</div>
-                            <div id="attendanceFileInfo">ファイル：未読込</div>
-                        </div>
-
-
-                        <div id="attendanceCalendarGrid"
-                            style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: #e2e8f0; border: 1px solid #e2e8f0; border-radius: 0.5rem; overflow: hidden;">
-                            <!-- Grid cells populated by JS -->
-                        </div>
-
-                        <div class="card" style="margin-top: 1.5rem; padding: 1.2rem;">
-                            <div class="card-title" style="font-size: 1rem; margin-bottom: 1rem;">累積出欠推移 (Cumulative
-                                Attendance Trend)</div>
-                            <div style="height: 300px; position: relative;">
-                                <canvas id="cumulativeAttendanceChart"></canvas>
-                            </div>
-                        </div>
-
-                        <div class="card" style="margin-top: 1.5rem; padding: 1.2rem;">
-                            <div
-                                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                                <div class="card-title" style="font-size: 1rem; margin-bottom: 0;">科目別出欠推移 (Subject
-                                    Attendance Trend)</div>
-                                <div class="control-group">
-                                    <label for="attendanceSubjectFilter">科目:</label>
-                                    <select id="attendanceSubjectFilter" style="width: 200px;">
-                                        <option value="">-- 科目を選択 --</option>
-                                        <!-- Populated by JS -->
-                                    </select>
-                                </div>
-                            </div>
-                            <div style="height: 300px; position: relative;">
-                                <canvas id="subjectAttendanceChart"></canvas>
-                            </div>
-                        </div>
-
-                        <div class="card" style="margin-top: 1.5rem; padding: 1.2rem;">
-                            <div
-                                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                                <div class="card-title" style="font-size: 1rem; margin-bottom: 0;">曜日別出欠推移 (Day of Week
-                                    Attendance Trend)</div>
-                                <div class="control-group">
-                                    <label for="attendanceDayFilter">曜日:</label>
-                                    <select id="attendanceDayFilter" style="width: 140px;">
-                                        <option value="1">月曜日</option>
-                                        <option value="2">火曜日</option>
-                                        <option value="3">水曜日</option>
-                                        <option value="4">木曜日</option>
-                                        <option value="5">金曜日</option>
-                                        <option value="6">土曜日</option>
-                                        <option value="0">日曜日</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div style="height: 300px; position: relative;">
-                                <canvas id="dayAttendanceChart"></canvas>
-                            </div>
-                        </div>
-
-                        <div class="card" style="margin-top: 1.5rem; padding: 1.2rem;">
-                            <div
-                                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                                <div class="card-title" style="font-size: 1rem; margin-bottom: 0;">時限別出欠推移 (Period
-                                    Attendance Trend)</div>
-                                <div class="control-group">
-                                    <label for="attendancePeriodFilter">時限:</label>
-                                    <select id="attendancePeriodFilter" style="width: 120px;">
-                                        <option value="1">1限</option>
-                                        <option value="2">2限</option>
-                                        <option value="3">3限</option>
-                                        <option value="4">4限</option>
-                                        <option value="5">5限</option>
-                                        <option value="6">6限</option>
-                                        <option value="7">7限</option>
-                                        <option value="8">8限</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div style="height: 300px; position: relative;">
-                                <canvas id="periodAttendanceChart"></canvas>
-                            </div>
-                        </div>
-
-                    </div>
-
-                    <div id="attendanceDailyStats" class="card" style="margin-top: 2rem; padding: 1rem;">
-                        <div class="card-title" style="font-size: 1rem; margin-bottom: 1rem;">月間統計 (Monthly Statistics)
-                        </div>
-                        <div class="table-container">
-                            <table id="attendanceStatsTable">
-                                <thead>
-                                    <tr style="background: #f1f5f9;">
-                                        <th rowspan="2" style="width: 180px; vertical-align: middle;">授業科目</th>
-                                        <th rowspan="2" style="width: 110px; vertical-align: middle;">担当者</th>
-                                        <th colspan="4"
-                                            style="text-align: center; border-bottom: 2px solid #e2e8f0; background: #f0f9ff; color: #1e40af;">
-                                            月間統計 (Monthly)</th>
-                                        <th colspan="4"
-                                            style="text-align: center; border-bottom: 2px solid #e2e8f0; border-left: 2px solid #e2e8f0; background: #fdfaf0; color: #92400e;">
-                                            全期間統計 (Cumulative)</th>
-                                    </tr>
-                                    <tr style="background: #f8fafc; font-size: 0.75rem;">
-                                        <th style="text-align: center; border-left: 1px solid #e2e8f0;">欠</th>
-                                        <th style="text-align: center;">遅</th>
-                                        <th style="text-align: center;">早</th>
-                                        <th style="text-align: center; font-weight: bold; background: #e0f2fe;">計</th>
-                                        <th style="text-align: center; border-left: 2px solid #e2e8f0;">欠</th>
-                                        <th style="text-align: center;">遅</th>
-                                        <th style="text-align: center;">早</th>
-                                        <th style="text-align: center; font-weight: bold; background: #fef3c7;">計</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="attendanceStatsBody">
-                                    <!-- Populated by JS -->
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Help & Security View -->
-                <div id="help-content" class="tab-content hidden fade-in">
-                    <!-- GENE Version Feature Summary -->
+                <div style="display: flex; gap: 1.5rem; align-items: flex-start;">
+                    <!-- Left Sidebar: Student List for dragging -->
                     <div class="card"
-                        style="background: linear-gradient(135deg, #1e293b, #334155); color: white; border: none; margin-bottom: 2rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);">
-                        <div class="card-header" style="border-bottom: 1px solid rgba(255,255,255,0.1);">
-                            <h2 class="card-title" style="color: white; display:flex; align-items:center; gap:0.8rem;">
+                        style="width: 280px; flex-shrink: 0; position: sticky; top: 1rem; max-height: calc(100vh - 12rem); display: flex; flex-direction: column;">
+                        <div class="card-header" style="padding: 0.8rem 1rem;">
+                            <h3 class="card-title"
+                                style="font-size: 0.9rem; display: flex; align-items: center; gap: 0.5rem;">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                    stroke="currentColor" stroke-width="2" width="24" height="24">
+                                    stroke="currentColor" stroke-width="2" width="16" height="16">
                                     <path stroke-linecap="round" stroke-linejoin="round"
-                                        d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                        d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                                 </svg>
-                                Grade Manager GENE 機能概要
-                            </h2>
+                                学生リスト (Drag)
+                            </h3>
                         </div>
-                        <div style="padding: 1.5rem;">
-                            <ul
-                                style="display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: 1rem; list-style: none; padding: 0; margin: 0;">
-                                <li
-                                    style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 0.8rem; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: flex-start; gap: 0.8rem;">
-                                    <div style="color: #60a5fa; font-weight: bold;">✓</div>
-                                    <div><strong>システムへのパスワードログイン</strong><br><span
-                                            style="font-size: 0.85rem; color: #94a3b8;">セキュアなハッシュ認証によるデータ保護</span></div>
-                                </li>
-                                <li
-                                    style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 0.8rem; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: flex-start; gap: 0.8rem;">
-                                    <div style="color: #60a5fa; font-weight: bold;">✓</div>
-                                    <div><strong>学生個人：教務システムからのコピペ成績入力</strong><br><span
-                                            style="font-size: 0.85rem; color: #94a3b8;">成績個票からの簡単インポート機能（成績個票入力）</span>
-                                    </div>
-                                </li>
-                                <li
-                                    style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 0.8rem; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: flex-start; gap: 0.8rem;">
-                                    <div style="color: #60a5fa; font-weight: bold;">✓</div>
-                                    <div><strong>学生個人：卒業要件確認①</strong><br><span
-                                            style="font-size: 0.85rem; color: #94a3b8;">単位数・必修・DP-X科目の取得確認</span></div>
-                                </li>
-                                <li
-                                    style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 0.8rem; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: flex-start; gap: 0.8rem;">
-                                    <div style="color: #60a5fa; font-weight: bold;">✓</div>
-                                    <div><strong>学生個人：卒業要件確認②</strong><br><span
-                                            style="font-size: 0.85rem; color: #94a3b8;">DP-X科目の開講スケジュールと進捗確認</span>
-                                    </div>
-                                </li>
-                                <li
-                                    style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 0.8rem; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: flex-start; gap: 0.8rem;">
-                                    <div style="color: #60a5fa; font-weight: bold;">✓</div>
-                                    <div><strong>学生個人：全定期試験の平均点・順位推移</strong><br><span
-                                            style="font-size: 0.85rem; color: #94a3b8;">登録済みすべての試験結果の推移を可視化</span></div>
-                                </li>
-                                <li
-                                    style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 0.8rem; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: flex-start; gap: 0.8rem;">
-                                    <div style="color: #60a5fa; font-weight: bold;">✓</div>
-                                    <div><strong>学生個人：評点・GPAの累積推移</strong><br><span
-                                            style="font-size: 0.85rem; color: #94a3b8;">学年ごとの単純平均・加重平均・GPA算出</span>
-                                    </div>
-                                </li>
-                                <li
-                                    style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 0.8rem; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: flex-start; gap: 0.8rem;">
-                                    <div style="color: #60a5fa; font-weight: bold;">✓</div>
-                                    <div><strong>クラス統計：平均点・累積GPAのまとめ</strong><br><span
-                                            style="font-size: 0.85rem; color: #94a3b8;">最新テスト結果に基づいたクラス全体の状況把握</span>
-                                    </div>
-                                </li>
-                                <li
-                                    style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 0.8rem; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: flex-start; gap: 0.8rem;">
-                                    <div style="color: #60a5fa; font-weight: bold;">✓</div>
-                                    <div><strong>要注意学生のピックアップ</strong><br><span
-                                            style="font-size: 0.85rem; color: #94a3b8;">最新テストと年度通算の二通りでリスク学生を抽出</span>
-                                    </div>
-                                </li>
-                                <li
-                                    style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 0.8rem; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: flex-start; gap: 0.8rem;">
-                                    <div style="color: #60a5fa; font-weight: bold;">✓</div>
-                                    <div><strong>各種設定 (Settings)</strong><br><span
-                                            style="font-size: 0.85rem; color: #94a3b8;">科目定義・学生名簿・パスワード等の管理</span></div>
-                                </li>
-                                <li
-                                    style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 0.8rem; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: flex-start; gap: 0.8rem;">
-                                    <div style="color: #60a5fa; font-weight: bold;">✓</div>
-                                    <div><strong>席決め：成績分布の可視化配置</strong><br><span
-                                            style="font-size: 0.85rem; color: #94a3b8;">教室内の成績分布を確認しながら席配置可能</span>
-                                    </div>
-                                </li>
-                                <li
-                                    style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 0.8rem; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: flex-start; gap: 0.8rem;">
-                                    <div style="color: #60a5fa; font-weight: bold;">✓</div>
-                                    <div><strong>名簿管理・取り込み (Roster)</strong><br><span
-                                            style="font-size: 0.85rem; color: #94a3b8;">CSVによる学生名簿の一括管理・プレビュー読み込み</span>
-                                    </div>
-                                </li>
-                                <li
-                                    style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 0.8rem; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: flex-start; gap: 0.8rem;">
-                                    <div style="color: #60a5fa; font-weight: bold;">✓</div>
-                                    <div><strong>教職員名簿 (Faculty)</strong><br><span
-                                            style="font-size: 0.85rem; color: #94a3b8;">教職員情報の管理とTeams/メール連携</span>
-                                    </div>
-                                </li>
-                                <li
-                                    style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 0.8rem; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: flex-start; gap: 0.8rem;">
-                                    <div style="color: #60a5fa; font-weight: bold;">✓</div>
-                                    <div><strong>出欠状況 (Attendance)</strong><br><span
-                                            style="font-size: 0.85rem; color: #94a3b8;">月次・科目別の出欠記録と統計分析</span></div>
-                                </li>
-                                <li
-                                    style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 0.8rem; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: flex-start; gap: 0.8rem;">
-                                    <div style="color: #60a5fa; font-weight: bold;">✓</div>
-                                    <div><strong>クラス委員・係 (Officers)</strong><br><span
-                                            style="font-size: 0.85rem; color: #94a3b8;">クラス役員・係の設定と割当管理。CSV同期、Teamsグループチャット連携、PDF出力に対応</span>
-                                    </div>
-                                </li>
-                            </ul>
+                        <div id="officerStudentList"
+                            style="padding: 0.5rem; overflow-y: auto; display: flex; flex-direction: column; gap: 0.3rem;">
+                            <!-- Populated by JS -->
                         </div>
                     </div>
 
-                    <div class="card" style="background: #f8fafc; border-left: 5px solid var(--primary);">
-                        <div class="card-header">
-                            <h2 class="card-title">基本的な使用方法 (Basic Usage)</h2>
+                    <!-- Right Main: Role Categories -->
+                    <div style="flex-grow: 1;">
+                        <div id="officerCategoriesGrid"
+                            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+                            <!-- Populated by JS -->
                         </div>
-                        <div style="line-height: 1.8; color: #334155;">
-                            <ol style="margin-left: 1.5rem; display: flex; flex-direction: column; gap: 1rem;">
-                                <li><strong>1. 初期設定とマスタ管理:</strong><br>
-                                    「各種設定
-                                    (Settings)」タブで、学生名簿と各学年の科目定義（単位数・種別・DP等）を登録します。名簿ファイル（csv/txt）のドラッグ＆ドロップ読込にも対応しています。
-                                </li>
-                                <li><strong>2. 成績データの入力:</strong><br>
-                                    「成績一覧 (Grades)」タブで、対象学年と学生を選択します。各テスト点数を直接入力するか、表上部の<span class="paste-icon"
-                                        style="opacity:1; vertical-align:middle; margin:0 2px;"><svg
-                                            xmlns="http://www.w3.org/2000/svg" width="14" height="14"
-                                            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                                            stroke-linecap="round" stroke-linejoin="round">
-                                            <path
-                                                d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2">
-                                            </path>
-                                            <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
-                                        </svg></span>アイコンからExcel等のデータを一括貼り付けできます。
-                                </li>
-                                <li><strong>3. 個別・累計分析:</strong><br>
-                                    「分析1 (Stats)」で単一テストの分布図と順位推移、「分析2 (Stats2)」で複数年にわたるGPAと加重平均の累積推移を確認できます。
-                                </li>
-                                <li><strong>4. 卒業要件の確認:</strong><br>
-                                    「卒業要件 (Grad
-                                    Requirements)」では、現在の取得単位がDP（A~E）やSDGs、一般/専門科目、必修科目の基準をどの程度満たしているか自動集計します（コース選択が必要です）。
-                                </li>
-                                <li><strong>5. クラス帳票と要注意抽出:</strong><br>
-                                    「クラス状況のまとめ (Class Stats)」で全員の成績一覧・GPA一覧を作成できます。「要注意抽出
-                                    (At-Risk)」機能により、成績不振科目が複数ある学生を瞬時に特定します。
-                                </li>
-                                <li><strong>6. 名簿・出欠・役員管理:</strong><br>
-                                    「名簿管理 (Roster)」で学生情報を更新、「教職員名簿 (Faculty)」で連絡先管理、「出欠状況 (Attendance)」で欠課集計・管理、「クラス委員
-                                    (Officers)」で役職決め・記録をサポートします。
-                                </li>
-                                <li><strong>7. 出欠メモとガントチャート:</strong><br>
-                                    「クラス出欠状況 (Class Attendance
-                                    Gantt)」でクラス全体の長期的な出欠を一目で確認できます。セルをクリックまたは右クリックで欠席理由などのメモ（★）を記録・編集できます。
-                                </li>
-                                <li><strong>8. 年間行事予定の確認と蓄積:</strong><br>
-                                    「年間行事予定表 (Annual
-                                    Events)」タブでは、学校発行の行事予定Excelを取り込み、年度・月ごとにカレンダー表示します。年度をまたいでデータを蓄積できるため、登録済みの試験日程等の参照が可能です。
-                                </li>
-                            </ol>
-                        </div>
-                    </div>
 
 
-
-                    <div class="card">
-                        <div class="card-header">
-                            <h2 class="card-title">使用上のご注意 (Security & Privacy)</h2>
-                        </div>
-                        <div style="line-height: 1.8; color: #334155;">
-                            <p>本システムはオフライン第一の設計となっており、学生の機密情報を保持したまま安全に利用可能です。</p>
-                            <ul
-                                style="margin-left: 1.5rem; margin-top: 1rem; margin-bottom: 1.5rem; list-style-type: disc;">
-                                <li><strong>サーバー送信なし:</strong>
-                                    データがインターネット上のサーバーに送信されることは<strong>一切ありません</strong>。すべての集計はブラウザ内で完結します。</li>
-                                <li><strong>ローカル保存:</strong> データはブラウザの <strong>LocalStorage</strong>
-                                    に暗号化またはシリアル化されて保存されます。他のPCやブラウザとは同期されません。</li>
-                                <li><strong>パスワード保護:</strong> 起動時にSHA-256ハッシュによるパスワード認証が必要です。設定で変更や保護の解除も可能です。</li>
-
-                                <li
-                                    style="border-top: 1px dashed #e2e8f0; margin: 1rem 0; padding-top: 1rem; list-style: none;">
-                                    <strong>【重要】年度更新と学生管理について</strong><br>
-                                    <div style="font-size: 0.9rem; color: #475569; margin-top: 0.5rem;">
-                                        進級・留年・退学等に伴うデータの取り扱いは以下の通りです：
-                                        <ul
-                                            style="margin-left: 1.2rem; margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.4rem; list-style-type: circle;">
-                                            <li><strong>学生の識別:</strong> 学籍番号（OMU ID）をキーに、年度を跨いでも同一人物として成績が累積されます。</li>
-                                            <li><strong>除籍・退学:</strong> 新名簿から消えた学生は選択肢に出ませんが、過去の成績データ自体はシステム内に保持されます。
-                                            </li>
-                                            <li><strong>原級留置（留年）:</strong>
-                                                同じ学年に留まっても、過去の成績の上に新しいデータが積み重なり、GPAも通算で計算されます。</li>
-                                            <li><strong>年度末保存:</strong>
-                                                JSONエクスポートは「全履歴・全成績」を含む完全なスナップショットです。年度の区切りには必ず保存してください。</li>
-                                        </ul>
-                                    </div>
-                                </li>
-                                <li style="color: #b91c1c; font-weight: bold;">使用上の注意:
-                                    共用PCでは必ず「Logout」して終了してください（パスワード入力画面に戻ります）。</li>
-                                <li style="color: #b91c1c; font-weight: bold;">データバックアップ:
-                                    重要なデータは定期的に「JSON/Score」でエクスポートしてバックアップを取ることを強く推奨します。このJSONファイルには、登録済みの全年度の名簿・教員・出欠・行事の履歴、および全学生の累計成績、全設定が含まれます。ブラウザのデータ削除やキャッシュクリアでデータが失われる可能性があります。
-                                </li>
-                                <li style="color: #b91c1c; font-weight: bold;">機密情報の取り扱い:
-                                    生成ファイルやキャッシュに機密３情報を含む可能性がありますので、学校の管理下にある端末でご使用ください。
-                                </li>
-                            </ul>
-                        </div>
-                    </div>
-
-                    <div class="card">
-                        <div class="card-header">
-                            <h2 class="card-title">入出力ファイルと用途</h2>
-                        </div>
-                        <div class="table-container">
-                            <table style="width: 100%; border-collapse: collapse;">
-                                <thead>
-                                    <tr style="background: #f1f5f9;">
-                                        <th style="padding: 10px; border: 1px solid #cbd5e1;">形式</th>
-                                        <th style="padding: 10px; border: 1px solid #cbd5e1;">用途</th>
-                                        <th style="padding: 10px; border: 1px solid #cbd5e1;">内容</th>
-                                        <th style="padding: 10px; border: 1px solid #cbd5e1;">操作場所</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">PDF
-                                        </td>
-                                        <td style="padding: 10px; border: 1px solid #e2e8f0;">配布・印刷用（出力のみ）</td>
-                                        <td style="padding: 10px; border: 1px solid #e2e8f0;">
-                                            個人成績レポート、推移グラフ、クラス順位表、要注意者抽出結果など
-                                        </td>
-                                        <td style="padding: 10px; border: 1px solid #e2e8f0;">ヘッダー「PDF」ボタン</td>
-                                    </tr>
-                                    <tr>
-                                        <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">JSON
-                                        </td>
-                                        <td style="padding: 10px; border: 1px solid #e2e8f0;">バックアップ・復元</td>
-                                        <td style="padding: 10px; border: 1px solid #e2e8f0;">
-                                            <strong>出力:</strong>
-                                            全年度の成績、科目マスタ、出欠履歴、登録済みソースの履歴（名簿等の全メタデータ）、座席配置、時間割、クラス委員設定等、システム上の全情報の完全なスナップショット<br>
-                                            <strong>読込:</strong> エクスポートしたJSONファイルから、過去の履歴を含めた全システム状態を完全に復元
-                                        </td>
-                                        <td style="padding: 10px; border: 1px solid #e2e8f0;">
-                                            ヘッダー「JSON/Score」「JSON/Load」ボタン
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">
-                                            CSV<br>(学生)
-                                        </td>
-                                        <td style="padding: 10px; border: 1px solid #e2e8f0;">学生リスト管理</td>
-                                        <td style="padding: 10px; border: 1px solid #e2e8f0;">
-                                            <strong>出力:</strong> 学生名とメタデータ（学年、組、出席番号など）を含むリスト<br>
-                                            <strong>読込:</strong> 学生名とメタデータの一括登録・更新
-                                        </td>
-                                        <td style="padding: 10px; border: 1px solid #e2e8f0;">設定タブ「学生リスト」セクション</td>
-                                    </tr>
-                                    <tr>
-                                        <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">
-                                            CSV<br>(科目)
-                                        </td>
-                                        <td style="padding: 10px; border: 1px solid #e2e8f0;">科目定義管理</td>
-                                        <td style="padding: 10px; border: 1px solid #e2e8f0;">
-                                            <strong>出力:</strong> 全学年の科目定義（科目名、単位数、学年、種別など）<br>
-                                            <strong>読込:</strong> 科目定義の一括登録・更新
-                                        </td>
-                                        <td style="padding: 10px; border: 1px solid #e2e8f0;">設定タブ「全学年科目定義」セクション</td>
-                                    </tr>
-                                    <tr>
-                                        <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">
-                                            CSV<br>(名簿)
-                                        </td>
-                                        <td style="padding: 10px; border: 1px solid #e2e8f0;">学生名簿取り込み</td>
-                                        <td style="padding: 10px; border: 1px solid #e2e8f0;">
-                                            <strong>読込:</strong> 学籍番号、氏名、学年、組、性別、コースなどの詳細情報を含む名簿データ（プレビュー機能付き）
-                                        </td>
-                                        <td style="padding: 10px; border: 1px solid #e2e8f0;">「名簿管理・取り込み」タブ</td>
-                                    </tr>
-                                    <tr>
-                                        <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">
-                                            CSV<br>(教職員)</td>
-                                        <td style="padding: 10px; border: 1px solid #e2e8f0;">教職員名簿管理</td>
-                                        <td style="padding: 10px; border: 1px solid #e2e8f0;">
-                                            <strong>読込:</strong> 教職員の氏名、メールアドレス、部署、役職などの情報（Teams連携・メール送信機能対応）
-                                        </td>
-                                        <td style="padding: 10px; border: 1px solid #e2e8f0;">「教職員名簿」タブ</td>
-                                    </tr>
-                                    <tr>
-                                        <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">
-                                            CSV<br>(役員)</td>
-                                        <td style="padding: 10px; border: 1px solid #e2e8f0;">クラス委員割当同期</td>
-                                        <td style="padding: 10px; border: 1px solid #e2e8f0;">
-                                            <strong>読込:</strong> 学年、カテゴリ、役割、氏名の割当リスト。未定義ロールの自動追加および空定義の削除を同期
-                                        </td>
-                                        <td style="padding: 10px; border: 1px solid #e2e8f0;">「クラス委員」タブ</td>
-                                    </tr>
-                                    <tr>
-                                        <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">
-                                            JSON<br>(座席)</td>
-                                        <td style="padding: 10px; border: 1px solid #e2e8f0;">座席配置保存</td>
-                                        <td style="padding: 10px; border: 1px solid #e2e8f0;">
-                                            座席レイアウト（行列数、無効席）と学生配置情報のプリセット保存・読込（複数保存可能）
-                                        </td>
-                                        <td style="padding: 10px; border: 1px solid #e2e8f0;">「席決め」タブ</td>
-                                    </tr>
-                                    <tr>
-                                        <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">
-                                            XLSX<br>(年間行事)</td>
-                                        <td style="padding: 10px; border: 1px solid #e2e8f0;">年間行事予定の管理</td>
-                                        <td style="padding: 10px; border: 1px solid #e2e8f0;">
-                                            <strong>読込:</strong>
-                                            学校等で公式発行される年間行事予定表のExcelファイル（「本科」シート）。年度を自動検出し、年度ごとの積層管理（追加・置換）に対応します。
-                                        </td>
-                                        <td style="padding: 10px; border: 1px solid #e2e8f0;">「年間行事予定表」タブ</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <div class="card">
-                        <div class="card-header">
-                            <h2 class="card-title">出欠管理機能 (Attendance)</h2>
-                        </div>
-                        <div style="line-height: 1.8; color: #334155;">
-                            <ul style="margin-left: 1.5rem; list-style-type: disc;">
-                                <li><strong>個人出欠カレンダー:</strong> カレンダー上で欠席・遅刻・早退・忌引等の記録を確認・編集できます。メモ機能で理由なども記録可能です。</li>
-                                <li><strong>クラス出欠ガントチャート:</strong>
-                                    長期的な視点でクラス全体の出欠状況を一覧表示します。
-                                    <ul>
-                                        <li>ドラッグ操作で複数日の範囲選択が可能</li>
-                                        <li>右クリックで「期間予定（長期欠席など）」の一括登録</li>
-                                        <li>セルをクリックまたは右クリックで「メモ（★）」の編集が可能</li>
-                                        <li>A4用紙に最適化された印刷レイアウト対応</li>
-                                    </ul>
-                                </li>
-                                <li><strong>教務システム連携:</strong> 教務システムから出力される「出欠ログCSV」を取り込むことで、最新の出欠データを一括反映できます。</li>
-                                <li><strong>出欠統計解析:</strong> クラス全員の累積欠席・遅刻・早退数を一覧表示。項目別のソートにより、指導対象学生の早期発見をサポートします。</li>
-                                <li><strong>要注意学生の抽出:</strong> 成績不振や出欠過多の学生を判定基準に基づき自動抽出。Teams連携により即時のフォローアップが可能です。</li>
-                            </ul>
-                        </div>
-                    </div>
-
-
-                    <div class="card" style="border-left: 5px solid #f59e0b;">
-                        <div class="card-header">
-                            <h2 class="card-title" style="color: #92400e;">重要・免責事項</h2>
-                        </div>
-                        <div style="line-height: 1.8; color: #334155;">
-                            <p style="font-weight: bold;">本システムで算出されるデータは、学習指導の参考とするための「参考値」です。</p>
-                            <p style="margin-top: 1rem;">
-                                平均点、順位、GPA、累計単位数等の計算結果には、システム上の端数処理や各種推定値が含まれる場合があります。単位修得の可否や進級判定等の最終的かつ公式な判断は、必ず<strong>教務発行の正式な書類（通知表、成績証明書等）</strong>を正として判断してください。
-                            </p>
-                            <p style="margin-top: 0.5rem; color: #b91c1c; font-size: 0.9rem;">
-                                ※ 特別学修単位の算入には上限がありますが、本システムでは上限は考慮されませんのでご注意ください。
-                            </p>
-                        </div>
                     </div>
                 </div>
+            </div>
+
+            <div id="attendance-content" class="tab-content hidden fade-in">
+                <div class="card">
+                    <div class="card-header" style="justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+                        <div class="card-title">出欠カレンダー (Attendance Calendar)</div>
+                        <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;" class="no-print">
+                            <div class="control-group">
+                                <label for="attendanceMonthSelect">年月:</label>
+                                <select id="attendanceMonthSelect" style="width: 140px;">
+                                    <!-- Populated by JS -->
+                                </select>
+                            </div>
+                            <div class="control-group">
+                                <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer;">
+                                    <input type="checkbox" id="attFilterBadOnly"
+                                        onchange="toggleAttendanceBadOnlyMode()" style="width: 16px; height: 16px;">
+                                    <span style="font-size: 0.85rem; color: #475569;">欠席・遅刻のみ</span>
+                                </label>
+                            </div>
+                            <div class="divider-v"></div>
+                            <input type="file" id="attendanceCsvFileInput" accept=".csv,text/csv,text/plain"
+                                class="hidden">
+                        </div>
+                    </div>
+
+                    <div id="attendanceInfoBar"
+                        style="background: #f1f5f9; padding: 0.75rem 1rem; border-radius: 0.5rem; margin-bottom: 1rem; display: flex; justify-content: space-between; font-size: 0.85rem; color: #475569; border: 1px solid #e2e8f0;">
+                        <div id="attendancePeriodInfo">期間：未設定</div>
+                        <div id="attendanceFileInfo">ファイル：未読込</div>
+                    </div>
+
+
+                    <div id="attendanceCalendarGrid"
+                        style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: #e2e8f0; border: 1px solid #e2e8f0; border-radius: 0.5rem; overflow: hidden;">
+                        <!-- Grid cells populated by JS -->
+                    </div>
+
+                    <div class="card" style="margin-top: 1.5rem; padding: 1.2rem;">
+                        <div class="card-title" style="font-size: 1rem; margin-bottom: 1rem;">累積出欠推移 (Cumulative
+                            Attendance Trend)</div>
+                        <div style="height: 300px; position: relative;">
+                            <canvas id="cumulativeAttendanceChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="card" style="margin-top: 1.5rem; padding: 1.2rem;">
+                        <div
+                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                            <div class="card-title" style="font-size: 1rem; margin-bottom: 0;">科目別出欠推移 (Subject
+                                Attendance Trend)</div>
+                            <div class="control-group">
+                                <label for="attendanceSubjectFilter">科目:</label>
+                                <select id="attendanceSubjectFilter" style="width: 200px;">
+                                    <option value="">-- 科目を選択 --</option>
+                                    <!-- Populated by JS -->
+                                </select>
+                            </div>
+                        </div>
+                        <div style="height: 300px; position: relative;">
+                            <canvas id="subjectAttendanceChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="card" style="margin-top: 1.5rem; padding: 1.2rem;">
+                        <div
+                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                            <div class="card-title" style="font-size: 1rem; margin-bottom: 0;">曜日別出欠推移 (Day of Week
+                                Attendance Trend)</div>
+                            <div class="control-group">
+                                <label for="attendanceDayFilter">曜日:</label>
+                                <select id="attendanceDayFilter" style="width: 140px;">
+                                    <option value="1">月曜日</option>
+                                    <option value="2">火曜日</option>
+                                    <option value="3">水曜日</option>
+                                    <option value="4">木曜日</option>
+                                    <option value="5">金曜日</option>
+                                    <option value="6">土曜日</option>
+                                    <option value="0">日曜日</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div style="height: 300px; position: relative;">
+                            <canvas id="dayAttendanceChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="card" style="margin-top: 1.5rem; padding: 1.2rem;">
+                        <div
+                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                            <div class="card-title" style="font-size: 1rem; margin-bottom: 0;">時限別出欠推移 (Period
+                                Attendance Trend)</div>
+                            <div class="control-group">
+                                <label for="attendancePeriodFilter">時限:</label>
+                                <select id="attendancePeriodFilter" style="width: 120px;">
+                                    <option value="1">1限</option>
+                                    <option value="2">2限</option>
+                                    <option value="3">3限</option>
+                                    <option value="4">4限</option>
+                                    <option value="5">5限</option>
+                                    <option value="6">6限</option>
+                                    <option value="7">7限</option>
+                                    <option value="8">8限</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div style="height: 300px; position: relative;">
+                            <canvas id="periodAttendanceChart"></canvas>
+                        </div>
+                    </div>
+
+                </div>
+
+                <div id="attendanceDailyStats" class="card" style="margin-top: 2rem; padding: 1rem;">
+                    <div class="card-title" style="font-size: 1rem; margin-bottom: 1rem;">月間統計 (Monthly Statistics)
+                    </div>
+                    <div class="table-container">
+                        <table id="attendanceStatsTable">
+                            <thead>
+                                <tr style="background: #f1f5f9;">
+                                    <th rowspan="2" style="width: 180px; vertical-align: middle;">授業科目</th>
+                                    <th rowspan="2" style="width: 110px; vertical-align: middle;">担当者</th>
+                                    <th colspan="4"
+                                        style="text-align: center; border-bottom: 2px solid #e2e8f0; background: #f0f9ff; color: #1e40af;">
+                                        月間統計 (Monthly)</th>
+                                    <th colspan="4"
+                                        style="text-align: center; border-bottom: 2px solid #e2e8f0; border-left: 2px solid #e2e8f0; background: #fdfaf0; color: #92400e;">
+                                        全期間統計 (Cumulative)</th>
+                                </tr>
+                                <tr style="background: #f8fafc; font-size: 0.75rem;">
+                                    <th style="text-align: center; border-left: 1px solid #e2e8f0;">欠</th>
+                                    <th style="text-align: center;">遅</th>
+                                    <th style="text-align: center;">早</th>
+                                    <th style="text-align: center; font-weight: bold; background: #e0f2fe;">計</th>
+                                    <th style="text-align: center; border-left: 2px solid #e2e8f0;">欠</th>
+                                    <th style="text-align: center;">遅</th>
+                                    <th style="text-align: center;">早</th>
+                                    <th style="text-align: center; font-weight: bold; background: #fef3c7;">計</th>
+                                </tr>
+                            </thead>
+                            <tbody id="attendanceStatsBody">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Help & Security View -->
+            <div id="help-content" class="tab-content hidden fade-in">
+                <!-- GENE Version Feature Summary -->
+                <div class="card"
+                    style="background: linear-gradient(135deg, #1e293b, #334155); color: white; border: none; margin-bottom: 2rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);">
+                    <div class="card-header" style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+                        <h2 class="card-title" style="color: white; display:flex; align-items:center; gap:0.8rem;">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor" stroke-width="2" width="24" height="24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                            Grade Manager GENE 機能概要
+                        </h2>
+                    </div>
+                    <div style="padding: 1.5rem;">
+                        <ul
+                            style="display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: 1rem; list-style: none; padding: 0; margin: 0;">
+                            <li
+                                style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 0.8rem; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: flex-start; gap: 0.8rem;">
+                                <div style="color: #60a5fa; font-weight: bold;">✓</div>
+                                <div><strong>システムへのパスワードログイン</strong><br><span
+                                        style="font-size: 0.85rem; color: #94a3b8;">セキュアなハッシュ認証によるデータ保護</span></div>
+                            </li>
+                            <li
+                                style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 0.8rem; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: flex-start; gap: 0.8rem;">
+                                <div style="color: #60a5fa; font-weight: bold;">✓</div>
+                                <div><strong>学生個人：教務システムからのコピペ成績入力</strong><br><span
+                                        style="font-size: 0.85rem; color: #94a3b8;">成績個票からの簡単インポート機能（成績個票入力）</span>
+                                </div>
+                            </li>
+                            <li
+                                style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 0.8rem; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: flex-start; gap: 0.8rem;">
+                                <div style="color: #60a5fa; font-weight: bold;">✓</div>
+                                <div><strong>学生個人：卒業要件確認①</strong><br><span
+                                        style="font-size: 0.85rem; color: #94a3b8;">単位数・必修・DP-X科目の取得確認</span></div>
+                            </li>
+                            <li
+                                style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 0.8rem; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: flex-start; gap: 0.8rem;">
+                                <div style="color: #60a5fa; font-weight: bold;">✓</div>
+                                <div><strong>学生個人：卒業要件確認②</strong><br><span
+                                        style="font-size: 0.85rem; color: #94a3b8;">DP-X科目の開講スケジュールと進捗確認</span>
+                                </div>
+                            </li>
+                            <li
+                                style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 0.8rem; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: flex-start; gap: 0.8rem;">
+                                <div style="color: #60a5fa; font-weight: bold;">✓</div>
+                                <div><strong>学生個人：全定期試験の平均点・順位推移</strong><br><span
+                                        style="font-size: 0.85rem; color: #94a3b8;">登録済みすべての試験結果の推移を可視化</span></div>
+                            </li>
+                            <li
+                                style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 0.8rem; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: flex-start; gap: 0.8rem;">
+                                <div style="color: #60a5fa; font-weight: bold;">✓</div>
+                                <div><strong>学生個人：評点・GPAの累積推移</strong><br><span
+                                        style="font-size: 0.85rem; color: #94a3b8;">学年ごとの単純平均・加重平均・GPA算出</span>
+                                </div>
+                            </li>
+                            <li
+                                style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 0.8rem; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: flex-start; gap: 0.8rem;">
+                                <div style="color: #60a5fa; font-weight: bold;">✓</div>
+                                <div><strong>クラス統計：平均点・累積GPAのまとめ</strong><br><span
+                                        style="font-size: 0.85rem; color: #94a3b8;">最新テスト結果に基づいたクラス全体の状況把握</span>
+                                </div>
+                            </li>
+                            <li
+                                style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 0.8rem; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: flex-start; gap: 0.8rem;">
+                                <div style="color: #60a5fa; font-weight: bold;">✓</div>
+                                <div><strong>要注意学生のピックアップ</strong><br><span
+                                        style="font-size: 0.85rem; color: #94a3b8;">最新テストと年度通算の二通りでリスク学生を抽出</span>
+                                </div>
+                            </li>
+                            <li
+                                style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 0.8rem; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: flex-start; gap: 0.8rem;">
+                                <div style="color: #60a5fa; font-weight: bold;">✓</div>
+                                <div><strong>各種設定 (Settings)</strong><br><span
+                                        style="font-size: 0.85rem; color: #94a3b8;">科目定義・学生名簿・パスワード等の管理</span></div>
+                            </li>
+                            <li
+                                style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 0.8rem; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: flex-start; gap: 0.8rem;">
+                                <div style="color: #60a5fa; font-weight: bold;">✓</div>
+                                <div><strong>席決め：成績分布の可視化配置</strong><br><span
+                                        style="font-size: 0.85rem; color: #94a3b8;">教室内の成績分布を確認しながら席配置可能</span>
+                                </div>
+                            </li>
+                            <li
+                                style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 0.8rem; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: flex-start; gap: 0.8rem;">
+                                <div style="color: #60a5fa; font-weight: bold;">✓</div>
+                                <div><strong>名簿管理・取り込み (Roster)</strong><br><span
+                                        style="font-size: 0.85rem; color: #94a3b8;">CSVによる学生名簿の一括管理・プレビュー読み込み</span>
+                                </div>
+                            </li>
+                            <li
+                                style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 0.8rem; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: flex-start; gap: 0.8rem;">
+                                <div style="color: #60a5fa; font-weight: bold;">✓</div>
+                                <div><strong>教職員名簿 (Faculty)</strong><br><span
+                                        style="font-size: 0.85rem; color: #94a3b8;">教職員情報の管理とTeams/メール連携</span>
+                                </div>
+                            </li>
+                            <li
+                                style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 0.8rem; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: flex-start; gap: 0.8rem;">
+                                <div style="color: #60a5fa; font-weight: bold;">✓</div>
+                                <div><strong>出欠状況 (Attendance)</strong><br><span
+                                        style="font-size: 0.85rem; color: #94a3b8;">月次・科目別の出欠記録と統計分析</span></div>
+                            </li>
+                            <li
+                                style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 0.8rem; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: flex-start; gap: 0.8rem;">
+                                <div style="color: #60a5fa; font-weight: bold;">✓</div>
+                                <div><strong>クラス委員・係 (Officers)</strong><br><span
+                                        style="font-size: 0.85rem; color: #94a3b8;">クラス役員・係の設定と割当管理。CSV同期、Teamsグループチャット連携、PDF出力に対応</span>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="card" style="background: #f8fafc; border-left: 5px solid var(--primary);">
+                    <div class="card-header">
+                        <h2 class="card-title">基本的な使用方法 (Basic Usage)</h2>
+                    </div>
+                    <div style="line-height: 1.8; color: #334155;">
+                        <ol style="margin-left: 1.5rem; display: flex; flex-direction: column; gap: 1rem;">
+                            <li><strong>1. 初期設定とマスタ管理:</strong><br>
+                                「各種設定
+                                (Settings)」タブで、学生名簿と各学年の科目定義（単位数・種別・DP等）を登録します。名簿ファイル（csv/txt）のドラッグ＆ドロップ読込にも対応しています。
+                            </li>
+                            <li><strong>2. 成績データの入力:</strong><br>
+                                「成績一覧 (Grades)」タブで、対象学年と学生を選択します。各テスト点数を直接入力するか、表上部の<span class="paste-icon"
+                                    style="opacity:1; vertical-align:middle; margin:0 2px;"><svg
+                                        xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round">
+                                        <path
+                                            d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2">
+                                        </path>
+                                        <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                                    </svg></span>アイコンからExcel等のデータを一括貼り付けできます。
+                            </li>
+                            <li><strong>3. 個別・累計分析:</strong><br>
+                                「分析1 (Stats)」で単一テストの分布図と順位推移、「分析2 (Stats2)」で複数年にわたるGPAと加重平均の累積推移を確認できます。
+                            </li>
+                            <li><strong>4. 卒業要件の確認:</strong><br>
+                                「卒業要件 (Grad
+                                Requirements)」では、現在の取得単位がDP（A~E）やSDGs、一般/専門科目、必修科目の基準をどの程度満たしているか自動集計します（コース選択が必要です）。
+                            </li>
+                            <li><strong>5. クラス帳票と要注意抽出:</strong><br>
+                                「クラス状況のまとめ (Class Stats)」で全員の成績一覧・GPA一覧を作成できます。「要注意抽出
+                                (At-Risk)」機能により、成績不振科目が複数ある学生を瞬時に特定します。
+                            </li>
+                            <li><strong>6. 名簿・出欠・役員管理:</strong><br>
+                                「名簿管理 (Roster)」で学生情報を更新、「教職員名簿 (Faculty)」で連絡先管理、「出欠状況 (Attendance)」で欠課集計・管理、「クラス委員
+                                (Officers)」で役職決め・記録をサポートします。
+                            </li>
+                            <li><strong>7. 出欠メモとガントチャート:</strong><br>
+                                「クラス出欠状況 (Class Attendance
+                                Gantt)」でクラス全体の長期的な出欠を一目で確認できます。セルをクリックまたは右クリックで欠席理由などのメモ（★）を記録・編集できます。
+                            </li>
+                            <li><strong>8. 年間行事予定の確認と蓄積:</strong><br>
+                                「年間行事予定表 (Annual
+                                Events)」タブでは、学校発行の行事予定Excelを取り込み、年度・月ごとにカレンダー表示します。年度をまたいでデータを蓄積できるため、登録済みの試験日程等の参照が可能です。
+                            </li>
+                        </ol>
+                    </div>
+                </div>
+
+
+
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">使用上のご注意 (Security & Privacy)</h2>
+                    </div>
+                    <div style="line-height: 1.8; color: #334155;">
+                        <p>本システムはオフライン第一の設計となっており、学生の機密情報を保持したまま安全に利用可能です。</p>
+                        <ul
+                            style="margin-left: 1.5rem; margin-top: 1rem; margin-bottom: 1.5rem; list-style-type: disc;">
+                            <li><strong>サーバー送信なし:</strong>
+                                データがインターネット上のサーバーに送信されることは<strong>一切ありません</strong>。すべての集計はブラウザ内で完結します。</li>
+                            <li><strong>ローカル保存:</strong> データはブラウザの <strong>LocalStorage</strong>
+                                に暗号化またはシリアル化されて保存されます。他のPCやブラウザとは同期されません。</li>
+                            <li><strong>パスワード保護:</strong> 起動時にSHA-256ハッシュによるパスワード認証が必要です。設定で変更や保護の解除も可能です。</li>
+
+                            <li
+                                style="border-top: 1px dashed #e2e8f0; margin: 1rem 0; padding-top: 1rem; list-style: none;">
+                                <strong>【重要】年度更新と学生管理について</strong><br>
+                                <div style="font-size: 0.9rem; color: #475569; margin-top: 0.5rem;">
+                                    進級・留年・退学等に伴うデータの取り扱いは以下の通りです：
+                                    <ul
+                                        style="margin-left: 1.2rem; margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.4rem; list-style-type: circle;">
+                                        <li><strong>学生の識別:</strong> 学籍番号（OMU ID）をキーに、年度を跨いでも同一人物として成績が累積されます。</li>
+                                        <li><strong>除籍・退学:</strong> 新名簿から消えた学生は選択肢に出ませんが、過去の成績データ自体はシステム内に保持されます。
+                                        </li>
+                                        <li><strong>原級留置（留年）:</strong>
+                                            同じ学年に留まっても、過去の成績の上に新しいデータが積み重なり、GPAも通算で計算されます。</li>
+                                        <li><strong>年度末保存:</strong>
+                                            JSONエクスポートは「全履歴・全成績」を含む完全なスナップショットです。年度の区切りには必ず保存してください。</li>
+                                    </ul>
+                                </div>
+                            </li>
+                            <li style="color: #b91c1c; font-weight: bold;">使用上の注意:
+                                共用PCでは必ず「Logout」して終了してください（パスワード入力画面に戻ります）。</li>
+                            <li style="color: #b91c1c; font-weight: bold;">データバックアップ:
+                                重要なデータは定期的に「JSON/Score」でエクスポートしてバックアップを取ることを強く推奨します。このJSONファイルには、登録済みの全年度の名簿・教員・出欠・行事の履歴、および全学生の累計成績、全設定が含まれます。ブラウザのデータ削除やキャッシュクリアでデータが失われる可能性があります。
+                            </li>
+                            <li style="color: #b91c1c; font-weight: bold;">機密情報の取り扱い:
+                                生成ファイルやキャッシュに機密３情報を含む可能性がありますので、学校の管理下にある端末でご使用ください。
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">入出力ファイルと用途</h2>
+                    </div>
+                    <div class="table-container">
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <thead>
+                                <tr style="background: #f1f5f9;">
+                                    <th style="padding: 10px; border: 1px solid #cbd5e1;">形式</th>
+                                    <th style="padding: 10px; border: 1px solid #cbd5e1;">用途</th>
+                                    <th style="padding: 10px; border: 1px solid #cbd5e1;">内容</th>
+                                    <th style="padding: 10px; border: 1px solid #cbd5e1;">操作場所</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">PDF
+                                    </td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">配布・印刷用（出力のみ）</td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">
+                                        個人成績レポート、推移グラフ、クラス順位表、要注意者抽出結果など
+                                    </td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">ヘッダー「PDF」ボタン</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">JSON
+                                    </td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">バックアップ・復元</td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">
+                                        <strong>出力:</strong>
+                                        全年度の成績、科目マスタ、出欠履歴、登録済みソースの履歴（名簿等の全メタデータ）、座席配置、時間割、クラス委員設定等、システム上の全情報の完全なスナップショット<br>
+                                        <strong>読込:</strong> エクスポートしたJSONファイルから、過去の履歴を含めた全システム状態を完全に復元
+                                    </td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">
+                                        ヘッダー「JSON/Score」「JSON/Load」ボタン
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">
+                                        CSV<br>(学生)
+                                    </td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">学生リスト管理</td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">
+                                        <strong>出力:</strong> 学生名とメタデータ（学年、組、出席番号など）を含むリスト<br>
+                                        <strong>読込:</strong> 学生名とメタデータの一括登録・更新
+                                    </td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">設定タブ「学生リスト」セクション</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">
+                                        CSV<br>(科目)
+                                    </td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">科目定義管理</td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">
+                                        <strong>出力:</strong> 全学年の科目定義（科目名、単位数、学年、種別など）<br>
+                                        <strong>読込:</strong> 科目定義の一括登録・更新
+                                    </td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">設定タブ「全学年科目定義」セクション</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">
+                                        CSV<br>(名簿)
+                                    </td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">学生名簿取り込み</td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">
+                                        <strong>読込:</strong> 学籍番号、氏名、学年、組、性別、コースなどの詳細情報を含む名簿データ（プレビュー機能付き）
+                                    </td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">「名簿管理・取り込み」タブ</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">
+                                        CSV<br>(教職員)</td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">教職員名簿管理</td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">
+                                        <strong>読込:</strong> 教職員の氏名、メールアドレス、部署、役職などの情報（Teams連携・メール送信機能対応）
+                                    </td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">「教職員名簿」タブ</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">
+                                        CSV<br>(役員)</td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">クラス委員割当同期</td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">
+                                        <strong>読込:</strong> 学年、カテゴリ、役割、氏名の割当リスト。未定義ロールの自動追加および空定義の削除を同期
+                                    </td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">「クラス委員」タブ</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">
+                                        JSON<br>(座席)</td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">座席配置保存</td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">
+                                        座席レイアウト（行列数、無効席）と学生配置情報のプリセット保存・読込（複数保存可能）
+                                    </td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">「席決め」タブ</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">
+                                        XLSX<br>(年間行事)</td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">年間行事予定の管理</td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">
+                                        <strong>読込:</strong>
+                                        学校等で公式発行される年間行事予定表のExcelファイル（「本科」シート）。年度を自動検出し、年度ごとの積層管理（追加・置換）に対応します。
+                                    </td>
+                                    <td style="padding: 10px; border: 1px solid #e2e8f0;">「年間行事予定表」タブ</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">出欠管理機能 (Attendance)</h2>
+                    </div>
+                    <div style="line-height: 1.8; color: #334155;">
+                        <ul style="margin-left: 1.5rem; list-style-type: disc;">
+                            <li><strong>個人出欠カレンダー:</strong> カレンダー上で欠席・遅刻・早退・忌引等の記録を確認・編集できます。メモ機能で理由なども記録可能です。</li>
+                            <li><strong>クラス出欠ガントチャート:</strong>
+                                長期的な視点でクラス全体の出欠状況を一覧表示します。
+                                <ul>
+                                    <li>ドラッグ操作で複数日の範囲選択が可能</li>
+                                    <li>右クリックで「期間予定（長期欠席など）」の一括登録</li>
+                                    <li>セルをクリックまたは右クリックで「メモ（★）」の編集が可能</li>
+                                    <li>A4用紙に最適化された印刷レイアウト対応</li>
+                                </ul>
+                            </li>
+                            <li><strong>教務システム連携:</strong> 教務システムから出力される「出欠ログCSV」を取り込むことで、最新の出欠データを一括反映できます。</li>
+                            <li><strong>出欠統計解析:</strong> クラス全員の累積欠席・遅刻・早退数を一覧表示。項目別のソートにより、指導対象学生の早期発見をサポートします。</li>
+                            <li><strong>要注意学生の抽出:</strong> 成績不振や出欠過多の学生を判定基準に基づき自動抽出。Teams連携により即時のフォローアップが可能です。</li>
+                        </ul>
+                    </div>
+                </div>
+
+
+                <div class="card" style="border-left: 5px solid #f59e0b;">
+                    <div class="card-header">
+                        <h2 class="card-title" style="color: #92400e;">重要・免責事項</h2>
+                    </div>
+                    <div style="line-height: 1.8; color: #334155;">
+                        <p style="font-weight: bold;">本システムで算出されるデータは、学習指導の参考とするための「参考値」です。</p>
+                        <p style="margin-top: 1rem;">
+                            平均点、順位、GPA、累計単位数等の計算結果には、システム上の端数処理や各種推定値が含まれる場合があります。単位修得の可否や進級判定等の最終的かつ公式な判断は、必ず<strong>教務発行の正式な書類（通知表、成績証明書等）</strong>を正として判断してください。
+                        </p>
+                        <p style="margin-top: 0.5rem; color: #b91c1c; font-size: 0.9rem;">
+                            ※ 特別学修単位の算入には上限がありますが、本システムでは上限は考慮されませんのでご注意ください。
+                        </p>
+                    </div>
+                </div>
+            </div>
         </section>
     </main>
 

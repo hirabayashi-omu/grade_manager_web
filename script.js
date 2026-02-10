@@ -2535,40 +2535,7 @@ function renderSettings() {
     const nameSel = document.getElementById('settingNameDisplay');
     if (nameSel) nameSel.value = state.nameDisplayMode || 'name';
 
-    // 1. Render Students (List style)
-    const studentsList = document.getElementById('studentsList');
-    if (studentsList) {
-        studentsList.innerHTML = '';
-        state.students.forEach((s, idx) => {
-            const item = document.createElement('div');
-            item.style.cssText = 'display: flex; align-items: center; justify-content: space-between; background: white; padding: 0.6rem 0.8rem; border-radius: 0.5rem; border: 1px solid #e2e8f0; font-size: 0.9rem; transition: all 0.2s;';
-            const isCurrent = (s === state.currentStudent);
-            if (isCurrent) {
-                item.style.background = '#eff6ff';
-                item.style.borderColor = '#3b82f6';
-            }
-            item.innerHTML = `
-                <div style="display: flex; align-items: center; gap: 0.6rem; overflow: hidden; cursor: pointer;" onclick="document.getElementById('studentSelect').value='${s}'; state.currentStudent='${s}'; saveSessionState(); renderSettings();">
-                    <div style="width: 24px; height: 24px; background: ${isCurrent ? '#bfdbfe' : '#f1f5f9'}; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; color: ${isCurrent ? '#1e40af' : '#64748b'};">${idx + 1}</div>
-                    <span style="font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: ${isCurrent ? '#1d4ed8' : '#334155'};">${s} ${isCurrent ? '<span style="font-size:0.7em; color:#3b82f6; border:1px solid #3b82f6; padding:1px 4px; border-radius:4px; margin-left:4px;">選択中</span>' : ''}</span>
-                </div>
-                <div style="display: flex; gap: 0.2rem;">
-                    <button onclick="editStudentMetadata('${s}')" style="border:none; background:none; color:#94a3b8; cursor:pointer; padding: 0.2rem; display: flex;" title="詳細情報を編集">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                    </button>
-                    <!-- Rename Button (Separate from Metadata) -->
-                    <button onclick="editStudentSetting(${idx})" style="border:none; background:none; color:#94a3b8; cursor:pointer; padding: 0.2rem; display: flex;" title="氏名変更">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                    </button>
-                    <button onclick="removeStudentSetting(${idx})" style="border:none; background:none; color:#94a3b8; cursor:pointer; padding: 0.2rem; display: flex;" title="削除">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
-                </div>
-            `;
-            studentsList.appendChild(item);
-        });
-        updatePlaceholderNames();
-    }
+
 
     // 4. Update Storage Usage
     updateStorageUsageDisplay();
