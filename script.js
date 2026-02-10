@@ -410,7 +410,9 @@ let state = {
     officerRoles: JSON.parse(localStorage.getItem('gm_state_officerRoles') || 'null'), // Default in init
     annualEvents: JSON.parse(localStorage.getItem('gm_state_annual_events') || 'null') || {},
     officers: JSON.parse(localStorage.getItem('gm_state_officers') || '{}'), // Key: year, Value: { roleId: [name1, name2], ... }
-    sourceInfo: JSON.parse(localStorage.getItem('gm_state_sourceInfo') || '{}') // Metadata for imported files
+    sourceInfo: JSON.parse(localStorage.getItem('gm_state_sourceInfo') || '{}'), // Metadata for imported files
+    dataRangeMode: 'single', // 'single' or 'all' - controls whether to show single year or all data
+    targetFiscalYear: null // Target fiscal year for attendance filtering (auto-detected from attendance sources)
 };
 
 /**
@@ -746,6 +748,11 @@ function saveSessionState() {
         // Timetable Persistence
         localStorage.setItem('gm_state_timetables', JSON.stringify(state.timetables || {}));
 
+        // Data Range Mode Persistence
+        localStorage.setItem('gm_state_dataRangeMode', state.dataRangeMode || 'single');
+        localStorage.setItem('gm_state_targetFiscalYear', state.targetFiscalYear || '');
+
+
     } catch (e) {
         console.error('Save State Error:', e);
         if (e.name === 'QuotaExceededError' || e.code === 22) {
@@ -873,6 +880,13 @@ function loadSessionState() {
     if (!state.currentYear) {
         setDefaultYear();
     }
+
+    // Restore Data Range Mode Settings
+    const savedDataRangeMode = localStorage.getItem('gm_state_dataRangeMode');
+    if (savedDataRangeMode) state.dataRangeMode = savedDataRangeMode;
+
+    const savedTargetFiscalYear = localStorage.getItem('gm_state_targetFiscalYear');
+    if (savedTargetFiscalYear) state.targetFiscalYear = parseInt(savedTargetFiscalYear) || null;
 }
 
 // ==================== INITIALIZATION ====================
@@ -924,6 +938,7 @@ function init() {
 
     initAtRiskDefaults();
     initContextMenu();
+    updateDataRangeControls(); // Initialize data range controls
 
     // 4. Initialize Auth & UI (Last, so data is ready for rendering)
     initAuth();
@@ -2074,6 +2089,94 @@ function setupAttendanceListeners() {
         touchStartStudent = null;
         touchStartType = null;
     });
+
+    // Data Range Mode Controls
+    document.getElementById('dataRangeSelect')?.addEventListener('change', (e) => {
+        state.dataRangeMode = e.target.value;
+        saveSessionState();
+        updateDataRangeControls();
+        render();
+    });
+
+    document.getElementById('fiscalYearSelect')?.addEventListener('change', (e) => {
+        state.targetFiscalYear = parseInt(e.target.value);
+        saveSessionState();
+        render();
+    });
+}
+
+/**
+ * Updates the data range controls (fiscal year dropdown visibility and options).
+ * Called when attendance data is loaded or when range mode changes.
+ */
+function updateDataRangeControls() {
+    const rangeSelect = document.getElementById('dataRangeSelect');
+    const fiscalYearSelect = document.getElementById('fiscalYearSelect');
+
+    if (!rangeSelect || !fiscalYearSelect) return;
+
+    // Set current mode
+    rangeSelect.value = state.dataRangeMode || 'single';
+
+    // Show/hide fiscal year selector based on mode
+    if (state.dataRangeMode === 'single') {
+        fiscalYearSelect.style.display = '';
+
+        // Populate fiscal year options from attendance sources
+        const years = new Set();
+
+        // Get years from attendance sources
+        if (state.attendance && state.attendance.sources) {
+            state.attendance.sources.forEach(src => {
+                if (src.year) years.add(src.year);
+            });
+        }
+
+        // If no sources, use current year as fallback
+        if (years.size === 0) {
+            const currentYear = new Date().getFullYear();
+            years.add(currentYear);
+        }
+
+        // Sort years descending
+        const sortedYears = Array.from(years).sort((a, b) => b - a);
+
+        // Populate dropdown
+        fiscalYearSelect.innerHTML = sortedYears.map(y =>
+            `<option value="${y}">${y}年度</option>`
+        ).join('');
+
+        // Set selected year
+        if (!state.targetFiscalYear || !years.has(state.targetFiscalYear)) {
+            state.targetFiscalYear = sortedYears[0]; // Default to latest
+        }
+        fiscalYearSelect.value = state.targetFiscalYear;
+    } else {
+        fiscalYearSelect.style.display = 'none';
+    }
+}
+
+/**
+ * Checks if a date string (YYYY/MM/DD) falls within the specified fiscal year.
+ * Japanese fiscal year runs from April 1 to March 31 of the following year.
+ * @param {string} dateStr - Date string in YYYY/MM/DD format
+ * @param {number} fiscalYear - The fiscal year (e.g., 2025 means 2025/04/01 - 2026/03/31)
+ * @returns {boolean}
+ */
+function isDateInFiscalYear(dateStr, fiscalYear) {
+    if (!dateStr || !fiscalYear) return true; // If no filter, include all
+
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return false;
+
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1; // 1-12
+
+    // Fiscal year starts April 1 of fiscalYear and ends March 31 of fiscalYear+1
+    if (year === fiscalYear && month >= 4) return true; // Apr-Dec of fiscalYear
+    if (year === fiscalYear + 1 && month <= 3) return true; // Jan-Mar of fiscalYear+1
+
+    return false;
 }
 
 function switchTab(tabName) {
@@ -6243,7 +6346,9 @@ function renderAtRiskReport() {
             return;
         }
 
-        const yearSubjects = state.subjects.filter(s => s.year == year && !s.exclude);
+        const yearSubjects = state.dataRangeMode === 'all'
+            ? state.subjects.filter(s => !s.exclude)
+            : state.subjects.filter(s => s.year == year && !s.exclude);
         const results = [];
 
         // Attendance limits from UI
@@ -6260,7 +6365,12 @@ function renderAtRiskReport() {
                     const attObj = state.attendance || {};
                     const records = attObj.records || {};
                     const studentAttendance = records[studentName] || {};
-                    const datesSorted = Object.keys(studentAttendance).sort((a, b) => new Date(a) - new Date(b));
+
+                    // Apply fiscal year filter if in single mode
+                    const shouldFilterByYear = state.dataRangeMode === 'single' && state.targetFiscalYear;
+                    const datesSorted = Object.keys(studentAttendance)
+                        .filter(dStr => !shouldFilterByYear || isDateInFiscalYear(dStr, state.targetFiscalYear))
+                        .sort((a, b) => new Date(a) - new Date(b));
 
                     const subStats = {}; // subj -> { abs, lat, total }
                     const dowStats = {}; // dow -> { abs, lat }
@@ -6968,7 +7078,15 @@ function renderSeatingGrid() {
             } else if (student && colorMode === 'attendance') {
                 const attendance = state.attendance.records[student] || {};
                 let totalAbs = 0, totalLat = 0;
-                Object.values(attendance).forEach(dayEvents => {
+
+                // Apply fiscal year filter if in single mode
+                const shouldFilterByYear = state.dataRangeMode === 'single' && state.targetFiscalYear;
+
+                Object.keys(attendance).forEach(dateStr => {
+                    // Skip dates outside fiscal year if filtering
+                    if (shouldFilterByYear && !isDateInFiscalYear(dateStr, state.targetFiscalYear)) return;
+
+                    const dayEvents = attendance[dateStr];
                     dayEvents.forEach(ev => {
                         if (ev.status === "欠") totalAbs++;
                         else if (ev.status === "遅") totalLat++;
@@ -7681,10 +7799,22 @@ function getStudentAverage(student) {
             avg = latestScores.reduce((a, b) => a + b, 0) / latestScores.length;
         }
     } else {
-        // Cumulative
+        // Cumulative - respect dataRangeMode
         const scoreData = state.scores[student];
         const allScores = [];
-        Object.values(scoreData).forEach(subjectScores => {
+
+        // Filter subjects by year if in single mode
+        const relevantSubjects = state.dataRangeMode === 'single' && state.currentYear
+            ? state.subjects.filter(s => s.year === state.currentYear && !s.exclude)
+            : state.subjects.filter(s => !s.exclude);
+
+        const relevantSubjectNames = new Set(relevantSubjects.map(s => s.name));
+
+        Object.keys(scoreData).forEach(subjectName => {
+            // Skip subjects not in the filtered list
+            if (!relevantSubjectNames.has(subjectName)) return;
+
+            const subjectScores = scoreData[subjectName];
             if (typeof subjectScores === 'object') {
                 SCORE_KEYS.forEach(key => {
                     const val = subjectScores[key];
@@ -7694,6 +7824,7 @@ function getStudentAverage(student) {
                 });
             }
         });
+
         if (allScores.length > 0) {
             avg = allScores.reduce((a, b) => a + b, 0) / allScores.length;
         }
@@ -10010,6 +10141,7 @@ function handleAttendanceFileUpload(e) {
             console.log('Attendance data saved, initializing...');
             initAttendance();
             updateSourceSummaryDisplay();
+            updateDataRangeControls(); // Update fiscal year dropdown
             alert(`出欠データを読み込みました。\n(Source: ${file.name})`);
         } catch (err) {
             console.error('CSV parsing error:', err);
@@ -10093,6 +10225,7 @@ function deleteAttendanceSource(sourceId) {
         renderCumulativeAttendanceChart();
     }
     updateSourceSummaryDisplay();
+    updateDataRangeControls(); // Update fiscal year dropdown
     alert(`データを削除しました。\n(削除数: ${removedCount} records)`);
 }
 
@@ -11305,7 +11438,13 @@ function generateClassAttendanceStats() {
             const subAbs = {};
             const subLat = {};
 
+            // Apply fiscal year filter if in single mode
+            const shouldFilterByYear = state.dataRangeMode === 'single' && state.targetFiscalYear;
+
             Object.entries(records).forEach(([dStr, dayEvents]) => {
+                // Skip dates outside fiscal year if filtering
+                if (shouldFilterByYear && !isDateInFiscalYear(dStr, state.targetFiscalYear)) return;
+
                 const dayIdx = new Date(dStr).getDay();
                 const dayLabel = ["日", "月", "火", "水", "木", "金", "土"][dayIdx];
 
@@ -11639,7 +11778,13 @@ function getStudentSummaryHtml(studentName, testKey, targetYear) {
     const subjectAttendance = {}; // Track per subject
     const alerts = []; // For "At-Risk" items
 
-    const datesSorted = Object.keys(records).sort((a, b) => new Date(a) - new Date(b));
+    // Apply fiscal year filter if in single mode
+    const shouldFilterByYear = state.dataRangeMode === 'single' && state.targetFiscalYear;
+
+    const datesSorted = Object.keys(records)
+        .filter(dStr => !shouldFilterByYear || isDateInFiscalYear(dStr, state.targetFiscalYear))
+        .sort((a, b) => new Date(a) - new Date(b));
+
     let maxStreak = 0, currentStreak = 0;
     const dowStats = {};
     const periodStats = {};

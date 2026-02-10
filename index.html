@@ -79,6 +79,19 @@
                 </select>
             </div>
 
+            <div class="control-group"
+                style="border-left: 1px solid #cbd5e1; padding-left: 0.8rem; margin-left: 0.4rem;"
+                title="データの集計対象範囲を切り替えます">
+                <label for="dataRangeSelect">抽出</label>
+                <select id="dataRangeSelect" style="width: 80px; color: #4338ca; font-weight: 600;">
+                    <option value="single">単年度</option>
+                    <option value="all">全期間</option>
+                </select>
+                <select id="fiscalYearSelect" style="width: 80px;" title="出欠集計の対象年度">
+                    <!-- Populated by JS -->
+                </select>
+            </div>
+
 
             <div class="control-group">
                 <label for="studentSelect">学生</label>
@@ -3044,9 +3057,12 @@
         }
     </style>
 
+    <div id="print-overlay" class="print-overlay"></div>
+    <script src="context_menu_helper.js"></script>
     <script src="settings_ui_helper.js"></script>
     <script src="timetable_editor.js"></script>
-    <script src="script.js"></script>
+    <script src="class_stats.js"></script>
+    <script src="script.js?v=4"></script>
 </body>
 
 </html>
