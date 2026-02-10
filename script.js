@@ -8468,6 +8468,11 @@ function confirmImportFromBoard() {
     const newStudents = [...state.students];
     const newMetadata = { ...state.studentMetadata };
 
+    // Auto-Detect Current Year from Imported Data (Majority Vote)
+    const yearCounts = {};
+    let maxCount = 0;
+    let majorityYear = null;
+
     // Helper to find existing student by OMUID/Student ID
     const findStudentById = (sid) => {
         if (!sid) return null;
@@ -8483,6 +8488,15 @@ function confirmImportFromBoard() {
 
     allCandidates.forEach(c => {
         if (importState.selected.has(c.name)) {
+            // Count Year
+            const y = parseInt(c.year);
+            if (!isNaN(y)) {
+                yearCounts[y] = (yearCounts[y] || 0) + 1;
+                if (yearCounts[y] > maxCount) {
+                    maxCount = yearCounts[y];
+                    majorityYear = y;
+                }
+            }
             // Try to find if this student already exists by ID
             const sid = c.studentId || c.metadata['studentId'] || c.metadata['学籍番号'] || c.metadata['OMUID'] || c.metadata['omuid'];
             const existingName = findStudentById(sid);
@@ -8521,6 +8535,14 @@ function confirmImportFromBoard() {
 
     state.students = newStudents;
     state.studentMetadata = newMetadata;
+
+    // Update State Current Year if detected and different
+    if (majorityYear !== null && majorityYear !== state.currentYear) {
+        state.currentYear = majorityYear;
+        console.log(`[Roster Import] Auto-updated current year to ${state.currentYear}`);
+        // Notify user about year update
+        setTimeout(() => alert(`名簿データに基づいて、現在の学年を「${state.currentYear}年」に更新しました。`), 500);
+    }
     invalidateCandidateCache(); // Update cache after import
 
     if (!state.students.includes(state.currentStudent)) {
