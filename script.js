@@ -397,6 +397,8 @@ let state = {
     seatingPresets: [],
     studentMetadata: {}, // Store tag info (extra columns from roster)
     nameDisplayMode: localStorage.getItem('gm_state_name_display') || 'name', // 'name' or 'initial'
+    rosterSources: [], // Array of { id, filename, year, importDate, studentCount, students: [], metadata: {} }
+    facultySources: [], // Array of { id, filename, year, importDate, facultyCount, faculty: [] }
     attendance: {
         records: {}, // Key: StudentName, Value: { "YYYY/MM/DD": [ { p:1, subj:"Math", status:"欠", teacher:"Tanaka" }, ... ] }
         periodInfo: { start: '', end: '' },
@@ -409,6 +411,7 @@ let state = {
     timetables: {}, // Key: year, Value: { semester: { day: { period: { s, t, email } } } }
     officerRoles: JSON.parse(localStorage.getItem('gm_state_officerRoles') || 'null'), // Default in init
     annualEvents: JSON.parse(localStorage.getItem('gm_state_annual_events') || 'null') || {},
+    annualEventSources: [], // Array of { id, year, filename, importDate }
     officers: JSON.parse(localStorage.getItem('gm_state_officers') || '{}'), // Key: year, Value: { roleId: [name1, name2], ... }
     sourceInfo: JSON.parse(localStorage.getItem('gm_state_sourceInfo') || '{}'), // Metadata for imported files
     dataRangeMode: 'single', // 'single' or 'all' - controls whether to show single year or all data
@@ -752,6 +755,11 @@ function saveSessionState() {
         localStorage.setItem('gm_state_dataRangeMode', state.dataRangeMode || 'single');
         localStorage.setItem('gm_state_targetFiscalYear', state.targetFiscalYear || '');
 
+        // Roster, Faculty and Annual Event Sources Persistence
+        localStorage.setItem('gm_state_rosterSources', JSON.stringify(state.rosterSources || []));
+        localStorage.setItem('gm_state_facultySources', JSON.stringify(state.facultySources || []));
+        localStorage.setItem('gm_state_annualEventSources', JSON.stringify(state.annualEventSources || []));
+
 
     } catch (e) {
         console.error('Save State Error:', e);
@@ -887,6 +895,22 @@ function loadSessionState() {
 
     const savedTargetFiscalYear = localStorage.getItem('gm_state_targetFiscalYear');
     if (savedTargetFiscalYear) state.targetFiscalYear = parseInt(savedTargetFiscalYear) || null;
+
+    // Restore Roster, Faculty and Annual Event Sources
+    try {
+        const savedRosterSources = localStorage.getItem('gm_state_rosterSources');
+        if (savedRosterSources) state.rosterSources = JSON.parse(savedRosterSources) || [];
+
+        const savedFacultySources = localStorage.getItem('gm_state_facultySources');
+        if (savedFacultySources) state.facultySources = JSON.parse(savedFacultySources) || [];
+
+        const savedEventSources = localStorage.getItem('gm_state_annualEventSources');
+        if (savedEventSources) state.annualEventSources = JSON.parse(savedEventSources) || [];
+
+        console.log(`Source history loaded: Roster(${state.rosterSources.length}), Faculty(${state.facultySources.length}), Events(${state.annualEventSources.length})`);
+    } catch (e) {
+        console.error('Failed to restore history sources:', e);
+    }
 }
 
 // ==================== INITIALIZATION ====================
@@ -1532,6 +1556,8 @@ function populateControls() {
     // 7. Summary Year Select
     const summaryYear = document.getElementById('summaryYearSelect');
     if (summaryYear) summaryYear.value = state.currentYear;
+
+    updateClassSelectVisibility();
 }
 
 function setupEventListeners() {
@@ -2091,18 +2117,30 @@ function setupAttendanceListeners() {
     });
 
     // Data Range Mode Controls
-    document.getElementById('dataRangeSelect')?.addEventListener('change', (e) => {
-        state.dataRangeMode = e.target.value;
+    const handleDataRangeChange = (val) => {
+        state.dataRangeMode = val;
+        if (state.dataRangeMode === 'single' && state.targetFiscalYear) {
+            syncRosterAndFacultyWithYear(state.targetFiscalYear);
+        }
         saveSessionState();
         updateDataRangeControls();
         render();
-    });
+    };
 
-    document.getElementById('fiscalYearSelect')?.addEventListener('change', (e) => {
-        state.targetFiscalYear = parseInt(e.target.value);
+    const handleFiscalYearChange = (val) => {
+        state.targetFiscalYear = parseInt(val);
+        syncRosterAndFacultyWithYear(state.targetFiscalYear);
         saveSessionState();
+        updateDataRangeControls(); // Ensure both dropdowns update if needed
         render();
-    });
+    };
+
+    document.getElementById('dataRangeSelect')?.addEventListener('change', (e) => handleDataRangeChange(e.target.value));
+
+    // Fiscal Year Controls (Settings Tab)
+    document.getElementById('fiscalYearSelect')?.addEventListener('change', (e) => handleFiscalYearChange(e.target.value));
+    // Fiscal Year Controls (Header)
+    document.getElementById('headerFiscalYearSelect')?.addEventListener('change', (e) => handleFiscalYearChange(e.target.value));
 }
 
 /**
@@ -2110,50 +2148,53 @@ function setupAttendanceListeners() {
  * Called when attendance data is loaded or when range mode changes.
  */
 function updateDataRangeControls() {
-    const rangeSelect = document.getElementById('dataRangeSelect');
-    const fiscalYearSelect = document.getElementById('fiscalYearSelect');
+    const rangeSelects = [
+        document.getElementById('dataRangeSelect')
+    ];
+    const fiscalYearSelects = [
+        document.getElementById('fiscalYearSelect'),
+        document.getElementById('headerFiscalYearSelect')
+    ];
 
-    if (!rangeSelect || !fiscalYearSelect) return;
+    // Update all range selects
+    rangeSelects.forEach(sel => {
+        if (sel) sel.value = state.dataRangeMode || 'single';
+    });
 
-    // Set current mode
-    rangeSelect.value = state.dataRangeMode || 'single';
-
-    // Show/hide fiscal year selector based on mode
-    if (state.dataRangeMode === 'single') {
-        fiscalYearSelect.style.display = '';
-
-        // Populate fiscal year options from attendance sources
-        const years = new Set();
-
-        // Get years from attendance sources
-        if (state.attendance && state.attendance.sources) {
-            state.attendance.sources.forEach(src => {
-                if (src.year) years.add(src.year);
-            });
-        }
-
-        // If no sources, use current year as fallback
-        if (years.size === 0) {
-            const currentYear = new Date().getFullYear();
-            years.add(currentYear);
-        }
-
-        // Sort years descending
-        const sortedYears = Array.from(years).sort((a, b) => b - a);
-
-        // Populate dropdown
-        fiscalYearSelect.innerHTML = sortedYears.map(y =>
-            `<option value="${y}">${y}年度</option>`
-        ).join('');
-
-        // Set selected year
-        if (!state.targetFiscalYear || !years.has(state.targetFiscalYear)) {
-            state.targetFiscalYear = sortedYears[0]; // Default to latest
-        }
-        fiscalYearSelect.value = state.targetFiscalYear;
-    } else {
-        fiscalYearSelect.style.display = 'none';
+    // Determine fiscal years
+    const years = new Set();
+    if (state.attendance && state.attendance.sources) {
+        state.attendance.sources.forEach(src => {
+            if (src.year) years.add(src.year);
+        });
     }
+    if (years.size === 0) {
+        const currentYear = new Date().getFullYear();
+        years.add(currentYear);
+    }
+    const sortedYears = Array.from(years).sort((a, b) => b - a);
+
+    // Default target year if needed
+    if (!state.targetFiscalYear || !years.has(state.targetFiscalYear)) {
+        state.targetFiscalYear = sortedYears[0];
+    }
+
+    // Update fiscal year selects
+    const isSingle = (state.dataRangeMode || 'single') === 'single';
+
+    fiscalYearSelects.forEach(sel => {
+        if (!sel) return;
+
+        if (isSingle) {
+            sel.style.display = '';
+            sel.innerHTML = sortedYears.map(y =>
+                `<option value="${y}">${y}年度</option>`
+            ).join('');
+            sel.value = state.targetFiscalYear;
+        } else {
+            sel.style.display = 'none';
+        }
+    });
 }
 
 /**
@@ -2489,6 +2530,10 @@ function clearStorageType(type) {
 function renderSettings() {
     // 0. Refresh imported file summaries
     updateSourceSummaryDisplay();
+    updateDataRangeControls();
+
+    const nameSel = document.getElementById('settingNameDisplay');
+    if (nameSel) nameSel.value = state.nameDisplayMode || 'name';
 
     // 1. Render Students (List style)
     const studentsList = document.getElementById('studentsList');
@@ -8730,6 +8775,98 @@ function confirmImportFromBoard() {
         state.currentStudent = state.students[0];
     }
 
+    // Save Roster as Year-Based Source
+    let detectedRosterYear = majorityYear !== null ? majorityYear : state.currentYear;
+
+    // Try to extract 4-digit year from filename (e.g., 2025meiretsu_0331.csv)
+    if (importState.filename) {
+        const yearMatch = importState.filename.match(/\b(20\d{2})\b/);
+        if (yearMatch) {
+            detectedRosterYear = yearMatch[1];
+            console.log(`[Roster Import] Extracted year ${detectedRosterYear} from filename: ${importState.filename}`);
+        }
+    }
+
+    const rosterYear = detectedRosterYear;
+    const sourceId = `roster_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    // Determine Group Name (e.g., "1-1" for 1st year, "2M" for others) from metadata
+    let detectedGroupName = "";
+    const rosterYearCounts = {}, courseCounts = {}, classCounts = {};
+
+    allCandidates.filter(c => importState.selected.has(c.name)).slice(0, 100).forEach(c => {
+        const m = c.metadata || {};
+        const y = m.year || m['学年'] || m['年'] || c.year || "";
+        const co = m.course || m['コース'] || m['学科'] || m['学科名'] || m['課程'] || "";
+        const cl = m.class || m['組'] || m['クラス'] || m['クラス名'] || m['学級'] || c.class || "";
+
+        if (y) rosterYearCounts[y] = (rosterYearCounts[y] || 0) + 1;
+        if (co) courseCounts[co] = (courseCounts[co] || 0) + 1;
+        if (cl) classCounts[cl] = (classCounts[cl] || 0) + 1;
+    });
+
+    const majYear = Object.entries(rosterYearCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || majorityYear;
+    const majCourse = Object.entries(courseCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
+    const majClass = Object.entries(classCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
+
+    if (majYear) {
+        if (majClass && (String(majClass).length === 1 || String(majClass).includes('-'))) {
+            if (String(majClass).includes('-')) detectedGroupName = majClass;
+            else detectedGroupName = majYear + String(majClass).toUpperCase();
+        } else if (majCourse) {
+            const label = majCourse.length <= 4 ? majCourse : majCourse.charAt(0);
+            detectedGroupName = majYear + label;
+        } else if (majClass) {
+            detectedGroupName = majYear + "年 " + majClass;
+        } else {
+            detectedGroupName = majYear + "年";
+        }
+    }
+
+    // Extract students and metadata for this source
+    const sourceStudents = allCandidates
+        .filter(c => importState.selected.has(c.name))
+        .map(c => c.name);
+
+    const sourceMetadata = {};
+    sourceStudents.forEach(name => {
+        if (newMetadata[name]) {
+            sourceMetadata[name] = newMetadata[name];
+        }
+    });
+
+    // Add or update roster source for this year
+    const existingSourceIdx = state.rosterSources.findIndex(s => s.year === rosterYear);
+    const rosterSource = {
+        id: existingSourceIdx >= 0 ? state.rosterSources[existingSourceIdx].id : sourceId,
+        filename: importState.filename || 'roster.csv',
+        year: rosterYear,
+        groupName: detectedGroupName, // Store Grade/Course name
+        importDate: new Date().toISOString(),
+        studentCount: sourceStudents.length,
+        students: sourceStudents,
+        metadata: sourceMetadata
+    };
+
+    if (existingSourceIdx >= 0) {
+        // Update existing source
+        state.rosterSources[existingSourceIdx] = rosterSource;
+        console.log(`[Roster Import] Updated existing roster source for year ${rosterYear}`);
+    } else {
+        // Add new source
+        state.rosterSources.push(rosterSource);
+        console.log(`[Roster Import] Added new roster source for year ${rosterYear}`);
+    }
+
+    // Also update current state source info
+    state.sourceInfo.roster = {
+        filename: importState.filename,
+        date: new Date().toISOString(),
+        count: sourceStudents.length,
+        year: rosterYear,
+        groupName: detectedGroupName
+    };
+
     saveSessionState();
 
     // Update Source Info for Roster
@@ -8737,7 +8874,8 @@ function confirmImportFromBoard() {
         count: state.students.length,
         date: new Date().toISOString(),
         filename: importState.filename || 'roster.csv',
-        year: majorityYear !== null ? majorityYear : state.currentYear
+        year: rosterYear,
+        groupName: detectedGroupName
     };
     // Re-save with source info
     saveSessionState();
@@ -9033,6 +9171,36 @@ function handleFacultyRosterSelect(e) {
             // Update Source Info for Faculty
             const yearMatch = file.name.match(/(\d{4})/);
             const dYear = yearMatch ? parseInt(yearMatch[1]) : new Date().getFullYear();
+
+            // Save Faculty as Year-Based Source
+            const sourceId = `faculty_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            const existingSourceIdx = state.facultySources.findIndex(s => s.year === dYear);
+
+            const facultySource = {
+                id: existingSourceIdx >= 0 ? state.facultySources[existingSourceIdx].id : sourceId,
+                filename: file.name,
+                year: dYear,
+                importDate: new Date().toISOString(),
+                facultyCount: candidates.length,
+                faculty: candidates.map(c => ({
+                    id: c.id,
+                    dept: c.dept,
+                    duty1: c.duty1,
+                    duty2: c.duty2,
+                    name: c.name,
+                    email: c.email,
+                    omuid: c.omuid
+                }))
+            };
+
+            if (existingSourceIdx >= 0) {
+                state.facultySources[existingSourceIdx] = facultySource;
+                console.log(`[Faculty Import] Updated existing faculty source for year ${dYear}`);
+            } else {
+                state.facultySources.push(facultySource);
+                console.log(`[Faculty Import] Added new faculty source for year ${dYear}`);
+            }
+
             state.sourceInfo.faculty = {
                 count: candidates.length,
                 date: new Date().toISOString(),
@@ -10218,13 +10386,13 @@ function deleteAttendanceSource(sourceId) {
     };
 
     saveSessionState();
+    updateSourceSummaryDisplay(); // Added this line
 
     // UI Refresh
     if (state.currentTab === 'attendance') {
         renderAttendanceCalendar();
         renderCumulativeAttendanceChart();
     }
-    updateSourceSummaryDisplay();
     updateDataRangeControls(); // Update fiscal year dropdown
     alert(`データを削除しました。\n(削除数: ${removedCount} records)`);
 }
@@ -11520,9 +11688,12 @@ function generateClassAttendanceStats() {
 
             // For strings (name)
             if (typeof valA === 'string') {
-                return sortOrder === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+                return sortOrder === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(a.name); // Fallback to name for tie-breaking
             }
             // For numbers
+            if (valA === valB) { // Tie-breaking for numbers
+                return a.name.localeCompare(b.name);
+            }
             return sortOrder === 'asc' ? valA - valB : valB - valA;
         });
 
@@ -11698,12 +11869,21 @@ function getClassName() {
 function updateClassSelectVisibility() {
     const classGroup = document.getElementById('classSelectGroup');
     const classSelect = document.getElementById('classSelect');
+    const courseSelect = document.getElementById('subjectCourseFilterHeader');
+
     if (!classGroup || !classSelect) return;
 
-    if (state.currentYear === 1 && (!state.currentCourse || state.currentCourse === "")) {
+    if (state.currentYear === 1) {
+        // Force course to be empty for Year 1
+        if (state.currentCourse !== "") {
+            state.currentCourse = "";
+            if (courseSelect) courseSelect.value = "";
+        }
+
         classGroup.style.display = 'flex';
         classSelect.value = state.currentClass || '1';
     } else {
+        // Hide class selector for years 2 and above
         classGroup.style.display = 'none';
     }
 }
@@ -12260,7 +12440,7 @@ function renderClassOfficers() {
 
                     teamChatLink = `
                         <a href="${groupUrl}" target="_blank" title="この係全員とグループチャット" style="display:inline-flex; vertical-align:middle; padding: 2px; background: #fff; border-radius: 4px; border: 1px solid #c7d2fe; text-decoration: none; margin-left: 4px;">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="#4338ca" stroke-width="2" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="#4338ca" stroke-width="2" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
                         </a>
                         <a href="${mailUrl}" title="この係全員にメール" style="display:inline-flex; vertical-align:middle; padding: 2px; background: #fff; border-radius: 4px; border: 1px solid #cbd5e1; text-decoration: none; margin-left: 4px;">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="#64748b" stroke-width="2" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
@@ -12953,34 +13133,59 @@ function migrateAnnualEvents() {
 function updateAnnualEventSummary() {
     migrateAnnualEvents();
     const summaryEl = document.getElementById('annualEventFileSummary');
+    const historyContainer = document.getElementById('annualEventHistoricalSourcesContainer');
+    const historyList = document.getElementById('annualEventHistoricalSourcesList');
     if (!summaryEl) return;
 
     const allKeys = Object.keys(state.annualEvents || {});
     const years = allKeys.filter(k => /^\d{4}$/.test(k)).sort((a, b) => b - a);
 
     if (years.length === 0) {
-        summaryEl.innerHTML = '<div style="color: #94a3b8; text-align: center;">データ未読込</div>';
+        summaryEl.innerHTML = '<div style="color: #94a3b8; text-align: center; padding: 0.5rem;">予定データ未読込</div>';
+        if (historyContainer) historyContainer.style.display = 'none';
     } else {
         const latestYear = years[0];
         summaryEl.innerHTML = `
-            <div style="color: #059669; font-weight: 600;">${latestYear}年度 読込済</div>
-            <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 0.5rem;">登録年度:</div>
-            <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 0.5rem;">
-                ${years.map(y => `
-                    <span style="background: #e2e8f0; border-radius: 4px; padding: 2px 6px; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 4px;">
-                        ${y}
-                        <button onclick="deleteAnnualEventYear('${y}')" title="${y}年度を削除" style="background: none; border: none; cursor: pointer; color: #64748b; padding: 0; display: flex; align-items: center;">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="12" height="12"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                        </button>
-                    </span>
-                `).join('')}
-            </div>
-            <button class="btn btn-secondary" onclick="clearAnnualEventsCache()" style="font-size: 0.75rem; padding: 0.2rem 0.5rem; color: #ef4444; border-color: #fecaca; width: 100%; justify-content: center;">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="12" height="12"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                全年度の行事データを消去
-            </button>
+            <div style="color: #059669; font-weight: 600;">読込済: ${latestYear}年度 行事予定</div>
+            <div style="font-size: 0.75rem; color: #64748b;">全 ${years.length} 年分が登録されています</div>
+            <div style="font-size: 0.7rem; color: #94a3b8;">カレンダー、月間リストに反映済み</div>
         `;
+
+        if (historyContainer && historyList) {
+            historyContainer.style.display = 'block';
+            renderHistoricalSourceList(state.annualEventSources || [], historyList, 'AnnualEvent');
+        }
     }
+}
+
+function restoreAnnualEventSource(sourceId) {
+    const source = (state.annualEventSources || []).find(s => s.id === sourceId);
+    if (!source) return;
+
+    const yearSelect = document.getElementById('eventYearSelect');
+    if (yearSelect) {
+        yearSelect.value = source.year;
+        renderAnnualEvents();
+        // Switch tab to calendar to show it
+        setTimeout(() => switchTab('annual_events'), 100);
+        alert(`${source.year}年度の行事で表示を更新しました。`);
+    }
+}
+
+function deleteAnnualEventSource(sourceId) {
+    const source = (state.annualEventSources || []).find(s => s.id === sourceId);
+    if (!source) return;
+
+    if (!confirm(`${source.year}年度の行事予定データを削除しますか？\n(この操作は取り消せません)`)) return;
+
+    delete state.annualEvents[source.year];
+    state.annualEventSources = state.annualEventSources.filter(s => s.id !== sourceId);
+
+    saveSessionState();
+    updateAnnualEventSummary();
+    renderAnnualEvents();
+
+    alert(`${source.year}年度のデータを削除しました。`);
 }
 
 function deleteAnnualEventYear(year) {
@@ -12998,82 +13203,154 @@ function deleteAnnualEventYear(year) {
 function updateSourceSummaryDisplay() {
     // Roster
     const rosterEl = document.getElementById('rosterFileSummary');
+    const rosterHistoryContainer = document.getElementById('rosterHistoricalSourcesContainer');
+    const rosterHistoryList = document.getElementById('rosterHistoricalSourcesList');
+
     if (rosterEl) {
         if (state.sourceInfo.roster && state.sourceInfo.roster.count > 0) {
             const info = state.sourceInfo.roster;
             const dateStr = new Date(info.date).toLocaleDateString();
-            const yearStr = info.year ? ` (${info.year}年)` : '';
+
+            // Handle labels using metadata if available
+            let displayYear = info.year;
+            if (info.filename && (!displayYear || String(displayYear).length < 4)) {
+                const yearMatch = info.filename.match(/(20\d{2})/);
+                if (yearMatch) displayYear = yearMatch[1];
+            }
+
+            const fiscalYearLabel = displayYear ? `${displayYear}年度` : (info.year ? `${info.year}年` : '');
+
+            // Extract Group Label from metadata (using actual students currently in state)
+            let groupName = info.groupName || "";
+            if (state.students.length > 0) {
+                const yearCounts = {}, courseCounts = {}, classCounts = {};
+                state.students.slice(0, 50).forEach(name => { // Sample some students
+                    const m = state.studentMetadata[name] || {};
+                    const y = m.year || m['学年'] || m['年'] || "";
+                    const c = m.course || m['コース'] || m['学科'] || m['学科名'] || m['課程'] || "";
+                    const cl = m.class || m['組'] || m['クラス'] || m['クラス名'] || m['学級'] || "";
+                    if (y) yearCounts[y] = (yearCounts[y] || 0) + 1;
+                    if (c) courseCounts[c] = (courseCounts[c] || 0) + 1;
+                    if (cl) classCounts[cl] = (classCounts[cl] || 0) + 1;
+                });
+
+                const majorityYear = Object.entries(yearCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
+                const majorityCourse = Object.entries(courseCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
+                const majorityClass = Object.entries(classCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
+
+                if (majorityYear) {
+                    if (majorityClass && (String(majorityClass).length === 1 || String(majorityClass).includes('-'))) {
+                        // e.g. "2M" or "1-1"
+                        if (String(majorityClass).includes('-')) groupName = majorityClass;
+                        else groupName = majorityYear + String(majorityClass).toUpperCase();
+                    } else if (majorityCourse) {
+                        // e.g. "2機械工学科" (If long, take first char like "2機")
+                        const courseLabel = majorityCourse.length <= 4 ? majorityCourse : majorityCourse.charAt(0);
+                        groupName = majorityYear + courseLabel;
+                    } else if (majorityClass) {
+                        groupName = majorityYear + "年 " + majorityClass;
+                    } else {
+                        groupName = majorityYear + "年";
+                    }
+                }
+            }
+
+            const groupLabel = groupName ? ` ${groupName}` : '';
+
             rosterEl.innerHTML = `
-                <div style="color: #059669; font-weight: 600;">読込済${yearStr}</div>
+                <div style="color: #059669; font-weight: 600;">読込済: ${fiscalYearLabel}${groupLabel}</div>
                 <div style="font-size: 0.75rem; color: #64748b;">${info.count} 名 (${dateStr})</div>
-                <div style="font-size: 0.7rem; color: #94a3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${info.filename || ''}</div>
+                <div style="font-size: 0.7rem; color: #94a3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${info.filename || ''}">${info.filename || ''}</div>
             `;
         } else {
-            rosterEl.innerHTML = '<div style="color: #94a3b8; text-align: center;">名簿未読込</div>';
+            rosterEl.innerHTML = '<div style="color: #94a3b8; text-align: center; padding: 0.5rem;">名簿データ未読込</div>';
+        }
+    }
+
+    // Render historical roster sources
+    if (rosterHistoryContainer && rosterHistoryList) {
+        if (state.rosterSources && state.rosterSources.length > 0) {
+            rosterHistoryContainer.style.display = 'block';
+            renderHistoricalSourceList(state.rosterSources, rosterHistoryList, 'Roster');
+        } else {
+            rosterHistoryContainer.style.display = 'none';
         }
     }
 
     // Faculty
     const facultyEl = document.getElementById('facultyFileSummary');
+    const facultyHistoryContainer = document.getElementById('facultyHistoricalSourcesContainer');
+    const facultyHistoryList = document.getElementById('facultyHistoricalSourcesList');
+
     if (facultyEl) {
         if (state.sourceInfo.faculty && state.sourceInfo.faculty.count > 0) {
             const info = state.sourceInfo.faculty;
             const dateStr = new Date(info.date).toLocaleDateString();
-            const yearStr = info.year ? ` (${info.year}年度)` : '';
+            const yearLabel = info.year ? `${info.year}年度` : '';
             facultyEl.innerHTML = `
-                <div style="color: #059669; font-weight: 600;">読込済${yearStr}</div>
+                <div style="color: #059669; font-weight: 600;">読込済: ${yearLabel} 教職員名簿</div>
                 <div style="font-size: 0.75rem; color: #64748b;">${info.count} 名 (${dateStr})</div>
-                <div style="font-size: 0.7rem; color: #94a3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${info.filename || ''}</div>
+                <div style="font-size: 0.7rem; color: #94a3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${info.filename || ''}">${info.filename || ''}</div>
             `;
         } else {
-            facultyEl.innerHTML = '<div style="color: #94a3b8; text-align: center;">教員名簿未読込</div>';
+            facultyEl.innerHTML = '<div style="color: #94a3b8; text-align: center; padding: 0.5rem;">教員名簿データ未読込</div>';
+        }
+    }
+
+    // Render historical faculty sources
+    if (facultyHistoryContainer && facultyHistoryList) {
+        if (state.facultySources && state.facultySources.length > 0) {
+            facultyHistoryContainer.style.display = 'block';
+            renderHistoricalSourceList(state.facultySources, facultyHistoryList, 'Faculty');
+        } else {
+            facultyHistoryContainer.style.display = 'none';
         }
     }
 
     // Attendance
+    // Attendance
     const attEl = document.getElementById('attendanceFileSummary');
+    const attHistoryContainer = document.getElementById('attendanceHistoricalSourcesContainer');
+    const attHistoryList = document.getElementById('attendanceHistoricalSourcesList');
+
     if (attEl) {
-        // V4: Use sources list
         if (state.attendance && state.attendance.sources && state.attendance.sources.length > 0) {
-            let html = `<div style="color: #059669; font-weight: 600; marginBottom: 4px;">読込済 (${state.attendance.sources.length}ファイル)</div>`;
+            const count = state.attendance.sources.length;
+            const years = [...new Set(state.attendance.sources.map(s => s.year).filter(y => y))].sort((a, b) => b - a);
+            const yearLabel = years.length > 0 ? `${years[0]}年度 ` : '';
 
-            // Sort by year desc, then importDate desc
-            const sortedSources = [...state.attendance.sources].sort((a, b) => {
-                if (b.year !== a.year) return b.year - a.year;
-                return new Date(b.importDate) - new Date(a.importDate);
-            });
+            // Get combined date range from summary
+            const start = state.attendance.periodInfo.start;
+            const end = state.attendance.periodInfo.end;
+            const rangeStr = (start && end) ? `${start} ～ ${end}` : '期間不明';
 
-            sortedSources.forEach(src => {
-                html += `
-                    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 4px; padding: 6px; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center;">
-                        <div style="overflow: hidden;">
-                            <div style="font-size: 0.75rem; font-weight: 600; color: #475569;">
-                                ${src.year}年度 <span style="font-weight: normal; color: #94a3b8;">(${src.dateRange.start} ~)</span>
-                            </div>
-                            <div style="font-size: 0.7rem; color: #64748b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px;" title="${src.filename}">
-                                ${src.filename}
-                            </div>
-                        </div>
-                        <button onclick="deleteAttendanceSource('${src.id}')" style="background: #fee2e2; color: #ef4444; border: 1px solid #fecaca; border-radius: 4px; padding: 2px 6px; font-size: 0.7rem; cursor: pointer; flex-shrink: 0; margin-left: 6px;">
-                            削除
-                        </button>
-                    </div>
-                `;
-            });
-            // Add Clear All option at bottom? No, exist in parent UI usually.
-            attEl.innerHTML = html;
+            attEl.innerHTML = `
+                <div style="color: #059669; font-weight: 600;">読込済: ${yearLabel}出欠データ</div>
+                <div style="font-size: 0.75rem; color: #64748b;">データの期間: ${rangeStr}</div>
+                <div style="font-size: 0.7rem; color: #94a3b8;">${count}個のファイルを読込中</div>
+            `;
         }
-        // Legacy Fallback
         else if (state.sourceInfo.attendance && state.sourceInfo.attendance.count > 0) {
             const info = state.sourceInfo.attendance;
-            const yearStr = info.year ? ` (${info.year}年度)` : '';
+            const yearLabel = info.year ? `${info.year}年度` : '';
+            const rangeStr = (info.startDate && info.endDate) ? `${info.startDate} ～ ${info.endDate}` : '';
             attEl.innerHTML = `
-                <div style="color: #059669; font-weight: 600;">読込済${yearStr}</div>
-                <div style="font-size: 0.75rem; color: #64748b;">${info.count} data pts</div>
+                <div style="color: #059669; font-weight: 600;">読込済: ${yearLabel} (レガシー)</div>
+                <div style="font-size: 0.75rem; color: #64748b;">${rangeStr}</div>
                 <div style="font-size: 0.7rem; color: #94a3b8;">Legacy Data</div>
             `;
         } else {
-            attEl.innerHTML = '<div style="color: #94a3b8; text-align: center;">出欠データ未読込</div>';
+            attEl.innerHTML = '<div style="color: #94a3b8; text-align: center; padding: 0.5rem;">出欠データ未読込</div>';
+        }
+    }
+
+    // Render historical attendance sources
+    if (attHistoryContainer && attHistoryList) {
+        if (state.attendance && state.attendance.sources && state.attendance.sources.length > 0) {
+            attHistoryContainer.style.display = 'block';
+            renderHistoricalSourceList(state.attendance.sources, attHistoryList, 'Attendance');
+        } else {
+            attHistoryContainer.style.display = 'none';
         }
     }
 
@@ -13081,14 +13358,98 @@ function updateSourceSummaryDisplay() {
     updateAnnualEventSummary();
 }
 
-function clearAnnualEventsCache() {
-    if (!confirm("読み込まれているすべての年度の行事予定データを消去しますか？\n(この操作は取り消せません)")) return;
-    state.annualEvents = {};
-    localStorage.removeItem('gm_state_annual_events');
-    updateAnnualEventSummary();
-    renderAnnualEvents();
-    alert("行事予定データを初期化しました。");
+/**
+ * Render a simple historical source list for the main import cards
+ */
+function renderHistoricalSourceList(sources, container, type) {
+    const sorted = [...sources].sort((a, b) => {
+        if (b.year !== a.year) return b.year - a.year;
+        return new Date(b.importDate) - new Date(a.importDate);
+    });
+
+    container.innerHTML = sorted.map(src => {
+        // Dynamic year extraction from filename for fiscal year
+        let displayFiscalYear = src.year;
+        if (src.filename && (!displayFiscalYear || String(displayFiscalYear).length < 4)) {
+            const yearMatch = src.filename.match(/(20\d{2})/);
+            if (yearMatch) displayFiscalYear = yearMatch[1];
+        }
+
+        const fiscalYearLabel = displayFiscalYear ? `${displayFiscalYear}年度` : (src.year ? `${src.year}年` : '');
+
+        // Extract Group Label or Info
+        let infoLabel = "";
+        let groupName = src.groupName || "";
+
+        // UI Label Logic (Restored missing logic)
+        if (type === 'Attendance' && src.dateRange) {
+            infoLabel = `<span style="font-weight: normal; color: #64748b; font-size: 0.75rem;">(${src.dateRange.start} ～ ${src.dateRange.end})</span>`;
+        } else if (type === 'AnnualEvent') {
+            infoLabel = `<span style="font-weight: normal; color: #94a3b8;">(行事予定)</span>`;
+        } else if (src.studentCount || src.facultyCount) {
+            infoLabel = `<span style="font-weight: normal; color: #94a3b8;">(${src.studentCount || src.facultyCount}名)</span>`;
+        }
+
+        const isGeneric = !groupName || groupName.endsWith('年');
+        if (isGeneric && src.metadata) {
+            const students = Object.values(src.metadata);
+            if (students.length > 0) {
+                const yearCounts = {}, courseCounts = {}, classCounts = {};
+                students.slice(0, 50).forEach(m => {
+                    const y = m.year || m['学年'] || m['年'] || "";
+                    const c = m.course || m['コース'] || m['学科'] || m['学科名'] || m['課程'] || "";
+                    const cl = m.class || m['組'] || m['クラス'] || m['クラス名'] || m['学級'] || "";
+                    if (y) yearCounts[y] = (yearCounts[y] || 0) + 1;
+                    if (c) courseCounts[c] = (courseCounts[c] || 0) + 1;
+                    if (cl) classCounts[cl] = (classCounts[cl] || 0) + 1;
+                });
+                const majorityYear = Object.entries(yearCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
+                const majorityCourse = Object.entries(courseCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
+                const majorityClass = Object.entries(classCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
+                if (majorityYear) {
+                    if (majorityClass && (String(majorityClass).length <= 2 || String(majorityClass).includes('-'))) {
+                        if (String(majorityClass).includes('-')) groupName = majorityClass;
+                        else groupName = majorityYear + String(majorityClass).toUpperCase();
+                    } else if (majorityCourse) {
+                        const courseLabel = majorityCourse.length <= 4 ? majorityCourse : majorityCourse.charAt(0);
+                        groupName = majorityYear + courseLabel;
+                    } else if (majorityClass) {
+                        groupName = majorityYear + "年 " + majorityClass;
+                    } else {
+                        groupName = majorityYear + "年";
+                    }
+                }
+            }
+        }
+
+        const groupLabel = groupName ? ` ${groupName}` : '';
+        const showRestore = (type !== 'Attendance');
+
+        return `
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.6rem; background: white; border: 1px solid #e2e8f0; border-radius: 0.5rem; font-size: 0.8rem; box-shadow: 0 1px 2px rgba(0,0,0,0.03);">
+                <div style="flex: 1; overflow: hidden; margin-right: 0.5rem;">
+                    <div style="font-weight: 600; color: #334155; margin-bottom: 0.1rem;">${fiscalYearLabel}${groupLabel} ${infoLabel}</div>
+                    <div style="font-size: 0.7rem; color: #94a3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${src.filename}">${src.filename}</div>
+                </div>
+                <div style="display: flex; gap: 0.4rem; flex-shrink: 0;">
+                    ${showRestore ? `
+                    <button onclick="restore${type}Source('${src.id}')" title="復元" style="width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 0.4rem; cursor: pointer; transition: all 0.2s;">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="14" height="14">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                    </button>` : ''}
+                    <button onclick="delete${type}Source('${src.id}')" title="削除" style="width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; background: #fff1f2; color: #dc2626; border: 1px solid #fecaca; border-radius: 0.4rem; cursor: pointer; transition: all 0.2s;">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="14" height="14">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
 }
+
+
 
 function updateEventYearOptions() {
     const yearSelect = document.getElementById('eventYearSelect');
@@ -13304,7 +13665,19 @@ function loadAnnualEventsFileDialog() {
                 if (!state.annualEvents) state.annualEvents = {};
                 state.annualEvents[detectedYear] = result;
 
-                // Update Source Info for Events
+                // Sync Annual Event Sources
+                if (!state.annualEventSources) state.annualEventSources = [];
+                const newEventSource = {
+                    id: 'event_' + Date.now(),
+                    year: parseInt(detectedYear),
+                    importDate: new Date().toISOString(),
+                    filename: file.name || 'Excel Import'
+                };
+                // Remove older entry for same year if it exists
+                state.annualEventSources = state.annualEventSources.filter(s => s.year !== newEventSource.year);
+                state.annualEventSources.push(newEventSource);
+
+                // Update Source Info for Events (Summary)
                 if (!state.sourceInfo.events) state.sourceInfo.events = {};
                 state.sourceInfo.events = {
                     year: parseInt(detectedYear),
@@ -13313,6 +13686,7 @@ function loadAnnualEventsFileDialog() {
                 };
 
                 localStorage.setItem('gm_state_annual_events', JSON.stringify(state.annualEvents));
+                saveSessionState();
                 updateAnnualEventSummary();
                 alert(`${detectedYear}年度として行事予定表を読み込みました。`);
 
@@ -13362,3 +13736,161 @@ function exportAnnualEventsCsv() {
     link.setAttribute("download", `annual_events_${y}.csv`);
     link.click();
 }
+
+// ==================== ROSTER SOURCE MANAGEMENT ====================
+
+/**
+ * Restore roster data from a specific year source
+ */
+function restoreRosterSource(sourceId) {
+    const source = state.rosterSources.find(s => s.id === sourceId);
+    if (!source) {
+        alert('指定された名簿ソースが見つかりません。');
+        return;
+    }
+
+    if (!confirm(`以下の名簿データを復元しますか？\n\nファイル: ${source.filename}\n年度: ${source.year}\n学生数: ${source.studentCount}\n\n※現在の学生リストとメタデータが上書きされます。`)) return;
+
+    // Restore students and metadata from source
+    state.students = [...source.students];
+    state.studentMetadata = JSON.parse(JSON.stringify(source.metadata));
+    state.currentYear = source.year;
+
+    // Update current student if needed
+    if (!state.students.includes(state.currentStudent)) {
+        state.currentStudent = state.students[0] || '';
+    }
+
+    saveSessionState();
+    populateControls();
+    render();
+
+    alert(`名簿データを復元しました。\n(${source.studentCount} 名)`);
+    console.log(`[Roster] Restored roster from source: ${source.filename} (Year: ${source.year})`);
+}
+
+/**
+ * Synchronizes the active roster and faculty lists with the specified fiscal year.
+ * Looks up historical sources and restores them if found.
+ */
+function syncRosterAndFacultyWithYear(year) {
+    if (!year) return;
+
+    console.log(`[Sync] Synchronizing roster for fiscal year: ${year}...`);
+
+    // 1. Sync Student Roster
+    const rosterSource = state.rosterSources.find(s => s.year == year);
+    if (rosterSource) {
+        state.students = [...rosterSource.students];
+        state.studentMetadata = JSON.parse(JSON.stringify(rosterSource.metadata));
+
+        // Also update source info summary
+        state.sourceInfo.roster = {
+            filename: rosterSource.filename,
+            date: rosterSource.importDate,
+            count: rosterSource.studentCount,
+            year: rosterSource.year,
+            groupName: rosterSource.groupName
+        };
+
+        // Ensure current student is valid
+        if (!state.students.includes(state.currentStudent)) {
+            state.currentStudent = state.students[0] || '';
+        }
+    }
+
+    // 2. Sync Faculty Roster
+    const facultySource = state.facultySources.find(s => s.year == year);
+    if (facultySource) {
+        if (typeof facultyImportState !== 'undefined') {
+            facultyImportState.candidates = JSON.parse(JSON.stringify(facultySource.faculty));
+            facultyImportState.selected = new Set();
+            facultyImportState.filters = {};
+            facultyImportState.searchText = '';
+        }
+
+        // Update faculty source info
+        state.sourceInfo.faculty = {
+            filename: facultySource.filename,
+            date: facultySource.importDate,
+            count: facultySource.facultyCount,
+            year: facultySource.year
+        };
+    }
+
+    // Update UI controls
+    if (typeof populateControls === 'function') populateControls();
+    if (typeof renderFacultyTable === 'function') renderFacultyTable();
+    if (typeof updateSourceSummaryDisplay === 'function') updateSourceSummaryDisplay();
+}
+
+/**
+ * Delete a roster source
+ */
+function deleteRosterSource(sourceId) {
+    const sourceIdx = state.rosterSources.findIndex(s => s.id === sourceId);
+    if (sourceIdx === -1) {
+        alert('指定された名簿ソースが見つかりません。');
+        return;
+    }
+
+    const source = state.rosterSources[sourceIdx];
+    if (!confirm(`以下の名簿ソースを削除しますか？\n\nファイル: ${source.filename}\n年度: ${source.year}\n学生数: ${source.studentCount}\n\n※この操作は取り消せません。`)) return;
+
+    state.rosterSources.splice(sourceIdx, 1);
+    saveSessionState();
+    updateSourceSummaryDisplay();
+
+    alert(`名簿ソースを削除しました。\n(${source.filename})`);
+    console.log(`[Roster] Deleted roster source: ${source.filename} (Year: ${source.year})`);
+}
+
+/**
+ * Restore faculty data from a specific year source
+ */
+function restoreFacultySource(sourceId) {
+    const source = state.facultySources.find(s => s.id === sourceId);
+    if (!source) {
+        alert('指定された教員名簿ソースが見つかりません。');
+        return;
+    }
+
+    if (!confirm(`以下の教員名簿データを復元しますか？\n\nファイル: ${source.filename}\n年度: ${source.year}\n教員数: ${source.facultyCount}\n\n※現在の教員候補リストが上書きされます。`)) return;
+
+    // Restore faculty candidates
+    facultyImportState.candidates = JSON.parse(JSON.stringify(source.faculty));
+    facultyImportState.selected = new Set();
+    facultyImportState.filters = {};
+    facultyImportState.searchText = '';
+
+    saveSessionState();
+    switchTab('faculty_roster');
+    renderFacultyFilters();
+    renderFacultyTable();
+
+    alert(`教員名簿データを復元しました。\n(${source.facultyCount} 名)`);
+    console.log(`[Faculty] Restored faculty from source: ${source.filename} (Year: ${source.year})`);
+}
+
+/**
+ * Delete a faculty source
+ */
+function deleteFacultySource(sourceId) {
+    const sourceIdx = state.facultySources.findIndex(s => s.id === sourceId);
+    if (sourceIdx === -1) {
+        alert('指定された教員名簿ソースが見つかりません。');
+        return;
+    }
+
+    const source = state.facultySources[sourceIdx];
+    if (!confirm(`以下の教員名簿ソースを削除しますか？\n\nファイル: ${source.filename}\n年度: ${source.year}\n教員数: ${source.facultyCount}\n\n※この操作は取り消せません。`)) return;
+
+    state.facultySources.splice(sourceIdx, 1);
+    saveSessionState();
+    updateSourceSummaryDisplay();
+
+    alert(`教員名簿ソースを削除しました。\n(${source.filename})`);
+    console.log(`[Faculty] Deleted faculty source: ${source.filename} (Year: ${source.year})`);
+}
+
+
