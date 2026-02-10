@@ -579,12 +579,22 @@ function normalizeStudentName(s) {
  * Compresses attendance data for storage by using dictionaries for repetitive strings.
  * This significantly reduces localStorage usage (often by 70-80%).
  */
+/**
+ * Compresses attendance data for storage by using dictionaries for repetitive strings.
+ * This significantly reduces localStorage usage (often by 70-80%).
+ * Version 4: Supports Source IDs for multiple file imports.
+ */
 function serializeAttendance(att) {
-    if (!att || !att.records || att._v === 3) return att;
+    if (!att || !att.records) return att;
+    // If already compressed (v3 or v4), return as is (unless we want to re-compress?)
+    // Usually we call this on raw state before saving.
+    // Raw state doesn't have _v property usually.
+    if (att._v) return att;
 
     const subjects = [];
     const teachers = [];
     const statuses = [];
+    const sourceIds = [];
 
     const getIdx = (arr, val) => {
         const valStr = (val || "").toString().trim();
@@ -605,17 +615,20 @@ function serializeAttendance(att) {
                 r.p,
                 getIdx(subjects, r.subj),
                 getIdx(statuses, r.status),
-                getIdx(teachers, r.teacher)
+                getIdx(teachers, r.teacher),
+                getIdx(sourceIds, r.sid) // New in v4
             ]);
         }
     }
 
     return {
-        _v: 3,
+        _v: 4,
         records: compressedRecords,
         subjects: subjects,
         teachers: teachers,
         statuses: statuses,
+        sourceIds: sourceIds,
+        sources: att.sources || [], // Persist sources metadata
         periodInfo: att.periodInfo,
         fileName: att.fileName,
         memos: att.memos,
@@ -627,32 +640,69 @@ function serializeAttendance(att) {
  * Decompresses attendance data from storage.
  */
 function deserializeAttendance(data) {
-    if (!data || data._v !== 3) return data;
+    if (!data) return data;
 
-    const records = {};
-    const subjects = data.subjects || [];
-    const teachers = data.teachers || [];
-    const statuses = data.statuses || [];
+    // v3 Support (Legacy)
+    if (data._v === 3) {
+        // ... (Logic from v3, but we can upgrade to v4 structure in memory)
+        const records = {};
+        const subjects = data.subjects || [];
+        const teachers = data.teachers || [];
+        const statuses = data.statuses || [];
 
-    for (const student in data.records) {
-        records[student] = {};
-        for (const date in data.records[student]) {
-            records[student][date] = data.records[student][date].map(r => ({
-                p: r[0],
-                subj: r[1] === -1 ? "" : subjects[r[1]],
-                status: r[2] === -1 ? "" : statuses[r[2]],
-                teacher: r[3] === -1 ? "" : teachers[r[3]]
-            }));
+        for (const student in data.records) {
+            records[student] = {};
+            for (const date in data.records[student]) {
+                records[student][date] = data.records[student][date].map(r => ({
+                    p: r[0],
+                    subj: r[1] === -1 ? "" : subjects[r[1]],
+                    status: r[2] === -1 ? "" : statuses[r[2]],
+                    teacher: r[3] === -1 ? "" : teachers[r[3]],
+                    sid: null // No source info in v3
+                }));
+            }
         }
+        return {
+            records: records,
+            sources: [], // No sources tracking in v3
+            periodInfo: data.periodInfo || { start: '', end: '' },
+            fileName: data.fileName || '',
+            memos: data.memos || {},
+            periodEvents: data.periodEvents || []
+        };
     }
 
-    return {
-        records: records,
-        periodInfo: data.periodInfo || { start: '', end: '' },
-        fileName: data.fileName || '',
-        memos: data.memos || {},
-        periodEvents: data.periodEvents || []
-    };
+    // v4 Support
+    if (data._v === 4) {
+        const records = {};
+        const subjects = data.subjects || [];
+        const teachers = data.teachers || [];
+        const statuses = data.statuses || [];
+        const sourceIds = data.sourceIds || [];
+
+        for (const student in data.records) {
+            records[student] = {};
+            for (const date in data.records[student]) {
+                records[student][date] = data.records[student][date].map(r => ({
+                    p: r[0],
+                    subj: r[1] === -1 ? "" : subjects[r[1]],
+                    status: r[2] === -1 ? "" : statuses[r[2]],
+                    teacher: r[3] === -1 ? "" : teachers[r[3]],
+                    sid: (r[4] !== undefined && r[4] !== -1) ? sourceIds[r[4]] : null
+                }));
+            }
+        }
+        return {
+            records: records,
+            sources: data.sources || [],
+            periodInfo: data.periodInfo || { start: '', end: '' },
+            fileName: data.fileName || '',
+            memos: data.memos || {},
+            periodEvents: data.periodEvents || []
+        };
+    }
+
+    return data; // Raw or unknown version
 }
 
 // ==================== STATE PERSISTENCE ====================
@@ -9830,13 +9880,18 @@ function handleAttendanceFileUpload(e) {
             if (firstDateIdx === -1) throw new Error("日付列が見つかりません。");
             console.log('First date column index:', firstDateIdx);
 
-            const records = {};
-            let globalMinDate = null;
-            let globalMaxDate = null;
+            if (!state.attendance.sources) state.attendance.sources = [];
+            const newSourceId = `src_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+
+            // Build new records relative to current state
+            const records = state.attendance.records || {};
+
+            let fileMinDate = null;
+            let fileMaxDate = null;
 
             dataRows.forEach(row => {
                 if (row.length < 3) return;
-                const studentName = row[2].trim(); // Name is in col 2 (0:No, 1:ID, 2:Name)
+                const studentName = row[2].trim(); // Name is in col 2
                 if (!studentName) return;
 
                 if (!records[studentName]) records[studentName] = {};
@@ -9853,32 +9908,78 @@ function handleAttendanceFileUpload(e) {
 
                     if (!dateRegex.test(normalizedDate)) continue;
 
+                    // If we have data here (even if status is empty, it's a record of a class), 
+                    // we should probably store it. But usually we only care if there IS a status or subject.
+                    // Let's store if subject or status exists.
+                    if (!subject && !status) continue;
+
                     if (!records[studentName][normalizedDate]) records[studentName][normalizedDate] = [];
+
+                    // Check for duplicate period entry for this source or overwrite existing?
+                    // Strategy: Filter out existing entry for SAME period if exists, then push new.
+                    // Actually, if we are "superimposing", maybe we overwrite the period slot.
+                    // Detailed logic: Remove record with same period if exists.
+                    records[studentName][normalizedDate] = records[studentName][normalizedDate].filter(r => r.p !== period);
+
                     records[studentName][normalizedDate].push({
                         p: period,
                         subj: subject,
                         status: status,
-                        teacher: teacher
+                        teacher: teacher,
+                        sid: newSourceId
                     });
 
-                    // Track date range
+                    // Track date range for this file
                     const d = new Date(normalizedDate);
                     if (!isNaN(d)) {
-                        if (!globalMinDate || d < globalMinDate) globalMinDate = d;
-                        if (!globalMaxDate || d > globalMaxDate) globalMaxDate = d;
+                        if (!fileMinDate || d < fileMinDate) fileMinDate = d;
+                        if (!fileMaxDate || d > fileMaxDate) fileMaxDate = d;
                     }
                 }
             });
 
-            console.log('Records built, student count:', Object.keys(records).length);
+            console.log('Records updated, student count:', Object.keys(records).length);
             state.attendance.records = records;
-            state.attendance.fileName = file.name;
-            if (globalMinDate && globalMaxDate) {
+            state.attendance.fileName = state.attendance.fileName ? `${state.attendance.fileName}, ${file.name}` : file.name;
+
+            // Recalculate global period info based on all records (or just extend?)
+            // Robust way: scan all records dates. Expensive?
+            // Simple way: extend current range with file range.
+            let globalStart = state.attendance.periodInfo?.start ? new Date(state.attendance.periodInfo.start) : null;
+            let globalEnd = state.attendance.periodInfo?.end ? new Date(state.attendance.periodInfo.end) : null;
+
+            if (fileMinDate) {
+                if (!globalStart || fileMinDate < globalStart) globalStart = fileMinDate;
+                if (!globalEnd || fileMaxDate > globalEnd) globalEnd = fileMaxDate;
+            }
+
+            if (globalStart && globalEnd) {
                 state.attendance.periodInfo = {
-                    start: globalMinDate.toISOString().split('T')[0].replace(/-/g, '/'),
-                    end: globalMaxDate.toISOString().split('T')[0].replace(/-/g, '/')
+                    start: globalStart.toISOString().split('T')[0].replace(/-/g, '/'),
+                    end: globalEnd.toISOString().split('T')[0].replace(/-/g, '/')
                 };
             }
+
+            // Add Source Metadata
+            let attYear = new Date().getFullYear();
+            if (fileMinDate) {
+                // If fiscal year logic needed: if month < 4, year--
+                attYear = fileMinDate.getFullYear();
+                if (fileMinDate.getMonth() + 1 < 4) attYear--;
+            }
+
+            state.attendance.sources.push({
+                id: newSourceId,
+                filename: file.name,
+                importDate: new Date().toISOString(),
+                dateRange: {
+                    start: fileMinDate ? fileMinDate.toISOString().split('T')[0].replace(/-/g, '/') : '',
+                    end: fileMaxDate ? fileMaxDate.toISOString().split('T')[0].replace(/-/g, '/') : ''
+                },
+                year: attYear,
+                count: Object.keys(records).length // Crude count (students involved)
+            });
+
 
             // Sync with master student list
             const foundNames = Object.keys(records);
@@ -9895,25 +9996,21 @@ function handleAttendanceFileUpload(e) {
                 if (typeof populateControls === 'function') populateControls();
             }
 
-            // Update Source Info for Attendance
-            let attYear = new Date().getFullYear();
-            if (state.attendance.periodInfo.start) {
-                attYear = parseInt(state.attendance.periodInfo.start.split('/')[0]);
-            }
+            // Update Source Info (Summary of latest)
             state.sourceInfo.attendance = {
                 startDate: state.attendance.periodInfo.start,
                 endDate: state.attendance.periodInfo.end,
                 count: Object.keys(records).length,
                 date: new Date().toISOString(),
-                filename: file.name,
-                year: attYear
+                filename: `(${state.attendance.sources.length} files)`,
+                year: attYear // Latest file's year
             };
 
             saveSessionState();
             console.log('Attendance data saved, initializing...');
             initAttendance();
             updateSourceSummaryDisplay();
-            alert('出欠データを読み込みました。');
+            alert(`出欠データを読み込みました。\n(Source: ${file.name})`);
         } catch (err) {
             console.error('CSV parsing error:', err);
             alert('CSVの解析に失敗しました: ' + err.message);
@@ -9925,6 +10022,61 @@ function handleAttendanceFileUpload(e) {
         console.log('Resetting file input');
         e.target.value = '';
     });
+}
+
+function deleteAttendanceSource(sourceId) {
+    if (!state.attendance || !state.attendance.sources) return;
+    const sourceIdx = state.attendance.sources.findIndex(s => s.id === sourceId);
+    if (sourceIdx === -1) return;
+
+    const source = state.attendance.sources[sourceIdx];
+    if (!confirm(`以下の出欠データを削除しますか？\n\nファイル: ${source.filename}\n期間: ${source.dateRange.start} ~ ${source.dateRange.end}`)) return;
+
+    // Remove source metadata
+    state.attendance.sources.splice(sourceIdx, 1);
+
+    // Filter records
+    let removedCount = 0;
+    const records = state.attendance.records;
+    for (const student in records) {
+        for (const date in records[student]) {
+            const originalLen = records[student][date].length;
+            records[student][date] = records[student][date].filter(r => r.sid !== sourceId);
+            if (records[student][date].length < originalLen) removedCount++;
+
+            if (records[student][date].length === 0) {
+                delete records[student][date];
+            }
+        }
+        if (Object.keys(records[student]).length === 0) {
+            delete records[student];
+        }
+    }
+
+    // Re-evaluate periodInfo (Global Range)
+    let minD = null, maxD = null;
+    // Iterate all remaining records to find new range. This might be slow but it's safe.
+    for (const st in records) {
+        for (const dt in records[st]) {
+            const d = new Date(dt);
+            if (!minD || d < minD) minD = d;
+            if (!maxD || d > maxD) maxD = d;
+        }
+    }
+    state.attendance.periodInfo = {
+        start: minD ? minD.toISOString().split('T')[0].replace(/-/g, '/') : '',
+        end: maxD ? maxD.toISOString().split('T')[0].replace(/-/g, '/') : ''
+    };
+
+    saveSessionState();
+
+    // UI Refresh
+    if (state.currentTab === 'attendance') {
+        renderAttendanceCalendar();
+        renderCumulativeAttendanceChart();
+    }
+    updateSourceSummaryDisplay(); // Update the list in settings
+    alert(`データを削除しました。\n(削除数: ${removedCount} records)`);
 }
 
 function renderAttendanceCalendar() {
@@ -12719,16 +12871,47 @@ function updateSourceSummaryDisplay() {
     // Attendance
     const attEl = document.getElementById('attendanceFileSummary');
     if (attEl) {
-        if (state.sourceInfo.attendance && state.sourceInfo.attendance.count > 0) {
+        // V4: Use sources list
+        if (state.attendance && state.attendance.sources && state.attendance.sources.length > 0) {
+            let html = `<div style="color: #059669; font-weight: 600; marginBottom: 4px;">読込済 (${state.attendance.sources.length}ファイル)</div>`;
+
+            // Sort by year desc, then importDate desc
+            const sortedSources = [...state.attendance.sources].sort((a, b) => {
+                if (b.year !== a.year) return b.year - a.year;
+                return new Date(b.importDate) - new Date(a.importDate);
+            });
+
+            sortedSources.forEach(src => {
+                html += `
+                    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 4px; padding: 6px; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center;">
+                        <div style="overflow: hidden;">
+                            <div style="font-size: 0.75rem; font-weight: 600; color: #475569;">
+                                ${src.year}年度 <span style="font-weight: normal; color: #94a3b8;">(${src.dateRange.start} ~)</span>
+                            </div>
+                            <div style="font-size: 0.7rem; color: #64748b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px;" title="${src.filename}">
+                                ${src.filename}
+                            </div>
+                        </div>
+                        <button onclick="deleteAttendanceSource('${src.id}')" style="background: #fee2e2; color: #ef4444; border: 1px solid #fecaca; border-radius: 4px; padding: 2px 6px; font-size: 0.7rem; cursor: pointer; flex-shrink: 0; margin-left: 6px;">
+                            削除
+                        </button>
+                    </div>
+                `;
+            });
+            // Add Clear All option at bottom? No, exist in parent UI usually.
+            attEl.innerHTML = html;
+        }
+        // Legacy Fallback
+        else if (state.sourceInfo.attendance && state.sourceInfo.attendance.count > 0) {
             const info = state.sourceInfo.attendance;
             const yearStr = info.year ? ` (${info.year}年度)` : '';
             attEl.innerHTML = `
                 <div style="color: #059669; font-weight: 600;">読込済${yearStr}</div>
-                <div style="font-size: 0.75rem; color: #64748b;">${info.startDate || ''} ~ ${info.endDate || ''}</div>
-                <div style="font-size: 0.7rem; color: #94a3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${info.filename || ''}</div>
+                <div style="font-size: 0.75rem; color: #64748b;">${info.count} data pts</div>
+                <div style="font-size: 0.7rem; color: #94a3b8;">Legacy Data</div>
             `;
         } else {
-            attEl.innerHTML = '<div style="color: #94a3b8; text-align: center;">出欠CSV未読込</div>';
+            attEl.innerHTML = '<div style="color: #94a3b8; text-align: center;">出欠データ未読込</div>';
         }
     }
 
