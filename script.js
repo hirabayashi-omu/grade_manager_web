@@ -3545,7 +3545,10 @@ function processRosterCSV(rows, header) {
         const colYear = header.findIndex(h => h.trim().replace(/"/g, '') === '年' || h.trim() === '年');
         const colClass = header.findIndex(h => h.trim().replace(/"/g, '') === '組' || h.trim() === '組');
         const colNo = header.findIndex(h => h.includes('出席') && h.includes('番号'));
-        const colId = header.findIndex(h => h.includes('学籍') && h.includes('番号')); // Optional
+        const colId = header.findIndex(h => {
+            const norm = h.toLowerCase();
+            return (norm.includes('学籍') && norm.includes('番号')) || norm === 'id' || norm === 'omuid' || norm === 'student_id';
+        });
 
         if (colName === -1) throw new Error("CSVに「氏名」列が見つかりません。");
 
@@ -8461,25 +8464,62 @@ function confirmImportFromBoard() {
         allCandidates.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
     }
 
-    const newStudents = [];
-    const newMetadata = {};
+    // MERGE logic: Keep current students to preserve history, update matched ones, add new ones.
+    const newStudents = [...state.students];
+    const newMetadata = { ...state.studentMetadata };
+
+    // Helper to find existing student by OMUID/Student ID
+    const findStudentById = (sid) => {
+        if (!sid) return null;
+        for (const name of state.students) {
+            const m = state.studentMetadata[name] || {};
+            // Check various ID keys
+            if (m.studentId === sid || m['学籍番号'] === sid || m.id === sid || m.omuid === sid || m.OMUID === sid) {
+                return name;
+            }
+        }
+        return null;
+    };
 
     allCandidates.forEach(c => {
         if (importState.selected.has(c.name)) {
-            newStudents.push(c.name);
+            // Try to find if this student already exists by ID
+            const sid = c.studentId || c.metadata['studentId'] || c.metadata['学籍番号'] || c.metadata['OMUID'] || c.metadata['omuid'];
+            const existingName = findStudentById(sid);
+
+            if (existingName && existingName !== c.name) {
+                // Name Change Detected!
+                console.log(`[Roster Import] Renaming student: ${existingName} -> ${c.name}`);
+
+                // 1. Move Scores
+                if (state.scores[existingName]) {
+                    state.scores[c.name] = JSON.parse(JSON.stringify(state.scores[existingName]));
+                    delete state.scores[existingName];
+                }
+
+                // 2. Move Attendance
+                if (state.attendance && state.attendance.records && state.attendance.records[existingName]) {
+                    state.attendance.records[c.name] = JSON.parse(JSON.stringify(state.attendance.records[existingName]));
+                    delete state.attendance.records[existingName];
+                }
+
+                // 3. Remove old name from list to avoid duplicates (will be re-added with new name)
+                const idx = newStudents.indexOf(existingName);
+                if (idx !== -1) newStudents.splice(idx, 1);
+
+                // 4. Clean old metadata
+                delete newMetadata[existingName];
+            }
+
+            // Append or Update
+            if (!newStudents.includes(c.name)) {
+                newStudents.push(c.name);
+            }
             newMetadata[c.name] = c.metadata;
         }
     });
 
-    // MERGE logic: Keep current students IF they are still relevant OR just replace?
-    // User said "絞り込んだものを流すイメージ". 
-    // Usually this means "Update the master list to MATCH the selected ones".
-
     state.students = newStudents;
-    // For metadata, we merge into existing to preserve any manually added fields not in roster?
-    // Actually, roster is usually the source of truth for 'Year/Class/No'.
-    // Let's replace metadata for THOSE students, but keep others if we were appending.
-    // Since we are replacing state.students, we just use newMetadata.
     state.studentMetadata = newMetadata;
     invalidateCandidateCache(); // Update cache after import
 
