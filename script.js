@@ -391,7 +391,8 @@ let state = {
         perspective: 'teacher',
         colorMode: 'none', // 'none', 'grade', 'attendance'
         gradeThreshold: 60,
-        gradeMethod: 'cumulative'
+        gradeMethod: 'cumulative',
+        pdfColor: '#eef2ff' // User-selected PDF background color
     },
     seatingPresets: [],
     studentMetadata: {}, // Store tag info (extra columns from roster)
@@ -1727,6 +1728,11 @@ function setupEventListeners() {
     });
     document.getElementById('saveSeatingBtn')?.addEventListener('click', saveSeatingLayout);
     document.getElementById('loadSeatingBtn')?.addEventListener('click', loadSeatingLayout);
+    document.getElementById('exportSeatingPdfBtn')?.addEventListener('click', exportSeatingPdf);
+    document.getElementById('seatingPdfColor')?.addEventListener('change', (e) => {
+        state.seating.pdfColor = e.target.value;
+        saveSessionState();
+    });
 
     document.getElementById('changePassBtn')?.addEventListener('click', openPasswordChange);
     document.getElementById('clearAllDataBtn')?.addEventListener('click', clearAllDataHard);
@@ -6726,8 +6732,14 @@ function renderSeatingGrid() {
 
     if (!grid) return;
 
-    const { cols, rows, perspective } = state.seating;
+    const { cols, rows, perspective, pdfColor } = state.seating;
     const isTeacher = perspective === 'teacher';
+
+    // Sync color picker with state
+    const colorPicker = document.getElementById('seatingPdfColor');
+    if (colorPicker && pdfColor) {
+        colorPicker.value = pdfColor;
+    }
 
     // Calculate dynamic sizing based on grid size
     const totalCells = cols * rows;
@@ -7197,10 +7209,196 @@ function updateGradeMethodInfo() {
             const lastKey = SCORE_KEYS[SCORE_KEYS.length - 1];
             infoDiv.textContent = `（${targetYear}年 ${lastKey}を使用）`;
         }
-    } else {
-        infoDiv.textContent = '';
     }
 }
+
+function exportSeatingPdf() {
+    const year = state.currentYear;
+    const className = typeof getClassName === 'function' ? getClassName() : `${year}学年`;
+    const { cols, rows, perspective } = state.seating;
+    const isTeacher = perspective === 'teacher';
+
+    // Calculate dynamic sizing based on grid size
+    let cellSize, fontSize, labelFontSize;
+    if (cols <= 5) {
+        cellSize = '80px';
+        fontSize = '0.95rem';
+        labelFontSize = '0.75rem';
+    } else if (cols <= 7) {
+        cellSize = '70px';
+        fontSize = '0.85rem';
+        labelFontSize = '0.7rem';
+    } else if (cols <= 10) {
+        cellSize = '60px';
+        fontSize = '0.75rem';
+        labelFontSize = '0.65rem';
+    } else if (cols <= 15) {
+        cellSize = '50px';
+        fontSize = '0.65rem';
+        labelFontSize = '0.6rem';
+    } else {
+        cellSize = '40px';
+        fontSize = '0.55rem';
+        labelFontSize = '0.55rem';
+    }
+
+    const gap = cols > 10 ? '4px' : '8px';
+
+    // Header
+    const headerHtml = `
+        <div style="margin-bottom: 25px; text-align: center;">
+            <h1 style="margin: 0 0 10px 0; font-size: 20pt; font-weight: 800; background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: -0.01em;">${className} 座席表</h1>
+            <div style="font-size: 9pt; color: #94a3b8; margin-top: 8px;">出力日: ${new Date().toLocaleDateString('ja-JP')} | 視点: ${isTeacher ? '教員' : '学生'}</div>
+        </div>
+    `;
+
+    // Teacher desk
+    const deskHtml = `
+        <div style="grid-column: 1 / -1; justify-self: center; width: auto; min-width: 200px; text-align: center; background: #e2e8f0; padding: 0.4rem 1.5rem; border-radius: 0.3rem; font-weight: bold; color: #475569; font-size: ${labelFontSize}; margin-bottom: ${!isTeacher ? '15px' : '0'}; margin-top: ${isTeacher ? '15px' : '0'};">
+            教 卓 (前方)
+        </div>
+    `;
+
+    // Generate grid cells
+    let gridCellsHtml = '';
+    for (let currentR = 0; currentR < rows; currentR++) {
+        for (let currentC = 0; currentC < cols; currentC++) {
+            const rowIdx = isTeacher ? rows - 1 - currentR : currentR;
+            const colIdx = isTeacher ? cols - 1 - currentC : currentC;
+            const pos = `${rowIdx}-${colIdx}`;
+            const student = state.seating.assignments[pos];
+            const isFixed = state.seating.fixed.includes(pos);
+            const isDisabled = state.seating.disabled.includes(pos);
+            const label = String.fromCharCode(65 + colIdx) + (rowIdx + 1);
+
+            // Get attendance number from metadata
+            let attendanceNo = '';
+            if (student && state.studentMetadata && state.studentMetadata[student]) {
+                const meta = state.studentMetadata[student];
+                attendanceNo = meta['出席番号'] || meta['番号'] || meta['No.'] || meta['No'] || '';
+            }
+
+            // Use user-selected PDF color
+            const userColor = state.seating.pdfColor || '#eef2ff';
+
+            // Helper function to calculate relative luminance
+            function getLuminance(hex) {
+                const rgb = parseInt(hex.replace('#', ''), 16);
+                const r = ((rgb >> 16) & 0xff) / 255;
+                const g = ((rgb >> 8) & 0xff) / 255;
+                const b = (rgb & 0xff) / 255;
+
+                // Apply gamma correction
+                const rsRGB = r <= 0.03928 ? r / 12.92 : Math.pow((r + 0.055) / 1.055, 2.4);
+                const gsRGB = g <= 0.03928 ? g / 12.92 : Math.pow((g + 0.055) / 1.055, 2.4);
+                const bsRGB = b <= 0.03928 ? b / 12.92 : Math.pow((b + 0.055) / 1.055, 2.4);
+
+                return 0.2126 * rsRGB + 0.7152 * gsRGB + 0.0722 * bsRGB;
+            }
+
+            // Helper function to darken color for border
+            function darkenColor(hex, percent) {
+                const num = parseInt(hex.replace('#', ''), 16);
+                const amt = Math.round(2.55 * percent);
+                const R = (num >> 16) - amt;
+                const G = ((num >> 8) & 0x00FF) - amt;
+                const B = (num & 0x0000FF) - amt;
+                return '#' + (0x1000000 + (R < 255 ? R < 1 ? 0 : R : 255) * 0x10000 +
+                    (G < 255 ? G < 1 ? 0 : G : 255) * 0x100 +
+                    (B < 255 ? B < 1 ? 0 : B : 255))
+                    .toString(16).slice(1);
+            }
+
+            // Helper function to lighten color for border
+            function lightenColor(hex, percent) {
+                const num = parseInt(hex.replace('#', ''), 16);
+                const amt = Math.round(2.55 * percent);
+                const R = (num >> 16) + amt;
+                const G = ((num >> 8) & 0x00FF) + amt;
+                const B = (num & 0x0000FF) + amt;
+                return '#' + (0x1000000 + (R < 255 ? R : 255) * 0x10000 +
+                    (G < 255 ? G : 255) * 0x100 +
+                    (B < 255 ? B : 255))
+                    .toString(16).slice(1);
+            }
+
+            const isEmpty = !student;
+            const luminance = getLuminance(userColor);
+
+            // Use white text on dark backgrounds, dark text on light backgrounds
+            const autoTextColor = luminance > 0.5 ? '#1e293b' : '#ffffff';
+            const autoBorderColor = luminance > 0.5 ? darkenColor(userColor, 15) : lightenColor(userColor, 15);
+
+            const cellBgColor = isDisabled ? '#f1f5f9' : (isEmpty ? '#fafafa' : userColor);
+            const cellBorderColor = isFixed ? '#4f46e5' : (isDisabled ? '#cbd5e1' : autoBorderColor);
+            const cellBorderWidth = isFixed ? '3px' : '1px';
+            const textColor = isEmpty ? '#94a3b8' : autoTextColor;
+
+            gridCellsHtml += `
+                <div style="position: relative; width: ${cellSize}; height: ${cellSize}; background: ${cellBgColor}; border: ${cellBorderWidth} solid ${cellBorderColor}; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px; -webkit-print-color-adjust: exact; print-color-adjust: exact;">
+                    <div style="position: absolute; top: 2px; left: 4px; font-size: ${labelFontSize}; color: ${textColor}; font-weight: 600; opacity: 0.7;">${label}</div>
+                    ${attendanceNo ? `<div style="position: absolute; top: 2px; right: 4px; font-size: ${labelFontSize}; color: ${textColor}; font-weight: bold; opacity: 0.7;">${attendanceNo}</div>` : ''}
+                    <div style="font-size: ${fontSize}; font-weight: 600; color: ${textColor}; text-align: center; line-height: 1.2;">${student || ''}</div>
+                </div>
+            `;
+        }
+    }
+
+    const gridHtml = `
+        <div style="display: grid; grid-template-columns: repeat(${cols}, ${cellSize}); gap: ${gap}; justify-content: center; margin-top: 20px;">
+            ${!isTeacher ? deskHtml : ''}
+            ${gridCellsHtml}
+            ${isTeacher ? deskHtml : ''}
+        </div>
+    `;
+
+    // Footer
+    const footerHtml = `
+        <div style="margin-top: 40px; display: flex; justify-content: space-between; align-items: center; padding-top: 10px; border-top: 1pt solid #4f46e5; font-size: 8pt; color: #94a3b8; font-weight: 500;">
+            <div style="display: flex; align-items: center; gap: 5px;">
+                <span style="background: #4f46e5; color: white; padding: 1px 4px; border-radius: 3px; font-size: 7pt; font-weight: 800;">GENE</span>
+                Grade Manager Professional
+            </div>
+            <div style="letter-spacing: 0.05em; text-transform: uppercase;">Class Seating Chart</div>
+        </div>
+    `;
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+        alert('ポップアップがブロックされました。PDF出力を許可してください。');
+        return;
+    }
+
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>${className} 座席表</title>
+            <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+            <style>
+                body {
+                    margin: 0; padding: 15mm 12mm;
+                    font-family: 'Inter', 'Noto Sans JP', sans-serif;
+                    color: #1e293b; background: white;
+                }
+                @media print {
+                    @page { margin: 0; }
+                    body { padding: 15mm 12mm; }
+                    -webkit-print-color-adjust: exact !important;
+                    print-color-adjust: exact !important;
+                }
+            </style>
+        </head>
+        <body onload="setTimeout(() => { window.print(); window.close(); }, 800)">
+            ${headerHtml}
+            ${gridHtml}
+            ${footerHtml}
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
+}
+
 
 function renderPresetList() {
     const select = document.getElementById('seatingPresetSelect');
@@ -11616,7 +11814,6 @@ function exportClassOfficersPdf() {
     const headerHtml = `
         <div style="margin-bottom: 25px; text-align: center;">
             <h1 style="margin: 0 0 10px 0; font-size: 20pt; font-weight: 800; background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: -0.01em;">${className} クラス役員・係名簿</h1>
-            <div style="font-size: 13pt; color: #64748b; font-weight: 500;">${year}年度 クラス組織・役員係名簿</div>
             <div style="font-size: 9pt; color: #94a3b8; margin-top: 8px;">出力日: ${new Date().toLocaleDateString('ja-JP')}</div>
         </div>
     `;
