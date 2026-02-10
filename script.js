@@ -8555,7 +8555,8 @@ function confirmImportFromBoard() {
     state.sourceInfo.roster = {
         count: state.students.length,
         date: new Date().toISOString(),
-        filename: importState.filename || 'roster.csv'
+        filename: importState.filename || 'roster.csv',
+        year: majorityYear !== null ? majorityYear : state.currentYear
     };
     // Re-save with source info
     saveSessionState();
@@ -8849,10 +8850,13 @@ function handleFacultyRosterSelect(e) {
             renderFacultyTable();
 
             // Update Source Info for Faculty
+            const yearMatch = file.name.match(/(\d{4})/);
+            const dYear = yearMatch ? parseInt(yearMatch[1]) : new Date().getFullYear();
             state.sourceInfo.faculty = {
                 count: candidates.length,
                 date: new Date().toISOString(),
-                filename: file.name
+                filename: file.name,
+                year: dYear
             };
 
             saveSessionState();
@@ -9892,12 +9896,17 @@ function handleAttendanceFileUpload(e) {
             }
 
             // Update Source Info for Attendance
+            let attYear = new Date().getFullYear();
+            if (state.attendance.periodInfo.start) {
+                attYear = parseInt(state.attendance.periodInfo.start.split('/')[0]);
+            }
             state.sourceInfo.attendance = {
                 startDate: state.attendance.periodInfo.start,
                 endDate: state.attendance.periodInfo.end,
                 count: Object.keys(records).length,
                 date: new Date().toISOString(),
-                filename: file.name
+                filename: file.name,
+                year: attYear
             };
 
             saveSessionState();
@@ -12650,6 +12659,61 @@ function updateAnnualEventSummary() {
     }
 }
 
+function updateSourceSummaryDisplay() {
+    // Roster
+    const rosterEl = document.getElementById('rosterFileSummary');
+    if (rosterEl) {
+        if (state.sourceInfo.roster && state.sourceInfo.roster.count > 0) {
+            const info = state.sourceInfo.roster;
+            const dateStr = new Date(info.date).toLocaleDateString();
+            const yearStr = info.year ? ` (${info.year}年)` : '';
+            rosterEl.innerHTML = `
+                <div style="color: #059669; font-weight: 600;">読込済${yearStr}</div>
+                <div style="font-size: 0.75rem; color: #64748b;">${info.count} 名 (${dateStr})</div>
+                <div style="font-size: 0.7rem; color: #94a3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${info.filename || ''}</div>
+            `;
+        } else {
+            rosterEl.innerHTML = '<div style="color: #94a3b8; text-align: center;">名簿未読込</div>';
+        }
+    }
+
+    // Faculty
+    const facultyEl = document.getElementById('facultyFileSummary');
+    if (facultyEl) {
+        if (state.sourceInfo.faculty && state.sourceInfo.faculty.count > 0) {
+            const info = state.sourceInfo.faculty;
+            const dateStr = new Date(info.date).toLocaleDateString();
+            const yearStr = info.year ? ` (${info.year}年度)` : '';
+            facultyEl.innerHTML = `
+                <div style="color: #059669; font-weight: 600;">読込済${yearStr}</div>
+                <div style="font-size: 0.75rem; color: #64748b;">${info.count} 名 (${dateStr})</div>
+                <div style="font-size: 0.7rem; color: #94a3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${info.filename || ''}</div>
+            `;
+        } else {
+            facultyEl.innerHTML = '<div style="color: #94a3b8; text-align: center;">教員名簿未読込</div>';
+        }
+    }
+
+    // Attendance
+    const attEl = document.getElementById('attendanceFileSummary');
+    if (attEl) {
+        if (state.sourceInfo.attendance && state.sourceInfo.attendance.count > 0) {
+            const info = state.sourceInfo.attendance;
+            const yearStr = info.year ? ` (${info.year}年度)` : '';
+            attEl.innerHTML = `
+                <div style="color: #059669; font-weight: 600;">読込済${yearStr}</div>
+                <div style="font-size: 0.75rem; color: #64748b;">${info.startDate || ''} ~ ${info.endDate || ''}</div>
+                <div style="font-size: 0.7rem; color: #94a3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${info.filename || ''}</div>
+            `;
+        } else {
+            attEl.innerHTML = '<div style="color: #94a3b8; text-align: center;">出欠CSV未読込</div>';
+        }
+    }
+
+    // Annual Events
+    updateAnnualEventSummary();
+}
+
 function clearAnnualEventsCache() {
     if (!confirm("読み込まれているすべての年度の行事予定データを消去しますか？\n(この操作は取り消せません)")) return;
     state.annualEvents = {};
@@ -12861,6 +12925,15 @@ function loadAnnualEventsFileDialog() {
 
                 if (!state.annualEvents) state.annualEvents = {};
                 state.annualEvents[detectedYear] = result;
+
+                // Update Source Info for Events
+                if (!state.sourceInfo.events) state.sourceInfo.events = {};
+                state.sourceInfo.events = {
+                    year: parseInt(detectedYear),
+                    date: new Date().toISOString(),
+                    filename: file.name || 'Excel Import'
+                };
+
                 localStorage.setItem('gm_state_annual_events', JSON.stringify(state.annualEvents));
                 updateAnnualEventSummary();
                 alert(`${detectedYear}年度の行事予定表を正常に読み込みました。`);
