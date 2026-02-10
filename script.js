@@ -408,6 +408,7 @@ let state = {
     },
     timetables: {}, // Key: year, Value: { semester: { day: { period: { s, t, email } } } }
     officerRoles: JSON.parse(localStorage.getItem('gm_state_officerRoles') || 'null'), // Default in init
+    annualEvents: JSON.parse(localStorage.getItem('gm_state_annual_events') || 'null') || {},
     officers: JSON.parse(localStorage.getItem('gm_state_officers') || '{}'), // Key: year, Value: { roleId: [name1, name2], ... }
     sourceInfo: JSON.parse(localStorage.getItem('gm_state_sourceInfo') || '{}') // Metadata for imported files
 };
@@ -674,6 +675,7 @@ function saveSessionState() {
         localStorage.setItem('gm_state_seating', JSON.stringify(state.seating));
         localStorage.setItem('gm_state_officers', JSON.stringify(state.officers));
         localStorage.setItem('gm_state_officerRoles', JSON.stringify(state.officerRoles));
+        localStorage.setItem('gm_state_annual_events', JSON.stringify(state.annualEvents || {}));
         // Use sessionStorage for login state so it clears when browser is closed
         sessionStorage.setItem('gm_state_isLoggedIn', state.isLoggedIn ? 'true' : 'false');
 
@@ -806,6 +808,17 @@ function loadSessionState() {
         console.error('Failed to restore timetable data:', e);
     }
 
+    // Restore Annual Events Data
+    try {
+        const savedAnnualEvents = localStorage.getItem('gm_state_annual_events');
+        if (savedAnnualEvents) {
+            state.annualEvents = JSON.parse(savedAnnualEvents) || {};
+            console.log("Annual events data loaded.");
+        }
+    } catch (e) {
+        console.error('Failed to restore annual events data:', e);
+    }
+
     // If no year was saved or it's invalid, auto-detect the latest year with data
     if (!state.currentYear) {
         setDefaultYear();
@@ -826,6 +839,7 @@ function init() {
     // MUST be done before syncSpecialActivitiesForAll because that function triggers a save,
     // and we need the roster data loaded so it doesn't get overwritten with empty arrays.
     loadSessionState();
+    migrateAnnualEvents();
 
     // 3. Logic that might trigger a save
     syncSpecialActivitiesForAll();
@@ -2049,6 +2063,8 @@ function switchTab(tabName) {
     } else if (tabName === 'class_attendance_stats') {
         initClassAttendanceStats();
         renderClassAttendanceStats();
+    } else if (tabName === 'annual_events') {
+        renderAnnualEvents();
     } else if (tabName === 'class_stats') {
         initClassStats();
     } else if (tabName === 'stats2') {
@@ -2121,10 +2137,16 @@ function exportJson() {
             currentYear: state.currentYear,
             currentCourse: state.currentCourse,
             currentClass: state.currentClass,
-            nameDisplayMode: state.nameDisplayMode
+            nameDisplayMode: state.nameDisplayMode,
+            timetables: state.timetables,
+            sourceInfo: state.sourceInfo,
+            annualEvents: state.annualEvents
         },
         importState: {
             candidates: importState.candidates
+        },
+        facultyImportState: {
+            candidates: facultyImportState.candidates
         }
     };
 
@@ -2184,9 +2206,15 @@ function handleJsonImport(e) {
                 if (s.currentCourse) state.currentCourse = s.currentCourse;
                 if (s.currentClass) state.currentClass = s.currentClass;
                 if (s.nameDisplayMode) state.nameDisplayMode = s.nameDisplayMode;
+                if (s.timetables) state.timetables = s.timetables;
+                if (s.sourceInfo) state.sourceInfo = s.sourceInfo;
+                if (s.annualEvents) state.annualEvents = s.annualEvents;
 
                 if (importData.importState && importData.importState.candidates) {
                     importState.candidates = importData.importState.candidates;
+                }
+                if (importData.facultyImportState && importData.facultyImportState.candidates) {
+                    facultyImportState.candidates = importData.facultyImportState.candidates;
                 }
             } else {
                 // Legacy / Partial Restore logic
@@ -3121,6 +3149,11 @@ function saveFinalSettings() {
             .map(s => `${s.name},${s.credits},${s.year},${s.type1 || ''},${s.type2 || ''},${s.type3 || ''},${s.type4 || ''},${s.exclude ? '1' : ''}`);
         const subjectsRaw = [header, ...rows].join('\n');
         localStorage.setItem('gm_master_subjects', subjectsRaw);
+
+        // Save Timetables and Officers as well for deep persistence
+        localStorage.setItem('gm_state_timetables', JSON.stringify(state.timetables || {}));
+        localStorage.setItem('gm_state_officers', JSON.stringify(state.officers || {}));
+        localStorage.setItem('gm_state_officerRoles', JSON.stringify(state.officerRoles || {}));
 
         // 3. Mark as fully initialized
         localStorage.setItem('grade_manager_initialized', 'true');
@@ -6463,9 +6496,21 @@ function renderAtRiskReport() {
                 `;
             }
 
+            const email = getStudentEmail(res.name);
+            const teamsLink = email ? `
+                <a href="https://teams.microsoft.com/l/chat/0/0?users=${encodeURIComponent(email)}" target="_blank" title="Teamsで連絡" style="display:inline-flex; vertical-align:middle; padding: 2px; background: #fff; border-radius: 3px; border: 1px solid #c7d2fe; text-decoration: none; margin-left: 5px;">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="#4338ca" stroke-width="2" width="12" height="12"><path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+                </a>
+            ` : '';
+
             html += `
                 <tr style="border-bottom: 1px solid #fecaca;">
-                    <td style="padding: 12px 10px; font-weight: bold; background: #fff;">${getDisplayName(res.name)}</td>
+                    <td style="padding: 12px 10px; font-weight: bold; background: #fff;">
+                        <div style="display:flex; align-items:center;">
+                            ${getDisplayName(res.name)}
+                            ${teamsLink}
+                        </div>
+                    </td>
                     <td style="padding: 12px 10px; background: #fff;">${reasonHtml}</td>
                     <td style="padding: 12px 10px; background: #fff;">${detailHtml}</td>
                 </tr>
@@ -9058,6 +9103,76 @@ function navigateClassAttendanceGantt(direction) {
     renderClassAttendanceStats();
 }
 
+function jumpToTodayAnnualEvent() {
+    const monthSelect = document.getElementById('eventMonthSelect');
+    const yearSelect = document.getElementById('eventYearSelect');
+    if (!monthSelect || !yearSelect) return;
+
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = now.getMonth() + 1;
+
+    // Academic year: April to March
+    const acadYear = (m < 4) ? (y - 1).toString() : y.toString();
+
+    // Select Year
+    let foundYear = false;
+    for (const opt of yearSelect.options) {
+        if (opt.value === acadYear) {
+            yearSelect.value = acadYear;
+            foundYear = true;
+            break;
+        }
+    }
+    // If exact year not found, just pick the closest or latest (handled by populate logic)
+
+    // Select Month
+    monthSelect.value = m.toString();
+
+    renderAnnualEvents();
+
+    // Scroll to today if possible
+    setTimeout(() => {
+        const todayCell = document.querySelector('.annual-event-today');
+        if (todayCell) {
+            todayCell.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }, 100);
+}
+
+function navigateAnnualEventMonth(direction) {
+    const monthSelect = document.getElementById('eventMonthSelect');
+    const yearSelect = document.getElementById('eventYearSelect');
+    if (!monthSelect || !yearSelect) return;
+
+    let m = parseInt(monthSelect.value);
+    let y = parseInt(yearSelect.value);
+
+    // Month sequence: 4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3
+    // We can just use standard date math and then map back to acad year
+    let date = new Date(y, m - 1, 1);
+    date.setMonth(date.getMonth() + direction);
+
+    const nextM = date.getMonth() + 1;
+    const nextY = date.getFullYear();
+    const nextAcadYear = (nextM < 4) ? (nextY - 1).toString() : nextY.toString();
+
+    // Check if next year exists in options
+    let yearExists = false;
+    for (const opt of yearSelect.options) {
+        if (opt.value === nextAcadYear) {
+            yearExists = true;
+            break;
+        }
+    }
+
+    if (yearExists) {
+        yearSelect.value = nextAcadYear;
+        monthSelect.value = nextM.toString();
+        renderAnnualEvents();
+    }
+}
+
 function renderClassAttendanceStats() {
     const gridWrapper = document.getElementById('classAttendanceGanttWrapper');
     const header = document.getElementById('classAttendanceGanttHeader');
@@ -9090,7 +9205,7 @@ function renderClassAttendanceStats() {
     // Prepare Header
     header.innerHTML = '';
     const thName = document.createElement('th');
-    thName.textContent = '学生名 / 日付';
+    thName.textContent = '学生名 / 日付・行事';
     thName.style.position = 'sticky';
     thName.style.left = '0';
     thName.style.zIndex = '40';
@@ -9140,6 +9255,69 @@ function renderClassAttendanceStats() {
 
         th.innerHTML = `${monthLabel}<div>${d}</div><div style="font-size: 0.7rem; color: ${(dayOfWeek === 0 || holidayName) ? '#ef4444' : dayOfWeek === 6 ? '#3b82f6' : '#64748b'};">${['日', '月', '火', '水', '木', '金', '土'][dayOfWeek]}</div>`;
         header.appendChild(th);
+    }
+
+    // Add Annual Event Row below dates
+    const thead = header.parentElement;
+    // Remove existing event row if any
+    const oldEventRow = document.getElementById('classAttendanceGanttEventRow');
+    if (oldEventRow) oldEventRow.remove();
+
+    const eventRow = document.createElement('tr');
+    eventRow.id = 'classAttendanceGanttEventRow';
+    eventRow.style.background = '#f8fafc';
+    thead.appendChild(eventRow);
+
+    // Make corner cell rowspan 2
+    thName.rowSpan = 2;
+
+    for (let i = 0; i < range; i++) {
+        const date = new Date(startDate);
+        date.setDate(date.getDate() + i);
+        const y = date.getFullYear();
+        const m = date.getMonth() + 1;
+        const d = date.getDate();
+        const isToday = date.getTime() === today.getTime();
+
+        // Holiday Check
+        const dateStr = `${y}/${m.toString().padStart(2, '0')}/${d.toString().padStart(2, '0')}`;
+        const holidayName = getJapaneseHolidaysCached(y)[dateStr];
+
+        const td = document.createElement('td');
+        td.style.minWidth = '70px';
+        td.style.width = '70px';
+        td.style.padding = '0.4rem 0.2rem';
+        td.style.textAlign = 'center';
+        td.style.fontSize = '0.7rem';
+        td.style.borderRight = '1px solid #cbd5e1';
+        td.style.borderBottom = '2px solid #cbd5e1';
+        td.style.color = (holidayName || date.getDay() === 0) ? '#ef4444' : '#64748b';
+        td.style.background = isToday ? '#fffbeb' : '#f8fafc';
+        if (d === 1 && i !== 0) {
+            td.style.borderLeft = '2px solid #64748b';
+        }
+
+        // Get Event from state.annualEvents
+        const acadYear = (m < 4) ? (y - 1).toString() : y.toString();
+        const yearData = state.annualEvents[acadYear];
+        let eventText = "";
+        if (yearData && yearData[m]) {
+            const ev = yearData[m].find(x => x.day === d);
+            if (ev) eventText = ev.event;
+        }
+
+        if (eventText) {
+            td.textContent = eventText;
+            td.style.fontWeight = '600';
+            td.style.overflow = 'hidden';
+            td.style.textOverflow = 'ellipsis';
+            td.style.whiteSpace = 'nowrap';
+            td.title = eventText;
+            if (eventText.includes('試') || eventText.includes('休')) {
+                td.style.color = '#ef4444';
+            }
+        }
+        eventRow.appendChild(td);
     }
 
     // Prepare Body
@@ -9788,6 +9966,36 @@ function renderAttendanceCalendar() {
             header.appendChild(star);
         }
         cell.appendChild(header);
+
+        // Annual Event Marker
+        const acadYearForEvent = (monthNum < 4) ? (year - 1).toString() : year.toString();
+        const yearData = state.annualEvents[acadYearForEvent];
+        let eventText = "";
+        if (yearData && yearData[monthNum]) {
+            const ev = yearData[monthNum].find(x => x.day === d);
+            if (ev) eventText = ev.event;
+        }
+        if (eventText) {
+            const evDiv = document.createElement('div');
+            evDiv.style.fontSize = '0.65rem';
+            evDiv.style.fontWeight = 'bold';
+            evDiv.style.color = '#475569';
+            evDiv.style.background = '#f1f5f9';
+            evDiv.style.padding = '1px 3px';
+            evDiv.style.borderRadius = '2px';
+            evDiv.style.marginBottom = '2px';
+            evDiv.style.overflow = 'hidden';
+            evDiv.style.textOverflow = 'ellipsis';
+            evDiv.style.whiteSpace = 'nowrap';
+            evDiv.style.borderLeft = '2px solid #cbd5e1';
+            evDiv.textContent = eventText;
+            evDiv.title = eventText;
+            if (eventText.includes('試') || eventText.includes('休')) {
+                evDiv.style.color = '#ef4444';
+                evDiv.style.background = '#fee2e2';
+            }
+            cell.appendChild(evDiv);
+        }
 
         // Render Period Events
         periodEvents.forEach((pev, pidx) => {
@@ -11462,8 +11670,8 @@ function getStudentSummaryHtml(studentName, testKey, targetYear) {
     }
 
     html += `
-        <div class="no-print" style="margin-top: 0.8rem; text-align: center; color: #94a3b8; font-size: 0.7rem;">
-            ※ 本データはシステム上の登録状況を表示したものです。面談等で活用してください。
+        <div class="no-print" style="margin-top: 0.8rem; text-align: center; color: #94a3b8; font-size: 0.7rem; line-height: 1.5; max-width: 630px; margin-left: auto; margin-right: auto;">
+            ※　本書類は参考資料です。単位修得の可否や進級判定等の最終的かつ公式な判断は、必ず教務発行の正式な書類（通知表、成績証明書等）を正として判断してください。
         </div>
     </div>
     `;
@@ -11634,12 +11842,25 @@ function renderClassOfficers() {
         cat.roles.forEach((role, roleIdx) => {
             const assigned = yearOfficers[role.id] || [];
 
+            // Team Chat Link
+            let teamChatLink = '';
+            if (assigned.length > 0) {
+                const emails = assigned.map(name => getStudentEmail(name)).filter(e => e !== "");
+                if (emails.length > 0) {
+                    const groupUrl = `https://teams.microsoft.com/l/chat/0/0?users=${encodeURIComponent(emails.join(','))}`;
+                    teamChatLink = `
+                        <a href="${groupUrl}" target="_blank" title="この係全員とグループチャット" style="display:inline-flex; vertical-align:middle; padding: 2px; background: #fff; border-radius: 4px; border: 1px solid #c7d2fe; text-decoration: none; margin-left: 4px;">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="#4338ca" stroke-width="2" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                        </a>`;
+                }
+            }
+
             rolesHtml += `
             <div id="role_target_${role.id}" class="role-drop-zone" style="padding: 1rem; border-bottom: 1px solid #f1f5f9; transition: background 0.2s;">
                 <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 0.5rem;">
                     <div style="flex-grow: 1;">
                         <div style="display: flex; align-items: center; gap: 0.5rem;">
-                            <div style="font-weight: 700; color: #1e293b; font-size: 0.95rem;">${role.name}</div>
+                            <div style="font-weight: 700; color: #1e293b; font-size: 0.95rem;">${role.name}${teamChatLink}</div>
                             <div style="display: flex; gap: 0.3rem;">
                                 <span onclick="editOfficerRole(${catIdx}, ${roleIdx})" style="cursor:pointer; color: #cbd5e1; font-size: 0.8rem;" title="定義を編集">✏️</span>
                                 <span onclick="deleteOfficerRole(${catIdx}, ${roleIdx})" style="cursor:pointer; color: #cbd5e1; font-size: 0.8rem;" title="役割を削除">🗑️</span>
@@ -11656,12 +11877,14 @@ function renderClassOfficers() {
                      ondragover="event.preventDefault(); this.style.borderColor='#3b82f6'; this.style.background='rgba(59, 130, 246, 0.05)';" 
                      ondragleave="this.style.borderColor='transparent'; this.style.background='transparent';"
                      ondrop="handleOfficerDrop(event, '${role.id}')">
-                    ${assigned.map((name, idx2) => `
+                    ${assigned.map((name, idx2) => {
+                return `
                         <div class="badge" style="background: #eef2ff; color: #4f46e5; border: 1px solid #c7d2fe; display: flex; align-items:center; gap: 0.4rem; padding: 0.3rem 0.6rem;">
                             ${name}
-                            <span onclick="removeOfficer('${role.id}', ${idx2})" style="cursor:pointer; font-weight:bold; color: #94a3b8;">×</span>
+                            <span onclick="removeOfficer('${role.id}', ${idx2})" style="cursor:pointer; font-weight:bold; color: #94a3b8; font-size: 1.1rem; line-height: 1;">×</span>
                         </div>
-                    `).join('')}
+                        `;
+            }).join('')}
                     ${assigned.length === 0 ? '<div style="font-size: 0.75rem; color: #cbd5e1;">ドラッグして割り当て</div>' : ''}
                 </div>
             </div>`;
@@ -12291,6 +12514,310 @@ function confirmAndDeletePeriodEvent(pev) {
 }
 
 
+// ==================== ANNUAL EVENTS (年間行事予定表) ====================
+function migrateAnnualEvents() {
+    if (!state.annualEvents || Array.isArray(state.annualEvents)) {
+        state.annualEvents = {};
+        return;
+    }
+    const keys = Object.keys(state.annualEvents);
+    if (keys.length === 0) return;
 
+    // Detect old format: keys are months "1" to "12" instead of years
+    const isOldFormat = keys.every(k => {
+        const n = parseInt(k);
+        return !isNaN(n) && n >= 1 && n <= 12;
+    }) && keys.some(k => state.annualEvents[k] && Array.isArray(state.annualEvents[k]));
 
+    if (isOldFormat) {
+        console.warn("Legacy annualEvents detected. Migrating to 2025年度...");
+        const migrated = { "2025": state.annualEvents };
+        state.annualEvents = migrated;
+        localStorage.setItem('gm_state_annual_events', JSON.stringify(state.annualEvents));
+    }
+}
 
+function updateAnnualEventSummary() {
+    migrateAnnualEvents();
+    const summaryEl = document.getElementById('annualEventFileSummary');
+    if (!summaryEl) return;
+
+    const allKeys = Object.keys(state.annualEvents || {});
+    const years = allKeys.filter(k => /^\d{4}$/.test(k)).sort((a, b) => b - a);
+
+    if (years.length === 0) {
+        summaryEl.innerHTML = '<div style="color: #94a3b8; text-align: center;">データ未読込</div>';
+    } else {
+        const latestYear = years[0];
+        summaryEl.innerHTML = `
+            <div style="color: #059669; font-weight: 600;">${latestYear}年度 読込済</div>
+            <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 0.5rem;">登録年度数: ${years.length} (${years.join(', ')})</div>
+            <button class="btn btn-secondary" onclick="clearAnnualEventsCache()" style="font-size: 0.75rem; padding: 0.2rem 0.5rem; color: #ef4444; border-color: #fecaca; width: 100%; justify-content: center;">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="12" height="12"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                全年度の行事データを消去
+            </button>
+        `;
+    }
+}
+
+function clearAnnualEventsCache() {
+    if (!confirm("読み込まれているすべての年度の行事予定データを消去しますか？\n(この操作は取り消せません)")) return;
+    state.annualEvents = {};
+    localStorage.removeItem('gm_state_annual_events');
+    updateAnnualEventSummary();
+    renderAnnualEvents();
+    alert("行事予定データを初期化しました。");
+}
+
+function updateEventYearOptions() {
+    const yearSelect = document.getElementById('eventYearSelect');
+    if (!yearSelect) return;
+
+    const allKeys = Object.keys(state.annualEvents || {});
+    const existingYears = allKeys
+        .filter(k => /^\d{4}$/.test(k)) // Only 4-digit years
+        .sort((a, b) => b - a);
+
+    if (existingYears.length === 0) {
+        yearSelect.innerHTML = '<option value="">(データ無し)</option>';
+        return;
+    }
+
+    const currentVal = yearSelect.value;
+    let html = '';
+    existingYears.forEach(y => {
+        html += `<option value="${y}" ${y === currentVal ? 'selected' : ''}>${y}年度</option>`;
+    });
+    yearSelect.innerHTML = html;
+    // Auto-select latest if nothing selected
+    if (!yearSelect.value && existingYears.length > 0) {
+        yearSelect.value = existingYears[0];
+    }
+}
+
+function renderAnnualEvents() {
+    migrateAnnualEvents();
+    const monthSelect = document.getElementById('eventMonthSelect');
+    const yearSelect = document.getElementById('eventYearSelect');
+    if (!monthSelect || !yearSelect) return;
+
+    // Ensure state exists
+    if (!state.annualEvents) state.annualEvents = {};
+
+    // Update options first to ensure we have available years
+    const hasYearsBefore = Object.keys(state.annualEvents).length > 0;
+    updateEventYearOptions();
+    const hasYearsAfter = Object.keys(state.annualEvents).length > 0;
+
+    updateAnnualEventSummary();
+
+    const y = yearSelect.value;
+    const m = monthSelect.value;
+    const container = document.getElementById('annualEventCalendar');
+    if (!container) return;
+
+    const yearData = state.annualEvents[y] || {};
+    const events = yearData[m] || [];
+
+    let html = `
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.95rem;">
+            <thead>
+                <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
+                    <th style="padding: 12px; text-align: center; width: 60px; color: #64748b;">日</th>
+                    <th style="padding: 12px; text-align: center; width: 60px; color: #64748b;">曜</th>
+                    <th style="padding: 12px; text-align: left; color: #64748b;">予定内容</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    const holidays = getJapaneseHolidaysCached(parseInt(y));
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    events.forEach(ev => {
+        // Date object for this year/month/day
+        // Careful with April-March academic year
+        let actualYear = parseInt(y);
+        if (parseInt(m) < 4) actualYear += 1;
+        const dObj = new Date(actualYear, parseInt(m) - 1, ev.day);
+        const dateStr = `${actualYear}/${m.toString().padStart(2, '0')}/${ev.day.toString().padStart(2, '0')}`;
+        const holidayName = holidays[dateStr];
+        const dayOfWeek = dObj.getDay(); // 0:Sun
+
+        const isSun = dayOfWeek === 0 || holidayName;
+        const isSat = dayOfWeek === 6;
+        const isToday = dObj.getTime() === today.getTime();
+
+        let rowStyle = 'border-bottom: 1px solid #f1f5f9;';
+        if (isSun) rowStyle += ' background: #fff1f2;';
+        else if (isSat) rowStyle += ' background: #f0f9ff;';
+
+        if (isToday) rowStyle += ' border-left: 4px solid #f59e0b; background: #fffbeb;';
+
+        const dayColor = isSun ? '#e11d48' : (isSat ? '#0284c7' : '#1e293b');
+
+        html += `
+            <tr style="${rowStyle}" class="${isToday ? 'annual-event-today' : ''}">
+                <td style="padding: 12px; text-align: center; font-weight: 700; color: ${dayColor}; position: relative;">
+                    ${isToday ? '<span style="position:absolute; left:2px; top:50%; transform:translateY(-50%); color:#f59e0b; font-size:0.6rem;">▶</span>' : ''}
+                    ${ev.day}
+                </td>
+                <td style="padding: 12px; text-align: center; color: ${dayColor}; font-weight: 500;">
+                    ${ev.wday}${holidayName ? '<div style="font-size:0.6rem; font-weight:normal;">' + holidayName + '</div>' : ''}
+                </td>
+                <td style="padding: 12px; line-height: 1.6; color: #334155;">
+                    ${ev.event.replace(/\r\n|\n/g, '<br>')}
+                </td>
+            </tr>
+        `;
+    });
+
+    html += `</tbody></table>`;
+
+    if (events.length === 0) {
+        let msg = y ? `${y}年度 ${m}月のデータがありません。` : '表示データがありません。';
+        html = `
+        <div style="padding: 3rem; text-align: center; color: #94a3b8; display:flex; flex-direction:column; align-items:center; gap:1rem;">
+            <span>${msg}</span>
+            <button class="btn btn-primary" onclick="loadAnnualEventsFileDialog()"> Excelファイルを読み込む </button>
+            <p style="font-size:0.75rem; color: #a1a1aa;">別の年度のデータを追加・置換する場合は上記をクリックしてください。</p>
+        </div>`;
+    }
+
+    container.innerHTML = html;
+}
+
+function loadAnnualEventsFileDialog() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.xlsx, .xls';
+    input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onprogress = (pe) => {
+            console.log('Loading Excel...', pe.loaded, pe.total);
+        };
+        reader.onload = (re) => {
+            try {
+                const data = new Uint8Array(re.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheetName = '本科';
+                if (!workbook.SheetNames.includes(sheetName)) {
+                    alert(`シート「${sheetName}」が見つかりません。`);
+                    return;
+                }
+                const worksheet = workbook.Sheets[sheetName];
+                const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+                // --- Robust Year Detection ---
+                let detectedYear = null;
+
+                // 1. Check Row 4 (Index 4) for a numeric year (as seen in some school templates)
+                if (rawData[4] && typeof rawData[4][8] === 'number') {
+                    detectedYear = rawData[4][8].toString();
+                }
+
+                // 2. Scan first 10 rows for "XXXX年度" string pattern
+                if (!detectedYear) {
+                    for (let i = 0; i < Math.min(rawData.length, 10); i++) {
+                        const rowStr = JSON.stringify(rawData[i]);
+                        const match = rowStr.match(/(\d{4})年度/);
+                        if (match) {
+                            detectedYear = match[1];
+                            break;
+                        }
+                    }
+                }
+
+                if (!detectedYear) {
+                    detectedYear = prompt("年度を自動検出できませんでした。\r\n正しい年度を4桁で入力してください (例: 2025)", "2025");
+                }
+
+                if (!detectedYear || !/^\d{4}/.test(detectedYear)) {
+                    alert("無効な年度入力です。インポートを中止しました。");
+                    return;
+                }
+                detectedYear = detectedYear.match(/\d{4}/)[0]; // Extract just the digits
+
+                if (state.annualEvents && state.annualEvents[detectedYear]) {
+                    if (!confirm(`${detectedYear}年度のデータは既に存在します。上書きしますか？`)) return;
+                }
+
+                const monthsArr = [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3];
+                const result = {};
+                monthsArr.forEach(m => { result[m] = []; });
+
+                for (let d = 1; d <= 31; d++) {
+                    const rowIndex = d + 7;
+                    const row = rawData[rowIndex];
+                    if (!row) continue;
+                    monthsArr.forEach((m, i) => {
+                        const wdayCol = 1 + i * 2;
+                        const eventCol = 2 + i * 2;
+                        const wday = row[wdayCol] || "";
+                        const event = row[eventCol] || "";
+                        if (wday !== "" || event !== "") {
+                            result[m].push({
+                                day: d,
+                                wday: wday,
+                                event: event.toString().trim()
+                            });
+                        }
+                    });
+                }
+
+                if (!state.annualEvents) state.annualEvents = {};
+                state.annualEvents[detectedYear] = result;
+                localStorage.setItem('gm_state_annual_events', JSON.stringify(state.annualEvents));
+                updateAnnualEventSummary();
+                alert(`${detectedYear}年度の行事予定表を正常に読み込みました。`);
+
+                // Clear and select the newly imported year
+                const yearSelect = document.getElementById('eventYearSelect');
+                if (yearSelect) {
+                    // We'll update options in render
+                    renderAnnualEvents();
+                    document.getElementById('eventYearSelect').value = detectedYear;
+                    renderAnnualEvents();
+                } else {
+                    renderAnnualEvents();
+                }
+            } catch (err) {
+                console.error(err);
+                alert('Excelファイルの解析に失敗しました。');
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    };
+    input.click();
+}
+
+function exportAnnualEventsCsv() {
+    const yearSelect = document.getElementById('eventYearSelect');
+    const y = yearSelect ? yearSelect.value : null;
+    if (!y || !state.annualEvents || !state.annualEvents[y]) {
+        alert("出力するデータがありません。");
+        return;
+    }
+
+    let csv = "年度,月,日,曜,予定内容\n";
+    const monthsArr = [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3];
+    const yearData = state.annualEvents[y];
+
+    monthsArr.forEach(m => {
+        const events = yearData[m] || [];
+        events.forEach(ev => {
+            csv += `${y},${m},${ev.day},${ev.wday},"${ev.event.replace(/"/g, '""')}"\n`;
+        });
+    });
+
+    const blob = new Blob(["\ufeff" + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `annual_events_${y}.csv`);
+    link.click();
+}
