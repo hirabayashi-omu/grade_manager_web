@@ -264,6 +264,15 @@
                 </svg>
                 クラス委員
             </div>
+            <div class="nav-item" data-tab="timetable" title="クラスの時間割を作成・編集します">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                    stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 11h6M9 15h3" />
+                </svg>
+                クラス時間割エディター
+            </div>
             <div class="nav-item" data-tab="settings" title="学生名や科目定義を直接編集します">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
                     stroke-width="2">
@@ -334,6 +343,7 @@
                 <button class="mobile-tab" data-tab="at_risk">要注意</button>
                 <button class="mobile-tab" data-tab="seating">席決め</button>
                 <button class="mobile-tab" data-tab="class_officers">クラス委員</button>
+                <button class="mobile-tab" data-tab="timetable">時間割</button>
                 <button class="mobile-tab" data-tab="roster_board">学籍名簿</button>
                 <button class="mobile-tab" data-tab="faculty_roster">教員名簿</button>
                 <button class="mobile-tab" data-tab="settings">システム設定</button>
@@ -1294,6 +1304,130 @@
                                     </tr>
                                 </tbody>
                             </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Timetable Editor View -->
+            <div id="timetable-content" class="tab-content hidden fade-in">
+                <div class="card">
+                    <div class="card-header"
+                        style="justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                        <div class="card-title">クラス時間割エディター (Class Timetable Editor)</div>
+                        <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+                            <div class="control-group">
+                                <label for="timetableSemester">学期:</label>
+                                <select id="timetableSemester" style="min-width: 120px;">
+                                    <option value="前期">前期 (4月-9月)</option>
+                                    <option value="後期">後期 (10月-3月)</option>
+                                </select>
+                            </div>
+                            <button id="clearTimetableBtn" class="btn btn-danger" style="background: #ef4444;"
+                                title="表示中の学期の時間をすべて消去します">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor" stroke-width="2" width="16" height="16">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                                全消去
+                            </button>
+                            <button id="saveTimetableBtn" class="btn btn-primary" title="時間割データを保存します">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor" stroke-width="2" width="16" height="16">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                                </svg>
+                                保存
+                            </button>
+                            <button id="exportTimetablePdfBtn" class="btn btn-secondary" title="時間割をPDF出力します">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor" stroke-width="2" width="16" height="16">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                                </svg>
+                                PDF出力
+                            </button>
+                            <button id="exportTimetableJsonBtn" class="btn btn-secondary"
+                                title="時間割データをJSON形式でエクスポートします">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor" stroke-width="2" width="16" height="16">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                JSON出力
+                            </button>
+                            <button id="importTimetableJsonBtn" class="btn btn-secondary"
+                                title="時間割データをJSON形式でインポートします">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor" stroke-width="2" width="16" height="16">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                </svg>
+                                JSON読込
+                            </button>
+                        </div>
+                    </div>
+
+                    <div style="padding: 1.5rem;">
+                        <div style="margin-bottom: 1rem; color: #64748b; font-size: 0.9rem;">
+                            <p style="margin-bottom: 0.5rem;">
+                                <strong>使い方:</strong>
+                                各セルをクリックして選択（青枠）し、<strong>Ctrl+C (コピー)</strong>, <strong>Ctrl+X (切り取り)</strong>,
+                                <strong>Ctrl+V (貼り付け)</strong> が可能です。
+                                選択したセルを再度クリック、またはダブルクリックで編集画面が開きます。
+                                選択の解除は <strong>Escキー</strong> で行えます。
+                            </p>
+                        </div>
+
+                        <!-- Timetable Grid -->
+                        <div style="overflow-x: auto;">
+                            <table id="timetableGrid"
+                                style="width: 100%; border-collapse: collapse; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                                <thead>
+                                    <tr
+                                        style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                                        <th
+                                            style="padding: 1rem; text-align: center; font-weight: 600; border: 1px solid #e2e8f0; min-width: 100px;">
+                                            時限</th>
+                                        <th
+                                            style="padding: 1rem; text-align: center; font-weight: 600; border: 1px solid #e2e8f0; min-width: 150px;">
+                                            月</th>
+                                        <th
+                                            style="padding: 1rem; text-align: center; font-weight: 600; border: 1px solid #e2e8f0; min-width: 150px;">
+                                            火</th>
+                                        <th
+                                            style="padding: 1rem; text-align: center; font-weight: 600; border: 1px solid #e2e8f0; min-width: 150px;">
+                                            水</th>
+                                        <th
+                                            style="padding: 1rem; text-align: center; font-weight: 600; border: 1px solid #e2e8f0; min-width: 150px;">
+                                            木</th>
+                                        <th
+                                            style="padding: 1rem; text-align: center; font-weight: 600; border: 1px solid #e2e8f0; min-width: 150px;">
+                                            金</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="timetableBody">
+                                    <!-- Populated by JS -->
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Legend -->
+                        <div
+                            style="margin-top: 1.5rem; padding: 1rem; background: #f8fafc; border-radius: 0.5rem; border: 1px solid #e2e8f0;">
+                            <div style="font-weight: 600; margin-bottom: 0.5rem; color: #1e293b;">時間割:</div>
+                            <div
+                                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.5rem; font-size: 0.85rem; color: #64748b;">
+                                <div>1限: 9:00～9:45</div>
+                                <div>2限: 9:50～10:35</div>
+                                <div>3限: 10:45～11:30</div>
+                                <div>4限: 11:35～12:20</div>
+                                <div>5限: 13:05～13:50</div>
+                                <div>6限: 13:55～14:40</div>
+                                <div>7限: 14:50～15:35</div>
+                                <div>8限: 15:40～16:25</div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -2683,7 +2817,114 @@
         </div>
     </div>
 
+    <!-- Timetable Context Menu -->
+    <div id="timetableContextMenu" class="context-menu" style="display: none;">
+        <div class="context-menu-item" id="ctxCut">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="16"
+                height="16">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M14.121 14.121L19 19m0-4.879L14.121 14.121m0 0A3 3 0 1012 11a3 3 0 002.121 3.121zM7.121 7.121L2 2m0 4.879L7.121 7.121m0 0A3 3 0 105 4a3 3 0 002.121 3.121z" />
+            </svg>
+            切り取り
+        </div>
+        <div class="context-menu-item" id="ctxCopy">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="16"
+                height="16">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
+            </svg>
+            コピー
+        </div>
+        <div class="context-menu-item" id="ctxPaste">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="16"
+                height="16">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+            貼り付け
+        </div>
+        <div class="context-menu-divider"></div>
+        <div class="context-menu-item" id="ctxDelete" style="color: #ef4444;">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="16"
+                height="16">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            削除
+        </div>
+    </div>
+
+    <style>
+        .context-menu {
+            position: fixed;
+            z-index: 10000;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            border-radius: 12px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            min-width: 160px;
+            padding: 6px;
+            animation: ctxPop 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            transform-origin: top left;
+        }
+
+        @keyframes ctxPop {
+            from {
+                opacity: 0;
+                transform: scale(0.95) translateY(-10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        .context-menu-item {
+            padding: 10px 12px;
+            font-size: 0.9rem;
+            color: #1e293b;
+            cursor: pointer;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 500;
+            transition: all 0.15s;
+        }
+
+        .context-menu-item:hover {
+            background: #f1f5f9;
+            color: #4f46e5;
+        }
+
+        .context-menu-item svg {
+            color: #64748b;
+            transition: color 0.15s;
+        }
+
+        .context-menu-item:hover svg {
+            color: #4f46e5;
+        }
+
+        .context-menu-divider {
+            height: 1px;
+            background: #e2e8f0;
+            margin: 4px 6px;
+        }
+
+        /* Prevent text selection on mobile while long-pressing */
+        .timetable-cell {
+            -webkit-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+        }
+    </style>
+
     <script src="settings_ui_helper.js"></script>
+    <script src="timetable_editor.js"></script>
     <script src="script.js"></script>
 </body>
 

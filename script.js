@@ -23,11 +23,92 @@ function normalizeDateStr(s) {
     return `${y}/${m}/${d}`;
 }
 
+/**
+ * 日本の祝日を判定・取得するヘルパー
+ * 2099年までの祝日法(ハッピーマンデー、振替休日、国民の休日等)に対応
+ */
+function getJapaneseHolidays(year) {
+    const holidays = {};
+
+    function add(date, name) {
+        const key = `${date.getFullYear()}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')}`;
+        holidays[key] = name;
+    }
+
+    // --- 固定祝日 ---
+    add(new Date(year, 0, 1), "元日");
+    add(new Date(year, 1, 11), "建国記念の日");
+    add(new Date(year, 1, 23), "天皇誕生日");
+    add(new Date(year, 3, 29), "昭和の日");
+    add(new Date(year, 4, 3), "憲法記念日");
+    add(new Date(year, 4, 4), "みどりの日");
+    add(new Date(year, 4, 5), "こどもの日");
+    add(new Date(year, 7, 11), "山の日");
+    add(new Date(year, 10, 3), "文化の日");
+    add(new Date(year, 10, 23), "勤労感謝の日");
+
+    // --- ハッピーマンデー (第n月曜日) ---
+    function nthMonday(year, month, n) {
+        const first = new Date(year, month, 1);
+        const day = first.getDay(); // 0:Sun
+        const offset = (day <= 1) ? (1 - day) : (8 - day);
+        return new Date(year, month, 1 + offset + (n - 1) * 7);
+    }
+    add(nthMonday(year, 0, 2), "成人の日");
+    add(nthMonday(year, 6, 3), "海の日");
+    add(nthMonday(year, 8, 3), "敬老の日");
+    add(nthMonday(year, 9, 2), "スポーツの日");
+
+    // --- 節気由来 (春分・秋分) 簡易計算式 ---
+    const shunbun = Math.floor(20.8431 + 0.242194 * (year - 1980) - Math.floor((year - 1980) / 4));
+    add(new Date(year, 2, shunbun), "春分の日");
+    const shubun = Math.floor(23.2488 + 0.242194 * (year - 1980) - Math.floor((year - 1980) / 4));
+    add(new Date(year, 8, shubun), "秋分の日");
+
+    // --- 振替休日の判定 ---
+    // 祝日が日曜日の場合、その後の最初の平日を振替休日とする
+    let holidayDates = Object.keys(holidays).map(k => new Date(k)).sort((a, b) => a - b);
+    holidayDates.forEach(d => {
+        if (d.getDay() === 0) { // 日曜日が祝日の場合
+            let helper = new Date(d);
+            let key;
+            do {
+                helper.setDate(helper.getDate() + 1);
+                key = `${helper.getFullYear()}/${(helper.getMonth() + 1).toString().padStart(2, '0')}/${helper.getDate().toString().padStart(2, '0')}`;
+            } while (holidays[key]); // 既に他の祝日なら翌日にずらす
+            add(helper, "振替休日");
+        }
+    });
+
+    // --- 国民の休日 (祝日と祝日に挟まれた平日) ---
+    holidayDates = Object.keys(holidays).map(k => new Date(k)).sort((a, b) => a - b);
+    for (let i = 0; i < holidayDates.length - 1; i++) {
+        const d1 = holidayDates[i];
+        const d2 = holidayDates[i + 1];
+        // 1日飛ばしで祝日がある場合
+        if (d2.getTime() - d1.getTime() === 2 * 24 * 60 * 60 * 1000) {
+            const mid = new Date(d1);
+            mid.setDate(mid.getDate() + 1);
+            if (mid.getDay() !== 0) { // 日曜でない場合 (日曜なら上記の振替休日ロジックが優先される)
+                add(mid, "国民の休日");
+            }
+        }
+    }
+
+    return holidays;
+}
+
 // ==================== DATA CONSTANTS ====================
 // These are factory defaults. We use localStorage for actual master data.
 const DEFAULT_STUDENTS_RAW = `
 学生太郎,学生次郎,学生花子,学生A,学生B,学生C,学生D,学生E
 `;
+
+let holidayCache = {};
+function getJapaneseHolidaysCached(year) {
+    if (!holidayCache[year]) holidayCache[year] = getJapaneseHolidays(year);
+    return holidayCache[year];
+}
 
 
 const DEFAULT_OFFICER_ROLES = [
@@ -606,6 +687,9 @@ function saveSessionState() {
         const serialized = serializeAttendance(state.attendance);
         localStorage.setItem('gm_attendance_data', JSON.stringify(serialized));
 
+        // Timetable Persistence
+        localStorage.setItem('gm_state_timetables', JSON.stringify(state.timetables || {}));
+
     } catch (e) {
         console.error('Save State Error:', e);
         if (e.name === 'QuotaExceededError' || e.code === 22) {
@@ -704,6 +788,17 @@ function loadSessionState() {
         }
     } catch (e) {
         console.error('Failed to restore attendance data:', e);
+    }
+
+    // Restore Timetable Data
+    try {
+        const savedTimetables = localStorage.getItem('gm_state_timetables');
+        if (savedTimetables) {
+            state.timetables = JSON.parse(savedTimetables) || {};
+            console.log("Timetable data loaded.");
+        }
+    } catch (e) {
+        console.error('Failed to restore timetable data:', e);
     }
 
     // Force automatic year detection on load to ensure we start at the latest data year
@@ -1857,6 +1952,10 @@ function switchTab(tabName) {
     } else if (tabName === 'student_summary') {
         populateControls();
         renderStudentSummary();
+    } else if (tabName === 'timetable') {
+        if (typeof initTimetableEditor === 'function') {
+            initTimetableEditor();
+        }
     }
 }
 
@@ -3640,6 +3739,10 @@ function render() {
         initAttendance();
     } else if (state.currentTab === 'student_summary') {
         renderStudentSummary();
+    } else if (state.currentTab === 'timetable') {
+        if (typeof renderTimetableGrid === 'function') {
+            renderTimetableGrid();
+        }
     }
 }
 
@@ -8656,6 +8759,10 @@ function renderClassAttendanceStats() {
         const d = date.getDate();
         const isToday = date.getTime() === today.getTime();
 
+        // Holiday Check
+        const dateStr = `${date.getFullYear()}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${d.toString().padStart(2, '0')}`;
+        const holidayName = getJapaneseHolidaysCached(date.getFullYear())[dateStr];
+
         const th = document.createElement('th');
         th.style.minWidth = '70px';
         th.style.width = '70px';
@@ -8663,9 +8770,10 @@ function renderClassAttendanceStats() {
         th.style.textAlign = 'center';
         th.style.fontSize = '0.8rem';
         th.style.fontWeight = 'bold';
-        th.style.background = isToday ? '#fffbeb' : (dayOfWeek === 0 || dayOfWeek === 6) ? '#f1f5f9' : '#f8fafc';
+        th.style.background = isToday ? '#fffbeb' : (dayOfWeek === 0 || dayOfWeek === 6 || holidayName) ? '#f1f5f9' : '#f8fafc';
         th.style.borderRight = '1px solid #e2e8f0';
         th.style.borderBottom = isToday ? '3px solid #f59e0b' : '1px solid #cbd5e1';
+        if (holidayName) th.title = holidayName;
 
         if (isToday) th.style.boxShadow = 'inset 0 -2px 0 #f59e0b';
 
@@ -8674,7 +8782,7 @@ function renderClassAttendanceStats() {
             monthLabel = `<div style="font-size: 0.6rem; color: #94a3b8; margin-bottom: 2px;">${date.getMonth() + 1}月</div>`;
         }
 
-        th.innerHTML = `${monthLabel}<div>${d}</div><div style="font-size: 0.7rem; color: ${dayOfWeek === 0 ? '#ef4444' : dayOfWeek === 6 ? '#3b82f6' : '#64748b'};">${['日', '月', '火', '水', '木', '金', '土'][dayOfWeek]}</div>`;
+        th.innerHTML = `${monthLabel}<div>${d}</div><div style="font-size: 0.7rem; color: ${(dayOfWeek === 0 || holidayName) ? '#ef4444' : dayOfWeek === 6 ? '#3b82f6' : '#64748b'};">${['日', '月', '火', '水', '木', '金', '土'][dayOfWeek]}</div>`;
         header.appendChild(th);
     }
 
@@ -8796,8 +8904,13 @@ function renderClassAttendanceStats() {
 
             td.onmouseout = () => {
                 if (isGanttDragging) return;
-                if (isToday) td.style.background = '#fffbef';
-                else if (dayOfWeek === 0 || dayOfWeek === 6) td.style.background = sIdx % 2 === 0 ? '#fcfcfc' : '#f5f7f9';
+
+                // Holiday Check
+                const dateParts = nDate.split('/');
+                const holidayName = getJapaneseHolidaysCached(parseInt(dateParts[0]))[nDate];
+
+                if (isToday) td.style.background = '#fffbeb';
+                else if (dayOfWeek === 0 || dayOfWeek === 6 || holidayName) td.style.background = sIdx % 2 === 0 ? '#fcfcfc' : '#f5f7f9';
                 else td.style.background = '';
             };
 
@@ -9242,18 +9355,22 @@ function renderAttendanceCalendar() {
     const records = state.attendance.records[studentName] || {};
     const periodEvents = (state.attendance.periodEvents || []).filter(ev => ev.student === studentName);
 
+    // Fetch holidays for the current year
+    const holidays = getJapaneseHolidaysCached(year);
+
     for (let d = 1; d <= lastDay.getDate(); d++) {
         const dateStr = `${year}/${monthNum.toString().padStart(2, '0')}/${d.toString().padStart(2, '0')}`;
         const dayEvents = records[dateStr] || [];
         const dayOfWeek = new Date(year, monthNum - 1, d).getDay(); // 0:Sun
         const currentDate = new Date(year, monthNum - 1, d);
+        const holidayName = holidays[dateStr];
 
         const cell = document.createElement('div');
         cell.className = 'calendar-day-cell';
         cell.dataset.date = dateStr;
         cell.style.background = 'white';
         if (dayOfWeek === 6) cell.style.background = '#eff6ff'; // Sat
-        if (dayOfWeek === 0) cell.style.background = '#fef2f2'; // Sun
+        if (dayOfWeek === 0 || holidayName) cell.style.background = '#fef2f2'; // Sun or Holiday
         cell.style.minHeight = '100px';
         cell.style.padding = '0.4rem';
         cell.style.border = '1px solid #e2e8f0';
@@ -9262,6 +9379,7 @@ function renderAttendanceCalendar() {
         cell.style.gap = '2px';
         cell.style.cursor = 'pointer';
         cell.style.position = 'relative';
+        if (holidayName) cell.title = holidayName;
 
         // Drag events
         cell.onmousedown = (e) => {
@@ -9292,7 +9410,7 @@ function renderAttendanceCalendar() {
         const dateLabel = document.createElement('span');
         dateLabel.textContent = d;
         if (dayOfWeek === 6) dateLabel.style.color = '#3b82f6';
-        if (dayOfWeek === 0) dateLabel.style.color = '#ef4444';
+        if (dayOfWeek === 0 || holidayName) dateLabel.style.color = '#ef4444';
         header.appendChild(dateLabel);
 
         // Memo Star
