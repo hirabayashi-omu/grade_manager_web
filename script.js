@@ -12785,15 +12785,15 @@ function renderAnnualEvents() {
             <tbody>
     `;
 
-    const holidays = getJapaneseHolidaysCached(parseInt(y));
+    let actualYear = parseInt(y);
+    if (parseInt(m) < 4) actualYear += 1;
+
+    const holidays = getJapaneseHolidaysCached(actualYear);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     events.forEach(ev => {
         // Date object for this year/month/day
-        // Careful with April-March academic year
-        let actualYear = parseInt(y);
-        if (parseInt(m) < 4) actualYear += 1;
         const dObj = new Date(actualYear, parseInt(m) - 1, ev.day);
         const dateStr = `${actualYear}/${m.toString().padStart(2, '0')}/${ev.day.toString().padStart(2, '0')}`;
         const holidayName = holidays[dateStr];
