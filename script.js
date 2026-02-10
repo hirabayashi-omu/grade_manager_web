@@ -10055,7 +10055,6 @@ function deleteAttendanceSource(sourceId) {
 
     // Re-evaluate periodInfo (Global Range)
     let minD = null, maxD = null;
-    // Iterate all remaining records to find new range. This might be slow but it's safe.
     for (const st in records) {
         for (const dt in records[st]) {
             const d = new Date(dt);
@@ -10068,6 +10067,24 @@ function deleteAttendanceSource(sourceId) {
         end: maxD ? maxD.toISOString().split('T')[0].replace(/-/g, '/') : ''
     };
 
+    // Update Source Info for consistency
+    const studentCount = Object.keys(records).length;
+    let latestYear = null;
+    if (state.attendance.sources.length > 0) {
+        // Try to get year from latest source
+        const latest = state.attendance.sources.sort((a, b) => new Date(b.importDate) - new Date(a.importDate))[0];
+        latestYear = latest.year;
+    }
+
+    state.sourceInfo.attendance = {
+        startDate: state.attendance.periodInfo.start,
+        endDate: state.attendance.periodInfo.end,
+        count: studentCount,
+        date: new Date().toISOString(),
+        filename: state.attendance.sources.length > 0 ? `(${state.attendance.sources.length} files)` : 'Cleared',
+        year: latestYear
+    };
+
     saveSessionState();
 
     // UI Refresh
@@ -10075,7 +10092,7 @@ function deleteAttendanceSource(sourceId) {
         renderAttendanceCalendar();
         renderCumulativeAttendanceChart();
     }
-    updateSourceSummaryDisplay(); // Update the list in settings
+    updateSourceSummaryDisplay();
     alert(`データを削除しました。\n(削除数: ${removedCount} records)`);
 }
 
