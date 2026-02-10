@@ -1631,7 +1631,11 @@
                                         学籍名簿ファイル</h4>
                                 </div>
                                 <p style="font-size: 0.85rem; color: #64748b; margin: 0; line-height: 1.5;">
-                                    教務主事室発行のCSV形式の名簿を読み込みます。学生の基本情報（番号・コース等）を更新します。</p>
+                                    教務主事室発行のCSV形式の名簿を読み込みます。学生の基本情報（番号・コース等）を更新します。<br>
+                                    <span style="color: #ea580c; font-weight: bold;">【年度更新・進級処理】</span>
+                                    新年度の名簿を読み込むと、システム全体の年度が自動的に更新されます。学籍番号（OMUID）に基づいて、氏名変更や進級データが引き継がれ、過去の成績データも正しく維持されます。<br>
+                                    ※名簿CSVファイルには必ず「学籍番号」または「OMUID」列を含めてください。
+                                </p>
                                 <div id="rosterFileSummary"
                                     style="font-size: 0.8rem; padding: 0.6rem; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 0.4rem; color: #475569;">
                                     <div style="color: #94a3b8; text-align: center;">名簿未読込</div>
