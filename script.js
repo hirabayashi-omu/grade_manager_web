@@ -403,6 +403,7 @@ let state = {
         memos: {}, // Key: "StudentName_YYYY/MM/DD", Value: { text: "...", color: "blue" }
         periodEvents: [] // Array of { student: string, start: "YYYY/MM/DD", end: "YYYY/MM/DD", text: "...", color: "blue" }
     },
+    timetables: {}, // Key: year, Value: { semester: { day: { period: { s, t, email } } } }
     officerRoles: JSON.parse(localStorage.getItem('gm_state_officerRoles') || 'null'), // Default in init
     officers: JSON.parse(localStorage.getItem('gm_state_officers') || '{}'), // Key: year, Value: { roleId: [name1, name2], ... }
     sourceInfo: JSON.parse(localStorage.getItem('gm_state_sourceInfo') || '{}') // Metadata for imported files
@@ -716,6 +717,7 @@ function loadSessionState() {
     const savedIsLoggedIn = sessionStorage.getItem('gm_state_isLoggedIn');
 
     if (savedTab) state.currentTab = savedTab;
+    if (savedYear) state.currentYear = parseInt(savedYear);
     if (savedHideEmpty !== null) state.hideEmptySubjects = (savedHideEmpty === 'true');
     if (savedBPYear) state.boxPlotYear = parseInt(savedBPYear);
     if (savedBPTest) state.boxPlotTest = savedBPTest;
@@ -801,10 +803,10 @@ function loadSessionState() {
         console.error('Failed to restore timetable data:', e);
     }
 
-    // Force automatic year detection on load to ensure we start at the latest data year
-    // This MUST happen after state.scores and state.subjects are loaded (which happens in refreshMasterData and mockData)
-    // Actually, loadSessionState is called in init() AFTER refreshMasterData and mockData.
-    setDefaultYear();
+    // If no year was saved or it's invalid, auto-detect the latest year with data
+    if (!state.currentYear) {
+        setDefaultYear();
+    }
 }
 
 // ==================== INITIALIZATION ====================
@@ -8770,7 +8772,7 @@ function renderClassAttendanceStats() {
         th.style.textAlign = 'center';
         th.style.fontSize = '0.8rem';
         th.style.fontWeight = 'bold';
-        th.style.background = isToday ? '#fffbeb' : (dayOfWeek === 0 || dayOfWeek === 6 || holidayName) ? '#f1f5f9' : '#f8fafc';
+        th.style.background = isToday ? '#fffbeb' : holidayName ? '#fee2e2' : dayOfWeek === 0 ? '#fecaca' : dayOfWeek === 6 ? '#dbeafe' : '#f8fafc';
         th.style.borderRight = '1px solid #e2e8f0';
         th.style.borderBottom = isToday ? '3px solid #f59e0b' : '1px solid #cbd5e1';
         if (holidayName) th.title = holidayName;
@@ -8857,7 +8859,10 @@ function renderClassAttendanceStats() {
             td.classList.add('gantt-day-cell');
             td.dataset.date = nDate;
             td.dataset.student = stu;
-            td.dataset.student = stu;
+
+            // Holiday Check
+            const holidayName = getJapaneseHolidaysCached(date.getFullYear())[nDate];
+
             td.style.padding = '4px 0';
             // Darker border for better visibility
             td.style.borderRight = '1px solid #cbd5e1';
@@ -8867,6 +8872,11 @@ function renderClassAttendanceStats() {
             td.style.cursor = 'pointer';
             td.style.transition = 'background 0.1s';
             td.style.position = 'relative'; // For positioning memo star
+
+            // Initial Background
+            if (isToday) td.style.background = '#fffbeb';
+            else if (holidayName || dayOfWeek === 0) td.style.background = '#fee2e2';
+            else if (dayOfWeek === 6) td.style.background = '#dbeafe';
 
             // Render Memo Star if exists
             const memoKey = stu + '_' + nDate;
@@ -8910,7 +8920,8 @@ function renderClassAttendanceStats() {
                 const holidayName = getJapaneseHolidaysCached(parseInt(dateParts[0]))[nDate];
 
                 if (isToday) td.style.background = '#fffbeb';
-                else if (dayOfWeek === 0 || dayOfWeek === 6 || holidayName) td.style.background = sIdx % 2 === 0 ? '#fcfcfc' : '#f5f7f9';
+                else if (holidayName || dayOfWeek === 0) td.style.background = '#fee2e2';
+                else if (dayOfWeek === 6) td.style.background = '#dbeafe';
                 else td.style.background = '';
             };
 
@@ -8993,12 +9004,6 @@ function renderClassAttendanceStats() {
                 return false;
             };
             addLongPressTrigger(td);
-
-            if (isToday) {
-                td.style.background = '#fffbef';
-            } else if (dayOfWeek === 0 || dayOfWeek === 6) {
-                td.style.background = sIdx % 2 === 0 ? '#fcfcfc' : '#f5f7f9';
-            }
 
             const container = document.createElement('div');
             container.style.display = 'flex';
@@ -9369,8 +9374,8 @@ function renderAttendanceCalendar() {
         cell.className = 'calendar-day-cell';
         cell.dataset.date = dateStr;
         cell.style.background = 'white';
-        if (dayOfWeek === 6) cell.style.background = '#eff6ff'; // Sat
-        if (dayOfWeek === 0 || holidayName) cell.style.background = '#fef2f2'; // Sun or Holiday
+        if (dayOfWeek === 6) cell.style.background = '#dbeafe'; // Sat (Blue 100)
+        if (dayOfWeek === 0 || holidayName) cell.style.background = '#fee2e2'; // Sun or Holiday (Red 100)
         cell.style.minHeight = '100px';
         cell.style.padding = '0.4rem';
         cell.style.border = '1px solid #e2e8f0';
