@@ -9854,6 +9854,22 @@ function renderAttendanceCalendar() {
     if (!grid) return;
     grid.innerHTML = '';
 
+    // Headers
+    const days = ['月', '火', '水', '木', '金', '土', '日'];
+    days.forEach((day, index) => {
+        const h = document.createElement('div');
+        h.textContent = day;
+        h.style.background = '#f8fafc';
+        h.style.padding = '0.5rem';
+        h.style.textAlign = 'center';
+        h.style.fontWeight = '600';
+        h.style.fontSize = '0.8rem';
+        h.style.color = '#64748b';
+        if (index === 5) h.style.color = '#3b82f6';
+        if (index === 6) h.style.color = '#ef4444';
+        grid.appendChild(h);
+    });
+
     // Cleanup drag state on new render
     grid.onmouseleave = () => {
         if (!isAttendanceDragging) {
