@@ -6427,6 +6427,8 @@ function renderAtRiskReport() {
             return;
         }
 
+
+
         let html = `
             <div style="margin-bottom: 1rem; font-weight: bold; color: #ef4444; font-size: 1.1rem; display: flex; justify-content: space-between; align-items: center;">
                 <span>抽出結果: ${results.length} 名</span>
@@ -6502,13 +6504,18 @@ function renderAtRiskReport() {
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="#4338ca" stroke-width="2" width="12" height="12"><path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
                 </a>
             ` : '';
+            const mailLink = email ? `
+                <a href="mailto:${email}?subject=${encodeURIComponent('【連絡】状況確認')}" title="メールを送信" style="display:inline-flex; vertical-align:middle; padding: 2px; background: #fff; border-radius: 3px; border: 1px solid #cbd5e1; text-decoration: none; margin-left: 5px;">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="#64748b" stroke-width="2" width="12" height="12"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                </a>
+            ` : '';
 
             html += `
                 <tr style="border-bottom: 1px solid #fecaca;">
                     <td style="padding: 12px 10px; font-weight: bold; background: #fff;">
                         <div style="display:flex; align-items:center;">
                             ${getDisplayName(res.name)}
-                            ${teamsLink}
+                            ${teamsLink}${mailLink}
                         </div>
                     </td>
                     <td style="padding: 12px 10px; background: #fff;">${reasonHtml}</td>
