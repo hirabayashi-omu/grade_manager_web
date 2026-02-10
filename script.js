@@ -12869,12 +12869,23 @@ function loadAnnualEventsFileDialog() {
                 // --- Robust Year Detection ---
                 let detectedYear = null;
 
-                // 1. Check Row 4 (Index 4) for a numeric year (as seen in some school templates)
-                if (rawData[4] && typeof rawData[4][8] === 'number') {
+                // 1. Check Filename for Year (Priority)
+                // Matches "2025_..." or similar patterns at start of filename
+                const filenameMatch = file.name.match(/^(\d{4})/);
+                if (filenameMatch) {
+                    const y = parseInt(filenameMatch[1]);
+                    // Basic sanity check for year range (e.g. 2000-2099)
+                    if (y >= 2000 && y <= 2099) {
+                        detectedYear = y.toString();
+                    }
+                }
+
+                // 2. Check Row 4 (Index 4) for a numeric year (as seen in some school templates)
+                if (!detectedYear && rawData[4] && typeof rawData[4][8] === 'number') {
                     detectedYear = rawData[4][8].toString();
                 }
 
-                // 2. Scan first 10 rows for "XXXX年度" string pattern
+                // 3. Scan first 10 rows for "XXXX年度" string pattern
                 if (!detectedYear) {
                     for (let i = 0; i < Math.min(rawData.length, 10); i++) {
                         const rowStr = JSON.stringify(rawData[i]);
