@@ -140,7 +140,12 @@ function renderTimetableGrid() {
             }
 
             if (subject) {
-                let html = `<div style="font-weight: 600; text-align: center; padding: 0.5rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 0.375rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 4px;">${subject}</div>`;
+                const iconsHtml = typeof getSubjectMetadataIcons === 'function' ? getSubjectMetadataIcons(subject) : '';
+                const theme = typeof getSubjectTheme === 'function' ? getSubjectTheme(subject) : { gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' };
+                let html = `
+                    <div style="font-weight: 600; text-align: center; padding: 0.5rem; background: ${theme.gradient}; color: white; border-radius: 0.375rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 4px;">${subject}</div>
+                    ${iconsHtml}
+                `;
 
                 if (teacherList.length > 0) {
                     html += `<div style="display: flex; flex-direction: column; gap: 2px;">`;
@@ -465,25 +470,8 @@ function exportTimetablePdf() {
     const semester = document.getElementById('timetableSemester')?.value || '前期';
     const timetable = getCurrentTimetable();
 
-    // Get class name with fallback
-    let className = '';
-    if (typeof getClassName === 'function') {
-        className = getClassName();
-    } else {
-        // Fallback class name generation
-        const course = state.currentCourse || '';
-        className = `${year}年${course ? ' ' + course : ''}`;
-    }
-
-    // Create print area
-    const printArea = document.createElement('div');
-    printArea.id = 'print-timetable-area';
-    printArea.style.cssText = `
-        position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 10000;
-        background: white; padding: 15mm 12mm;
-        font-family: 'Inter', 'Noto Sans JP', sans-serif; color: #1e293b;
-        user-select: none; box-sizing: border-box;
-    `;
+    // Formal Title construction via helper
+    const className = typeof getClassName === 'function' ? getClassName() : `${year}学年`;
 
     // Pre-calculate rowspans (Same logic as in render)
     const rowspans = {};
@@ -498,14 +486,12 @@ function exportTimetablePdf() {
             const currentData = timetable[day]?.[period];
             if (!currentData) continue;
             const currentSubj = typeof currentData === 'string' ? currentData : (currentData.s || '');
-            const currentTeacher = typeof currentData === 'string' ? '' : (currentData.t || '');
             if (!currentSubj) continue;
             for (let j = i + 1; j < PERIOD_TIMES.length; j++) {
                 const nextPeriod = PERIOD_TIMES[j].period;
                 const nextData = timetable[day]?.[nextPeriod];
                 if (!nextData) break;
                 const nextSubj = typeof nextData === 'string' ? nextData : (nextData.s || '');
-                const nextTeacher = typeof nextData === 'string' ? '' : (nextData.t || '');
                 if (currentSubj === nextSubj) {
                     span++;
                     skipCell[day][nextPeriod] = true;
@@ -517,28 +503,28 @@ function exportTimetablePdf() {
         }
     });
 
-    let html = `
+    let contentHtml = `
         <div style="margin-bottom: 20px; text-align: center;">
             <h1 style="margin: 0 0 10px 0; font-size: 20pt; font-weight: 800; color: #1e293b;">${className} 時間割表</h1>
             <div style="font-size: 13pt; color: #64748b; font-weight: 500;">${semester} (${year}年生)</div>
             <div style="font-size: 9pt; color: #94a3b8; margin-top: 8px;">出力日: ${new Date().toLocaleDateString('ja-JP')}</div>
         </div>
         
-        <table style="width: 100%; border-collapse: collapse; margin-top: 10px; table-layout: fixed; border: 2pt solid #1e293b;">
+        <table style="width: 100%; border-collapse: collapse; margin-top: 10px; table-layout: fixed; border: 2pt solid #4f46e5;">
             <thead>
-                <tr style="background: #1e293b; color: white;">
-                    <th style="padding: 12px; text-align: center; font-weight: 700; border: 1pt solid #1e293b; width: 12%;">時限</th>
-                    ${DAYS_OF_WEEK.map(day => `<th style="padding: 12px; text-align: center; font-weight: 700; border: 1pt solid #1e293b;">${day}</th>`).join('')}
+                <tr style="background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%); color: white; -webkit-print-color-adjust: exact; print-color-adjust: exact;">
+                    <th style="padding: 12px; text-align: center; font-weight: 700; border: 1pt solid #4338ca; width: 12%;">時限</th>
+                    ${DAYS_OF_WEEK.map(day => `<th style="padding: 12px; text-align: center; font-weight: 700; border: 1pt solid #4338ca;">${day}</th>`).join('')}
                 </tr>
             </thead>
             <tbody>
     `;
 
     PERIOD_TIMES.forEach(({ period, time }) => {
-        html += `<tr>`;
-        html += `<td style="padding: 12px; text-align: center; font-weight: 700; background: #f8fafc; border: 1pt solid #e2e8f0;">
-            <div style="font-size: 12pt; color: #1e293b;">${period}</div>
-            <div style="font-size: 7.5pt; color: #64748b; margin-top: 4px; font-weight: 500;">${time}</div>
+        contentHtml += `<tr>`;
+        contentHtml += `<td style="padding: 12px; text-align: center; font-weight: 700; background: #f5f3ff; border: 1pt solid #ddd6fe; -webkit-print-color-adjust: exact; print-color-adjust: exact;">
+            <div style="font-size: 13pt; color: #4338ca;">${period}</div>
+            <div style="font-size: 7.5pt; color: #6d61f2; margin-top: 4px; font-weight: 600;">${time}</div>
         </td>`;
 
         DAYS_OF_WEEK.forEach(day => {
@@ -554,15 +540,24 @@ function exportTimetablePdf() {
                 teacherList = names.map((name, i) => ({ name, email: emails[i] || '' }));
             }
 
-            html += `<td ${span > 1 ? `rowspan="${span}"` : ''} style="padding: 10px; border: 1pt solid #e2e8f0; text-align: center; vertical-align: middle; ${subject ? 'background: #faf5ff;' : ''}">
+            const iconsHtml = typeof getSubjectMetadataIcons === 'function' ? getSubjectMetadataIcons(subject) : '';
+            const theme = typeof getSubjectTheme === 'function' ? getSubjectTheme(subject) : {
+                bg: '#f8fafc',
+                text: '#64748b',
+                border: '#e2e8f0',
+                gradient: 'linear-gradient(135deg, #64748b 0%, #475569 100%)'
+            };
+
+            contentHtml += `<td ${span > 1 ? `rowspan="${span}"` : ''} style="padding: 10px; border: 1pt solid ${subject ? theme.border : '#e2e8f0'}; text-align: center; vertical-align: middle; background: ${subject ? theme.bg : 'white'}; -webkit-print-color-adjust: exact; print-color-adjust: exact;">
                 ${subject ? `
-                    <div style="font-size: 11pt; font-weight: 700; color: #1e293b; margin-bottom: 2px;">${subject}</div>
+                    <div style="font-size: 11pt; font-weight: 700; background: ${theme.gradient}; color: white; padding: 6px; border-radius: 4px; margin-bottom: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); -webkit-print-color-adjust: exact; print-color-adjust: exact;">${subject}</div>
+                    <div style="display: flex; justify-content: center; gap: 4px; margin-bottom: 6px;">${iconsHtml}</div>
                     ${teacherList.map(t => `
                         <div style="margin-top: 2px;">
                             <div style="font-size: 8.5pt; color: #1e293b; font-weight: 600; line-height: 1.1;">${t.name}</div>
                             ${t.email ? `
                                 <div style="font-size: 7.5pt; color: #64748b; word-break: break-all; line-height: 1.1; margin-top: 1px;">
-                                    <a href="mailto:${t.email}" style="color: inherit; text-decoration: none;">${t.email}</a>
+                                    ${t.email}
                                 </div>
                             ` : ''}
                         </div>
@@ -570,11 +565,10 @@ function exportTimetablePdf() {
                 ` : `<div style="color: #cbd5e1; font-size: 9pt;">-</div>`}
             </td>`;
         });
-
-        html += `</tr>`;
+        contentHtml += `</tr>`;
     });
 
-    html += `
+    contentHtml += `
             </tbody>
         </table>
         
@@ -589,30 +583,42 @@ function exportTimetablePdf() {
                 Generated by Grade Manager GENE
             </div>
         </div>
-        
-        <div style="position: absolute; bottom: 8mm; left: 12mm; right: 12mm; text-align: center; font-size: 7pt; color: #e2e8f0; letter-spacing: 0.1em; text-transform: uppercase;">
-            Grade Manager GENE Professional Edition
-        </div>
     `;
 
-    printArea.innerHTML = html;
-    document.body.appendChild(printArea);
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+        alert('ポップアップがブロックされました。PDF出力を許可してください。');
+        return;
+    }
 
-    // Add print style
-    const style = document.createElement('style');
-    style.id = 'print-timetable-style';
-    style.textContent = '@media print { body > *:not(#print-timetable-area) { display: none !important; } #print-timetable-area { position: absolute !important; padding: 0 !important; width: 100% !important; overflow: visible !important; } }';
-    document.head.appendChild(style);
-
-    window.print();
-
-    // Cleanup
-    setTimeout(() => {
-        if (document.getElementById('print-timetable-area')) {
-            document.body.removeChild(printArea);
-            document.head.removeChild(style);
-        }
-    }, 1000);
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>${className} 時間割表</title>
+            <link rel="preconnect" href="https://fonts.googleapis.com">
+            <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+            <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+            <style>
+                body {
+                    margin: 0; padding: 15mm 10mm;
+                    font-family: 'Inter', 'Noto Sans JP', sans-serif;
+                    color: #1e293b; background: white;
+                }
+                @media print {
+                    @page { margin: 0; }
+                    body { padding: 15mm 10mm; }
+                    -webkit-print-color-adjust: exact !important;
+                    print-color-adjust: exact !important;
+                }
+            </style>
+        </head>
+        <body onload="setTimeout(() => { window.print(); window.close(); }, 800)">
+            ${contentHtml}
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
 }
 
 function exportTimetableJson() {

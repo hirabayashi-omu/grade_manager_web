@@ -1265,6 +1265,122 @@ function refreshMasterData() {
     }
 }
 
+/**
+ * Generates HTML for metadata icons (badges) based on subject definitions.
+ * @param {string} subjectName Name of the subject to look up.
+ * @returns {string} HTML string of icon/badge elements.
+ */
+function getSubjectMetadataIcons(subjectName) {
+    if (!subjectName) return '';
+    // Handle dot variations
+    const norm = (s) => (s || "").toString().trim().replace(/・/g, '･');
+    const nName = norm(subjectName);
+    const sub = state.subjects.find(s => norm(s.name) === nName);
+    if (!sub) return '';
+
+    let iconsHtml = '<div class="subject-meta-icons" style="margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; align-items: center; pointer-events: none;">';
+
+    // 1. Requirement Type (種別1: 必, 選, 選必, etc.)
+    if (sub.type1) {
+        let color = '#f1f5f9'; // default light gray
+        let textColor = '#475569';
+        let borderColor = '#e2e8f0';
+
+        if (sub.type1.includes('必')) {
+            color = '#dbeafe'; // Blue 100
+            textColor = '#1d4ed8'; // Blue 700
+            borderColor = '#bfdbfe';
+        } else if (sub.type1.includes('選')) {
+            color = '#dcfce7'; // Green 100
+            textColor = '#15803d'; // Green 700
+            borderColor = '#bbf7d0';
+        }
+
+        iconsHtml += `<span style="font-size: 0.6rem; padding: 1px 4px; border-radius: 3px; background: ${color}; color: ${textColor}; font-weight: 800; border: 1px solid ${borderColor}; line-height: 1; min-width: 1.2rem; text-align: center;">${sub.type1}</span>`;
+    }
+
+    // 2. DP Category (種別3)
+    if (sub.type3) {
+        const dps = sub.type3.split(/[,\s]+/).filter(d => d.startsWith('DP-'));
+        dps.forEach(dp => {
+            iconsHtml += `<span style="font-size: 0.6rem; padding: 1px 4px; border-radius: 3px; background: #fff7ed; color: #c2410c; font-weight: 800; border: 1px solid #ffedd5; line-height: 1;">${dp.replace('DP-', '')}</span>`;
+        });
+    }
+
+    // 3. Credits (単位)
+    if (sub.credits > 0) {
+        iconsHtml += `<span style="font-size: 0.6rem; padding: 1px 4px; border-radius: 3px; background: #f8fafc; color: #64748b; font-weight: bold; border: 1px solid #e2e8f0; line-height: 1; display: flex; align-items: center; gap: 1px;">
+            <svg viewBox="0 0 24 24" width="8" height="8" fill="currentColor" style="opacity:0.6;"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14l-5-4.87 6.91-1.01L12 2z"/></svg>
+            ${sub.credits}</span>`;
+    }
+
+    iconsHtml += '</div>';
+    return iconsHtml;
+}
+window.getSubjectMetadataIcons = getSubjectMetadataIcons;
+
+/**
+ * Returns a color theme based on subject category (type2).
+ * @param {string} subjectName
+ * @returns {object} { bg, text, border, gradient }
+ */
+function getSubjectTheme(subjectName) {
+    const norm = (s) => (s || "").toString().trim().replace(/・/g, '･');
+    const nName = norm(subjectName);
+    const sub = state.subjects.find(s => norm(s.name) === nName);
+
+    // Default: Professional Slate
+    const defaultTheme = {
+        bg: '#f8fafc',
+        text: '#64748b',
+        border: '#e2e8f0',
+        gradient: 'linear-gradient(135deg, #64748b 0%, #475569 100%)'
+    };
+
+    if (!sub) return defaultTheme;
+
+    const t2 = sub.type2 || '';
+    if (t2.includes('一般')) {
+        return {
+            bg: '#f1f5f9',
+            text: '#475569',
+            border: '#cbd5e1',
+            gradient: 'linear-gradient(135deg, #94a3b8 0%, #64748b 100%)'
+        };
+    } else if (t2.includes('専門共通')) {
+        return {
+            bg: '#eff6ff',
+            text: '#1d4ed8',
+            border: '#bfdbfe',
+            gradient: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)'
+        };
+    } else if (t2.includes('基盤専門')) {
+        return {
+            bg: '#faf5ff',
+            text: '#7e22ce',
+            border: '#e9d5ff',
+            gradient: 'linear-gradient(135deg, #a855f7 0%, #7e22ce 100%)'
+        };
+    } else if (t2.includes('応用専門')) {
+        return {
+            bg: '#fff1f2',
+            text: '#be123c',
+            border: '#fecdd3',
+            gradient: 'linear-gradient(135deg, #fb7185 0%, #be123c 100%)'
+        };
+    } else if (t2.includes('その他') || t2.includes('特別学修')) {
+        return {
+            bg: '#fff7ed',
+            text: '#c2410c',
+            border: '#ffedd5',
+            gradient: 'linear-gradient(135deg, #f97316 0%, #c2410c 100%)'
+        };
+    }
+
+    return defaultTheme;
+}
+window.getSubjectTheme = getSubjectTheme;
+
 function mockData() {
     const stored = localStorage.getItem('grade_manager_scores');
     if (stored) {
@@ -3735,12 +3851,28 @@ function render() {
         renderGraduationRequirements();
     } else if (state.currentTab === 'class_stats') {
         initClassStats();
+    } else if (state.currentTab === 'at_risk') {
+        renderAtRiskReport();
     } else if (state.currentTab === 'settings') {
         renderSettings();
     } else if (state.currentTab === 'attendance') {
         initAttendance();
+    } else if (state.currentTab === 'class_attendance_stats') {
+        renderClassAttendanceStats();
     } else if (state.currentTab === 'student_summary') {
         renderStudentSummary();
+    } else if (state.currentTab === 'seating') {
+        renderSeatingChart();
+    } else if (state.currentTab === 'class_officers') {
+        renderClassOfficers();
+    } else if (state.currentTab === 'subject_management') {
+        renderSubjectManagement();
+    } else if (state.currentTab === 'metadata_editor') {
+        renderMetadataEditor();
+    } else if (state.currentTab === 'roster_board') {
+        renderRosterBoardTable();
+    } else if (state.currentTab === 'faculty_roster') {
+        renderFacultyTable();
     } else if (state.currentTab === 'timetable') {
         if (typeof renderTimetableGrid === 'function') {
             renderTimetableGrid();
@@ -4534,11 +4666,19 @@ function renderGradesTable() {
 
             tdStatus.appendChild(input);
 
+            const theme = getSubjectTheme(sub.name);
             trSpecial.innerHTML = `
-                <td><div style="font-weight:600">${sub.name}</div></td>
+                <td>
+                    <div style="font-weight:600">${sub.name}</div>
+                    ${getSubjectMetadataIcons(sub.name)}
+                </td>
                 <td style="text-align:center"><span class="badge badge-gray">${sub.credits}</span></td>
                 <td style="text-align:center"><span class="badge ${typeBadgeClass}">${sub.type1}</span></td>
-                <td style="text-align:center">${sub.type2}</td>
+                <td style="text-align:center">
+                    <span style="font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; background: ${theme.bg}; color: ${theme.text}; border: 1px solid ${theme.border}; font-weight: 700;">
+                        ${sub.type2}
+                    </span>
+                </td>
             `;
             trSpecial.appendChild(tdStatus);
             targetTbody.appendChild(trSpecial);
@@ -4550,11 +4690,19 @@ function renderGradesTable() {
             if (sub.type1 === '必') typeBadgeClass = 'badge-blue';
             else if (sub.type1 === '選必') typeBadgeClass = 'badge-success';
 
+            const theme = getSubjectTheme(sub.name);
             tr.innerHTML = `
-                <td><div style="font-weight:600">${sub.name}</div></td>
+                <td>
+                    <div style="font-weight:600">${sub.name}</div>
+                    ${getSubjectMetadataIcons(sub.name)}
+                </td>
                 <td style="text-align:center"><span class="badge badge-gray">${sub.credits}</span></td>
                 <td style="text-align:center"><span class="badge ${typeBadgeClass}">${sub.type1}</span></td>
-                <td style="text-align:center">${sub.type2}</td>
+                <td style="text-align:center">
+                    <span style="font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; background: ${theme.bg}; color: ${theme.text}; border: 1px solid ${theme.border}; font-weight: 700;">
+                        ${sub.type2}
+                    </span>
+                </td>
             `;
 
             SCORE_KEYS.forEach(key => {
@@ -8775,6 +8923,12 @@ function renderClassAttendanceStats() {
         th.style.background = isToday ? '#fffbeb' : holidayName ? '#fee2e2' : dayOfWeek === 0 ? '#fecaca' : dayOfWeek === 6 ? '#dbeafe' : '#f8fafc';
         th.style.borderRight = '1px solid #e2e8f0';
         th.style.borderBottom = isToday ? '3px solid #f59e0b' : '1px solid #cbd5e1';
+
+        // Month Divider
+        if (d === 1 && i !== 0) {
+            th.style.borderLeft = '2px solid #64748b';
+        }
+
         if (holidayName) th.title = holidayName;
 
         if (isToday) th.style.boxShadow = 'inset 0 -2px 0 #f59e0b';
@@ -8867,6 +9021,12 @@ function renderClassAttendanceStats() {
             // Darker border for better visibility
             td.style.borderRight = '1px solid #cbd5e1';
             td.style.borderBottom = '1px solid #cbd5e1';
+
+            // Month Divider
+            if (date.getDate() === 1 && i !== 0) {
+                td.style.borderLeft = '2px solid #94a3b8';
+            }
+
             td.style.verticalAlign = 'top';
             td.style.minHeight = '42px';
             td.style.cursor = 'pointer';
@@ -10696,13 +10856,11 @@ function updatePrintHeader() {
 function getClassName() {
     const year = state.currentYear;
     const course = state.currentCourse;
+    const cls = state.currentClass || 1;
     if (year === 1) {
-        if (!course || course === "") {
-            return `${year}年${state.currentClass || 1}組`;
-        }
-        return `${year}年 ${course}`;
+        return `${year}学年 ${cls}組（共通コース）`;
     }
-    return `${year}年 ${course || '共通'}`;
+    return `${year}学年 ${course ? course + 'コース' : '共通'}`;
 }
 
 function updateClassSelectVisibility() {
@@ -11151,31 +11309,42 @@ function printAllStudentSummaries() {
 
 
 function initOfficerRoles() {
-    // Migration: Rename old category if exists
-    if (state.officerRoles) {
-        const oldCat = state.officerRoles.find(c => c.category === "学生会・公的委員 (Student Council)" || c.category === "学生会・公的委員");
-        if (oldCat) {
-            oldCat.category = "学友会関連 (Student Association)";
+    const year = state.currentYear;
+
+    // Migration/Normalization: Handle old array format
+    if (Array.isArray(state.officerRoles)) {
+        const globalRoles = state.officerRoles;
+        state.officerRoles = {};
+        // Duplicate global roles to typical years to prevent data loss
+        [1, 2, 3, 4, 5].forEach(y => {
+            state.officerRoles[y] = JSON.parse(JSON.stringify(globalRoles));
+        });
+    }
+
+    if (!state.officerRoles) state.officerRoles = {};
+
+    // Initialize current year if missing
+    if (!state.officerRoles[year]) {
+        // Find nearest existing year to copy from, or fallback to defaults
+        const existingYears = Object.keys(state.officerRoles).map(Number).sort((a, b) => b - a);
+        const sourceYear = existingYears.find(y => y < year) || existingYears[0];
+
+        if (sourceYear) {
+            state.officerRoles[year] = JSON.parse(JSON.stringify(state.officerRoles[sourceYear]));
+        } else {
+            state.officerRoles[year] = JSON.parse(JSON.stringify(DEFAULT_OFFICER_ROLES));
         }
     }
 
-    if (!state.officerRoles) {
-        state.officerRoles = JSON.parse(JSON.stringify(DEFAULT_OFFICER_ROLES));
-    } else {
-        // Ensure new default categories/roles are added to existing ones
-        DEFAULT_OFFICER_ROLES.forEach(defaultCat => {
-            let cat = state.officerRoles.find(c => c.category === defaultCat.category);
-            if (!cat) {
-                state.officerRoles.push(JSON.parse(JSON.stringify(defaultCat)));
-            } else {
-                defaultCat.roles.forEach(defaultRole => {
-                    if (!cat.roles.find(r => r.id === defaultRole.id)) {
-                        cat.roles.push(JSON.parse(JSON.stringify(defaultRole)));
-                    }
-                });
-            }
-        });
+    const currentRoles = state.officerRoles[year];
+
+    // Migration: Rename old category if exists
+    const oldCat = currentRoles.find(c => c.category === "学生会・公的委員 (Student Council)" || c.category === "学生会・公的委員");
+    if (oldCat) {
+        oldCat.category = "学友会関連 (Student Association)";
     }
+
+    return currentRoles;
 }
 
 function renderClassOfficers() {
@@ -11224,7 +11393,8 @@ function renderClassOfficers() {
     });
 
     // Render Roles
-    state.officerRoles.forEach((cat, catIdx) => {
+    const currentRoles = initOfficerRoles();
+    currentRoles.forEach((cat, catIdx) => {
         const card = document.createElement('div');
         card.className = 'card';
         card.style.background = 'white';
@@ -11299,7 +11469,8 @@ function addOfficer(roleId, studentName) {
 
     // Find role limit
     let limit = 0;
-    state.officerRoles.some(c => {
+    const currentRoles = initOfficerRoles();
+    currentRoles.some(c => {
         const found = c.roles.find(r => r.id === roleId);
         if (found) { limit = found.limit; return true; }
     });
@@ -11337,12 +11508,13 @@ function showAddOfficerRoleModal() {
 }
 
 function editOfficerRole(catIdx, roleIdx) {
-    const role = state.officerRoles[catIdx].roles[roleIdx];
+    const currentRoles = initOfficerRoles();
+    const role = currentRoles[catIdx].roles[roleIdx];
     document.getElementById('officerRoleModalTitle').textContent = '役職・係の定義を編集';
     document.getElementById('saveOfficerRoleBtn').textContent = '変更を保存する';
     document.getElementById('editOfficerCatIdx').value = catIdx;
     document.getElementById('editOfficerRoleIdx').value = roleIdx;
-    document.getElementById('newRoleCategory').value = state.officerRoles[catIdx].category;
+    document.getElementById('newRoleCategory').value = currentRoles[catIdx].category;
     document.getElementById('newRoleName').value = role.name;
     document.getElementById('newRoleLimit').value = role.limit;
     document.getElementById('newRoleDesc').value = role.desc;
@@ -11364,10 +11536,12 @@ function saveNewOfficerRole() {
     }
 
     initOfficerRoles();
+    const year = state.currentYear;
+    const currentRoles = state.officerRoles[year];
 
     if (catIdx >= 0 && roleIdx >= 0) {
         // Edit existing
-        const oldCat = state.officerRoles[catIdx];
+        const oldCat = currentRoles[catIdx];
         const role = oldCat.roles[roleIdx];
 
         role.name = roleName;
@@ -11378,22 +11552,23 @@ function saveNewOfficerRole() {
         if (oldCat.category !== categoryName) {
             oldCat.roles.splice(roleIdx, 1);
             if (oldCat.roles.length === 0) {
-                state.officerRoles.splice(catIdx, 1);
+                currentRoles.splice(catIdx, 1);
             }
 
-            let newCat = state.officerRoles.find(c => c.category === categoryName);
+            let newCat = currentRoles.find(c => c.category === categoryName);
             if (!newCat) {
                 newCat = { category: categoryName, roles: [] };
-                state.officerRoles.push(newCat);
+                currentRoles.push(newCat);
             }
             newCat.roles.push(role);
         }
     } else {
         // Create new
-        let cat = state.officerRoles.find(c => c.category === categoryName);
+        const currentRoles = state.officerRoles[state.currentYear];
+        let cat = currentRoles.find(c => c.category === categoryName);
         if (!cat) {
             cat = { category: categoryName, roles: [] };
-            state.officerRoles.push(cat);
+            currentRoles.push(cat);
         }
 
         const newId = 'custom_' + Date.now();
@@ -11411,8 +11586,8 @@ function saveNewOfficerRole() {
 }
 
 function resetOfficerRolesToDefault() {
-    if (confirm('役職・係の定義を初期状態に戻しますか？\n（追加したカスタム係や編集内容は失われます。割り当て済みの学生データは維持されますが、定義から消えた係は表示されなくなります）')) {
-        state.officerRoles = JSON.parse(JSON.stringify(DEFAULT_OFFICER_ROLES));
+    if (confirm('現在の学年（' + state.currentYear + '年）の役職・係の定義を初期状態に戻しますか？\n（追加したカスタム係や編集内容は失われます。割り当て済みの学生データは維持されますが、定義から消えた係は表示されなくなります）')) {
+        state.officerRoles[state.currentYear] = JSON.parse(JSON.stringify(DEFAULT_OFFICER_ROLES));
         saveSessionState();
         renderClassOfficers();
     }
@@ -11420,9 +11595,10 @@ function resetOfficerRolesToDefault() {
 
 function deleteOfficerRole(catIdx, roleIdx) {
     if (confirm('この役職・係の定義を削除しますか？\n（割り当てられていた学生の記録も表示されなくなります）')) {
-        state.officerRoles[catIdx].roles.splice(roleIdx, 1);
-        if (state.officerRoles[catIdx].roles.length === 0) {
-            state.officerRoles.splice(catIdx, 1);
+        const currentRoles = state.officerRoles[state.currentYear];
+        currentRoles[catIdx].roles.splice(roleIdx, 1);
+        if (currentRoles[catIdx].roles.length === 0) {
+            currentRoles.splice(catIdx, 1);
         }
         saveSessionState();
         renderClassOfficers();
@@ -11434,40 +11610,30 @@ function exportClassOfficersPdf() {
     const yearOfficers = state.officers[year] || {};
     const className = getClassName();
 
-    const printArea = document.createElement('div');
-    printArea.id = 'print-officer-area';
-    printArea.style.cssText = `
-        position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 10000; 
-        background: white; padding: 15mm 12mm; 
-        font-family: 'Inter', 'Noto Sans JP', sans-serif; color: #1e293b;
-        user-select: none; box-sizing: border-box;
-    `;
+    const currentRoles = initOfficerRoles();
 
-    // Header Area - Minimum Height
+    // Header Area - High Premium Style
     const headerHtml = `
-        <div style="display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 1.5pt solid #4f46e5; padding-bottom: 5px; margin-bottom: 10px;">
-            <div>
-                <h1 style="margin: 0; font-size: 16pt; font-weight: 800; letter-spacing: -0.01em;">${className} クラス役員・係名簿</h1>
-            </div>
-            <div style="text-align: right; font-size: 8pt; color: #64748b;">
-                出力日: ${new Date().toLocaleDateString('ja-JP')}
-            </div>
+        <div style="margin-bottom: 25px; text-align: center;">
+            <h1 style="margin: 0 0 10px 0; font-size: 20pt; font-weight: 800; background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: -0.01em;">${className} クラス役員・係名簿</h1>
+            <div style="font-size: 13pt; color: #64748b; font-weight: 500;">${year}年度 クラス組織・役員係名簿</div>
+            <div style="font-size: 9pt; color: #94a3b8; margin-top: 8px;">出力日: ${new Date().toLocaleDateString('ja-JP')}</div>
         </div>
     `;
 
-    let contentHtml = '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">';
-    state.officerRoles.forEach((cat, idx) => {
+    let contentHtml = '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">';
+    currentRoles.forEach((cat, idx) => {
         contentHtml += `
-            <div style="break-inside: avoid; margin-bottom: 8px;">
-                <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 4px; border-left: 3px solid #4f46e5; padding-left: 6px;">
-                    <h2 style="margin: 0; font-size: 9pt; font-weight: 700; color: #334155;">${cat.category}</h2>
+            <div style="break-inside: avoid; margin-bottom: 15px;">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; background: #f5f3ff; padding: 6px 10px; border-radius: 6px; border-left: 5px solid #4f46e5; -webkit-print-color-adjust: exact; print-color-adjust: exact;">
+                    <h2 style="margin: 0; font-size: 10.5pt; font-weight: 800; color: #4338ca;">${cat.category}</h2>
                 </div>
-                <table style="width: 100%; border-collapse: collapse; border: 0.5pt solid #e2e8f0; font-size: 7.5pt;">
+                <table style="width: 100%; border-collapse: collapse; border: 1.5pt solid #4f46e5; font-size: 8.5pt; border-radius: 4px; overflow: hidden;">
                     <thead>
-                        <tr style="background: #f8fafc; border-bottom: 0.5pt solid #e2e8f0;">
-                            <th style="padding: 2px 4px; text-align: left; color: #64748b; width: 25%; border-right: 0.5pt solid #e2e8f0;">役割</th>
-                            <th style="padding: 2px 4px; text-align: left; color: #64748b; width: 45%; border-right: 0.5pt solid #e2e8f0;">説明</th>
-                            <th style="padding: 2px 4px; text-align: left; color: #64748b; width: 30%;">氏名</th>
+                        <tr style="background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%); color: white; -webkit-print-color-adjust: exact; print-color-adjust: exact;">
+                            <th style="padding: 6px 8px; text-align: left; border: 0.5pt solid rgba(255,255,255,0.2); width: 25%;">役割</th>
+                            <th style="padding: 6px 8px; text-align: left; border: 0.5pt solid rgba(255,255,255,0.2); width: 45%;">説明</th>
+                            <th style="padding: 6px 8px; text-align: left; border: 0.5pt solid rgba(255,255,255,0.2); width: 30%;">氏名</th>
                         </tr>
                     </thead>
                     <tbody>`;
@@ -11475,12 +11641,12 @@ function exportClassOfficersPdf() {
         cat.roles.forEach((role, rIdx) => {
             const assigned = yearOfficers[role.id] || [];
             contentHtml += `
-                        <tr style="border-bottom: 0.5pt solid #f1f5f9;">
-                            <td style="padding: 3px 4px; border-right: 0.5pt solid #e2e8f0; font-weight: 700; color: #1e293b; vertical-align: top; line-height: 1.1;">${role.name}</td>
-                            <td style="padding: 3px 4px; border-right: 0.5pt solid #e2e8f0; color: #64748b; font-size: 6.5pt; vertical-align: top; line-height: 1.1;">${role.desc || ''}</td>
-                            <td style="padding: 3px 4px; vertical-align: middle; line-height: 1.1;">
-                                <div style="font-weight: 600; color: #334155;">
-                                    ${assigned.length > 0 ? assigned.join('<br>') : '-'}
+                        <tr style="border-bottom: 0.5pt solid #ddd6fe;">
+                            <td style="padding: 6px 8px; border-right: 0.5pt solid #ddd6fe; font-weight: 700; color: #1e1b4b; background: #fdfcff; vertical-align: top; line-height: 1.3;">${role.name}</td>
+                            <td style="padding: 6px 8px; border-right: 0.5pt solid #ddd6fe; color: #64748b; font-size: 7.5pt; vertical-align: top; line-height: 1.2;">${role.desc || ''}</td>
+                            <td style="padding: 6px 8px; vertical-align: middle; line-height: 1.3; background: #ffffff;">
+                                <div style="font-weight: 700; color: #312e81; font-size: 9pt;">
+                                    ${assigned.length > 0 ? assigned.join('<br>') : '<span style="color:#cbd5e1">-</span>'}
                                 </div>
                             </td>
                         </tr>`;
@@ -11491,30 +11657,49 @@ function exportClassOfficersPdf() {
     contentHtml += '</div>';
 
     const footerHtml = `
-        <div style="position: absolute; bottom: 10mm; left: 12mm; right: 12mm; display: flex; justify-content: space-between; align-items: center; padding-top: 5px; border-top: 0.5pt dashed #e2e8f0; font-size: 6pt; color: #cbd5e1;">
-            <div>Grade Manager GENE Professional</div>
-            <div>Confidential Document</div>
+        <div style="margin-top: 40px; display: flex; justify-content: space-between; align-items: center; padding-top: 10px; border-top: 1pt solid #4f46e5; font-size: 8pt; color: #94a3b8; font-weight: 500;">
+            <div style="display: flex; align-items: center; gap: 5px;">
+                <span style="background: #4f46e5; color: white; padding: 1px 4px; border-radius: 3px; font-size: 7pt; font-weight: 800;">GENE</span>
+                Grade Manager Professional
+            </div>
+            <div style="letter-spacing: 0.05em; text-transform: uppercase;">クラス組織管理・編成記録</div>
         </div>
     `;
 
-    printArea.innerHTML = headerHtml + contentHtml + footerHtml;
-    document.body.appendChild(printArea);
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+        alert('ポップアップがブロックされました。PDF出力を許可してください。');
+        return;
+    }
 
-    // Add print hide class to everything else
-    const style = document.createElement('style');
-    style.id = 'print-hide-style';
-    style.textContent = '@media print { body > *:not(#print-officer-area) { display: none !important; } #print-officer-area { position: absolute !important; padding: 0 !important; } }';
-    document.head.appendChild(style);
-
-    window.print();
-
-    // After print (using timeout as print blocks)
-    setTimeout(() => {
-        if (document.getElementById('print-officer-area')) {
-            document.body.removeChild(printArea);
-            document.head.removeChild(style);
-        }
-    }, 1000);
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>${className} 役員名簿</title>
+            <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+            <style>
+                body {
+                    margin: 0; padding: 15mm 12mm;
+                    font-family: 'Inter', 'Noto Sans JP', sans-serif;
+                    color: #1e293b; background: white;
+                }
+                @media print {
+                    @page { margin: 0; }
+                    body { padding: 15mm 12mm; }
+                    -webkit-print-color-adjust: exact !important;
+                    print-color-adjust: exact !important;
+                }
+            </style>
+        </head>
+        <body onload="setTimeout(() => { window.print(); window.close(); }, 800)">
+            ${headerHtml}
+            ${contentHtml}
+            ${footerHtml}
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
 }
 
 function exportOfficerAssignmentsCsv() {
@@ -11528,7 +11713,8 @@ function exportOfficerAssignmentsCsv() {
         const yearOfficers = state.officers[year];
         if (!yearOfficers) return;
 
-        state.officerRoles.forEach(cat => {
+        const currentRoles = state.officerRoles[year] || [];
+        currentRoles.forEach(cat => {
             cat.roles.forEach(role => {
                 const assigned = yearOfficers[role.id] || [];
                 assigned.forEach(name => {
@@ -11572,9 +11758,10 @@ function importOfficerAssignmentsCsv(event) {
             const roleName = parts[2].replace(/"/g, '');
             const studentName = parts[3].replace(/"/g, '');
 
-            // Find matching role ID in current officerRoles
+            // Find matching role ID in officerRoles for THIS year
             let foundRoleId = null;
-            state.officerRoles.forEach(cat => {
+            const yearRoles = state.officerRoles[year] || [];
+            yearRoles.forEach(cat => {
                 const role = cat.roles.find(r => r.name === roleName && cat.category === categoryName);
                 if (role) foundRoleId = role.id;
             });
