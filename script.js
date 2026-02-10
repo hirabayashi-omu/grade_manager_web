@@ -12650,13 +12650,35 @@ function updateAnnualEventSummary() {
         const latestYear = years[0];
         summaryEl.innerHTML = `
             <div style="color: #059669; font-weight: 600;">${latestYear}年度 読込済</div>
-            <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 0.5rem;">登録年度数: ${years.length} (${years.join(', ')})</div>
+            <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 0.5rem;">登録年度:</div>
+            <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 0.5rem;">
+                ${years.map(y => `
+                    <span style="background: #e2e8f0; border-radius: 4px; padding: 2px 6px; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 4px;">
+                        ${y}
+                        <button onclick="deleteAnnualEventYear('${y}')" title="${y}年度を削除" style="background: none; border: none; cursor: pointer; color: #64748b; padding: 0; display: flex; align-items: center;">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="12" height="12"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                    </span>
+                `).join('')}
+            </div>
             <button class="btn btn-secondary" onclick="clearAnnualEventsCache()" style="font-size: 0.75rem; padding: 0.2rem 0.5rem; color: #ef4444; border-color: #fecaca; width: 100%; justify-content: center;">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="12" height="12"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                 全年度の行事データを消去
             </button>
         `;
     }
+}
+
+function deleteAnnualEventYear(year) {
+    if (!state.annualEvents || !state.annualEvents[year]) return;
+    if (!confirm(`${year}年度の行事データを削除しますか？`)) return;
+
+    delete state.annualEvents[year];
+    localStorage.setItem('gm_state_annual_events', JSON.stringify(state.annualEvents));
+
+    updateAnnualEventSummary();
+    renderAnnualEvents();
+    alert(`${year}年度のデータを削除しました。`);
 }
 
 function updateSourceSummaryDisplay() {
@@ -12870,8 +12892,8 @@ function loadAnnualEventsFileDialog() {
                 let detectedYear = null;
 
                 // 1. Check Filename for Year (Priority)
-                // Matches "2025_..." or similar patterns at start of filename
-                const filenameMatch = file.name.match(/^(\d{4})/);
+                // Search for "20xx" anywhere in the filename (handles full paths or prefixes)
+                const filenameMatch = file.name.match(/(20\d{2})/);
                 if (filenameMatch) {
                     const y = parseInt(filenameMatch[1]);
                     // Basic sanity check for year range (e.g. 2000-2099)
@@ -12947,7 +12969,7 @@ function loadAnnualEventsFileDialog() {
 
                 localStorage.setItem('gm_state_annual_events', JSON.stringify(state.annualEvents));
                 updateAnnualEventSummary();
-                alert(`${detectedYear}年度の行事予定表を正常に読み込みました。`);
+                alert(`${detectedYear}年度として行事予定表を読み込みました。`);
 
                 // Clear and select the newly imported year
                 const yearSelect = document.getElementById('eventYearSelect');
