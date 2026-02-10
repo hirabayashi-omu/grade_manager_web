@@ -402,7 +402,9 @@ let state = {
         periodInfo: { start: '', end: '' },
         fileName: '',
         memos: {}, // Key: "StudentName_YYYY/MM/DD", Value: { text: "...", color: "blue" }
-        periodEvents: [] // Array of { student: string, start: "YYYY/MM/DD", end: "YYYY/MM/DD", text: "...", color: "blue" }
+        periodEvents: [], // Array of { student: string, start: "YYYY/MM/DD", end: "YYYY/MM/DD", text: "...", color: "blue" }
+        statsSortKey: 'totalAbs',
+        statsSortOrder: 'desc'
     },
     timetables: {}, // Key: year, Value: { semester: { day: { period: { s, t, email } } } }
     officerRoles: JSON.parse(localStorage.getItem('gm_state_officerRoles') || 'null'), // Default in init
@@ -10791,26 +10793,29 @@ function renderPeriodAttendanceChart() {
                     title: { display: true, text: '累積回数' },
                     ticks: { stepSize: 1 }
                 }
-            },
-            plugins: {
-                legend: { position: 'top', align: 'end' },
-                tooltip: {
-                    callbacks: {
-                        label: function (context) {
-                            return `${context.dataset.label}: ${context.parsed.y} 回`;
-                        }
-                    }
-                }
             }
         }
     });
+}
+
+function sortAttendanceStats(key) {
+    if (state.attendance.statsSortKey === key) {
+        state.attendance.statsSortOrder = state.attendance.statsSortOrder === 'asc' ? 'desc' : 'asc';
+    } else {
+        state.attendance.statsSortKey = key;
+        state.attendance.statsSortOrder = 'desc';
+    }
+    generateClassAttendanceStats();
 }
 
 function generateClassAttendanceStats() {
     const container = document.getElementById('classAttendanceStatsContainer');
     if (!container) return;
 
-    container.innerHTML = '<div style="padding: 2rem; text-align: center; color: #64748b;">集計中...</div>';
+    // Show loading if first time or empty
+    if (!container.innerHTML || container.innerHTML.includes('集計中')) {
+        container.innerHTML = '<div style="padding: 2rem; text-align: center; color: #64748b;">集計中...</div>';
+    }
 
     setTimeout(() => {
         const studentList = getClassStudents(state.currentYear, state.currentCourse);
@@ -10821,13 +10826,13 @@ function generateClassAttendanceStats() {
             return;
         }
 
-        const stats = studentList.map(name => {
+        let stats = studentList.map(name => {
             const records = attendanceData[name] || {};
             let totalAbs = 0;
             let totalLat = 0;
             let totalEarly = 0;
             const subAbs = {};
-            const subLat = {}; // { subj: { count, slots: { "Day-Period": count } } }
+            const subLat = {};
 
             Object.entries(records).forEach(([dStr, dayEvents]) => {
                 const dayIdx = new Date(dStr).getDay();
@@ -10895,7 +10900,21 @@ function generateClassAttendanceStats() {
             };
         });
 
-        stats.sort((a, b) => b.totalAbs - a.totalAbs);
+        // Apply Sorting
+        const sortKey = state.attendance.statsSortKey || 'totalAbs';
+        const sortOrder = state.attendance.statsSortOrder || 'desc';
+
+        stats.sort((a, b) => {
+            let valA = a[sortKey];
+            let valB = b[sortKey];
+
+            // For strings (name)
+            if (typeof valA === 'string') {
+                return sortOrder === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+            }
+            // For numbers
+            return sortOrder === 'asc' ? valA - valB : valB - valA;
+        });
 
         let minDate = null;
         let maxDate = null;
@@ -10906,6 +10925,11 @@ function generateClassAttendanceStats() {
             });
         });
         const periodStr = (minDate && maxDate) ? `${minDate} ～ ${maxDate}` : "データなし";
+
+        const getSortIndicator = (key) => {
+            if (state.attendance.statsSortKey !== key) return '<span style="color:#cbd5e1; margin-left:4px; font-size:0.7rem;">↕</span>';
+            return state.attendance.statsSortOrder === 'asc' ? '<span style="color:#3b82f6; margin-left:4px;">↑</span>' : '<span style="color:#3b82f6; margin-left:4px;">↓</span>';
+        };
 
         let html = `
             <div style="margin-bottom: 1rem; color: #475569; font-size: 0.85rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
@@ -10918,10 +10942,10 @@ function generateClassAttendanceStats() {
                 <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
                     <thead>
                         <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
-                            <th style="padding: 1rem; text-align: left; width: 180px;">氏名</th>
-                            <th style="padding: 1rem; text-align: center;">合計欠席</th>
-                            <th style="padding: 1rem; text-align: center;">合計遅刻</th>
-                            <th style="padding: 1rem; text-align: center;">合計早退</th>
+                            <th onclick="sortAttendanceStats('name')" style="padding: 1rem; text-align: left; width: 180px; cursor: pointer; user-select: none;">氏名 ${getSortIndicator('name')}</th>
+                            <th onclick="sortAttendanceStats('totalAbs')" style="padding: 1rem; text-align: center; cursor: pointer; user-select: none;">合計欠席 ${getSortIndicator('totalAbs')}</th>
+                            <th onclick="sortAttendanceStats('totalLat')" style="padding: 1rem; text-align: center; cursor: pointer; user-select: none;">合計遅刻 ${getSortIndicator('totalLat')}</th>
+                            <th onclick="sortAttendanceStats('totalEarly')" style="padding: 1rem; text-align: center; cursor: pointer; user-select: none;">合計早退 ${getSortIndicator('totalEarly')}</th>
                             <th style="padding: 1rem; text-align: left;">最多欠席科目</th>
                             <th style="padding: 1rem; text-align: left;">最多遅刻科目 (曜日/時限)</th>
                         </tr>
@@ -10949,7 +10973,7 @@ function generateClassAttendanceStats() {
         html += `</tbody></table></div>`;
         container.innerHTML = html;
         if (typeof updatePrintHeader === 'function') updatePrintHeader();
-    }, 10);
+    }, 0);
 }
 
 function exportClassAttendanceCsv() {
@@ -11556,10 +11580,19 @@ function renderClassOfficers() {
 
     const year = state.currentYear;
     const yearOfficers = state.officers[year] || {};
+    const currentRolesData = initOfficerRoles();
 
-    // Pre-calculate assignment counts for marks
+    // Get all valid role IDs for the current year
+    const validRoleIds = new Set();
+    currentRolesData.forEach(cat => {
+        cat.roles.forEach(role => validRoleIds.add(role.id));
+    });
+
+    // Pre-calculate assignment counts for marks (only for valid roles)
     const assignedCounts = {};
-    Object.values(yearOfficers).forEach(names => {
+    Object.keys(yearOfficers).forEach(roleId => {
+        if (!validRoleIds.has(roleId)) return; // Skip deleted roles
+        const names = yearOfficers[roleId];
         if (!Array.isArray(names)) return;
         names.forEach(name => {
             assignedCounts[name] = (assignedCounts[name] || 0) + 1;
@@ -11793,11 +11826,20 @@ function resetOfficerRolesToDefault() {
 
 function deleteOfficerRole(catIdx, roleIdx) {
     if (confirm('この役職・係の定義を削除しますか？\n（割り当てられていた学生の記録も表示されなくなります）')) {
-        const currentRoles = state.officerRoles[state.currentYear];
+        const year = state.currentYear;
+        const currentRoles = state.officerRoles[year];
+        const roleId = currentRoles[catIdx].roles[roleIdx].id;
+
         currentRoles[catIdx].roles.splice(roleIdx, 1);
         if (currentRoles[catIdx].roles.length === 0) {
             currentRoles.splice(catIdx, 1);
         }
+
+        // Clean up assignment data
+        if (state.officers[year] && state.officers[year][roleId]) {
+            delete state.officers[year][roleId];
+        }
+
         saveSessionState();
         renderClassOfficers();
     }
