@@ -2024,92 +2024,57 @@ function setupAttendanceListeners() {
     };
 
     // Global Touch Handlers for Drag Selection (Smartphones)
-    let touchStartPos = null;
-    let touchStartTime = 0;
-    let touchMoveStartedForDrag = false;
-    let touchStartDate = null;
-    let touchStartStudent = null;
-    let touchStartType = null;
-
+    // Rule:
+    // - 1 Finger: Normal interaction (Scroll, Tap for memo, Long-press for menu)
+    // - 2 Fingers: Range Selection for period events
     window.addEventListener('touchstart', (e) => {
-        if (e.touches.length > 1) {
-            // Multi-touch: reset drag states to allow scrolling
-            isAttendanceDragging = false;
-            isGanttDragging = false;
-            touchStartPos = null;
-            return;
-        }
+        if (e.touches.length === 2) {
+            const t0 = e.touches[0];
+            const t1 = e.touches[1];
+            const target0 = document.elementFromPoint(t0.clientX, t0.clientY)?.closest('.calendar-day-cell, .gantt-day-cell');
+            const target1 = document.elementFromPoint(t1.clientX, t1.clientY)?.closest('.calendar-day-cell, .gantt-day-cell');
 
-        const touch = e.touches[0];
-        const target = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('.calendar-day-cell, .gantt-day-cell');
-        if (!target) return;
+            if (target0 && target1) {
+                const type0 = target0.classList.contains('calendar-day-cell') ? 'attendance' : 'gantt';
+                const type1 = target1.classList.contains('calendar-day-cell') ? 'attendance' : 'gantt';
 
-        touchStartPos = { x: touch.clientX, y: touch.clientY };
-        touchStartTime = Date.now();
-        touchMoveStartedForDrag = false;
-        touchStartDate = target.dataset.date;
-        touchStartStudent = target.dataset.student;
-        touchStartType = target.classList.contains('calendar-day-cell') ? 'attendance' : 'gantt';
-
-        // Initial selection visuals for the touched cell
-        if (touchStartType === 'attendance') {
-            const hasRange = attendanceDragStart && attendanceDragEnd && attendanceDragStart !== attendanceDragEnd;
-            if (!hasRange || (touchStartDate < Math.min(attendanceDragStart, attendanceDragEnd) || touchStartDate > Math.max(attendanceDragStart, attendanceDragEnd))) {
-                // Reset if outside range or no range exists
-            }
-        }
-    }, { passive: true });
-
-    window.addEventListener('touchmove', (e) => {
-        if (!touchStartPos) return;
-
-        if (e.touches.length > 1) {
-            // Multi-touch: explicitly allow native scroll and zoom
-            isAttendanceDragging = false;
-            isGanttDragging = false;
-            touchStartPos = null;
-            return;
-        }
-
-        const touch = e.touches[0];
-        const dx = touch.clientX - touchStartPos.x;
-        const dy = touch.clientY - touchStartPos.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        const timeElapsed = Date.now() - touchStartTime;
-
-        // Threshold logic to distinguish drag-to-select from scrolling
-        if (!touchMoveStartedForDrag) {
-            // If user moves quickly (< 200ms) more than 15px, assume they want to SCROLL
-            if (timeElapsed < 200 && dist > 15) {
-                touchStartPos = null; // Disable selection for this gesture
-                return;
-            }
-            // If they move after a short delay (>= 200ms) or move significantly, start drag
-            if (timeElapsed >= 200 && dist > 10) {
-                touchMoveStartedForDrag = true;
-                if (touchStartType === 'attendance') {
-                    attendanceDragStart = touchStartDate;
-                    attendanceDragEnd = touchStartDate;
-                    isAttendanceDragging = true;
-                } else if (touchStartType === 'gantt') {
-                    ganttDragStart = touchStartDate;
-                    ganttDragEnd = touchStartDate;
-                    ganttDragStudent = touchStartStudent;
-                    isGanttDragging = true;
+                if (type0 === type1) {
+                    if (type0 === 'attendance') {
+                        isAttendanceDragging = true;
+                        attendanceDragStart = target0.dataset.date;
+                        attendanceDragEnd = target1.dataset.date;
+                        updateAttendanceDragVisuals();
+                    } else if (type0 === 'gantt' && target0.dataset.student === target1.dataset.student) {
+                        isGanttDragging = true;
+                        ganttDragStudent = target0.dataset.student;
+                        ganttDragStart = target0.dataset.date;
+                        ganttDragEnd = target1.dataset.date;
+                        updateGanttDragVisuals();
+                    }
+                    if (e.cancelable) e.preventDefault();
                 }
             }
         }
+    }, { passive: false });
 
-        if (isAttendanceDragging || isGanttDragging) {
-            if (e.cancelable) e.preventDefault(); // Lock scroll while selecting
-            const target = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('.calendar-day-cell, .gantt-day-cell');
-            if (isAttendanceDragging && target?.classList.contains('calendar-day-cell')) {
-                attendanceDragEnd = target.dataset.date;
+    window.addEventListener('touchmove', (e) => {
+        if (e.touches.length === 2 && (isAttendanceDragging || isGanttDragging)) {
+            const t0 = e.touches[0];
+            const t1 = e.touches[1];
+            const target0 = document.elementFromPoint(t0.clientX, t0.clientY)?.closest('.calendar-day-cell, .gantt-day-cell');
+            const target1 = document.elementFromPoint(t1.clientX, t1.clientY)?.closest('.calendar-day-cell, .gantt-day-cell');
+
+            if (isAttendanceDragging && target0?.classList.contains('calendar-day-cell') && target1?.classList.contains('calendar-day-cell')) {
+                attendanceDragStart = target0.dataset.date;
+                attendanceDragEnd = target1.dataset.date;
                 updateAttendanceDragVisuals();
-            } else if (isGanttDragging && target?.classList.contains('gantt-day-cell')) {
-                if (target.dataset.student === ganttDragStudent) {
-                    ganttDragEnd = target.dataset.date;
+                if (e.cancelable) e.preventDefault();
+            } else if (isGanttDragging && target0?.classList.contains('gantt-day-cell') && target1?.classList.contains('gantt-day-cell')) {
+                if (target0.dataset.student === ganttDragStudent && target1.dataset.student === ganttDragStudent) {
+                    ganttDragStart = target0.dataset.date;
+                    ganttDragEnd = target1.dataset.date;
                     updateGanttDragVisuals();
+                    if (e.cancelable) e.preventDefault();
                 }
             }
         }
@@ -2120,10 +2085,6 @@ function setupAttendanceListeners() {
             isAttendanceDragging = false;
             isGanttDragging = false;
         }
-        touchStartPos = null;
-        touchStartDate = null;
-        touchStartStudent = null;
-        touchStartType = null;
     });
 
     // Data Range Mode Controls
@@ -9448,8 +9409,6 @@ function initAttendance() {
         monthSelect.selectedIndex = idx;
     }
 
-    document.getElementById('attendanceFileInfo').textContent = `ファイル：${state.attendance.fileName || '未読込'}`;
-
     // Populate Subject Filter
     populateAttendanceSubjectFilter();
 
@@ -10438,7 +10397,6 @@ function renderAttendanceCalendar() {
     for (let i = 0; i < startOffset; i++) {
         const cell = document.createElement('div');
         cell.style.background = '#f1f5f9';
-        cell.style.minHeight = '100px';
         grid.appendChild(cell);
     }
 
@@ -10461,7 +10419,6 @@ function renderAttendanceCalendar() {
         cell.style.background = 'white';
         if (dayOfWeek === 6) cell.style.background = '#dbeafe'; // Sat (Blue 100)
         if (dayOfWeek === 0 || holidayName) cell.style.background = '#fee2e2'; // Sun or Holiday (Red 100)
-        cell.style.minHeight = '100px';
         cell.style.padding = '0.4rem';
         cell.style.border = '1px solid #e2e8f0';
         cell.style.display = 'flex';
