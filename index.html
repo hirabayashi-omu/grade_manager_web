@@ -1044,8 +1044,33 @@
                             </button>
                             <div class="control-group" style="margin-left: 0.5rem;">
                                 <label>PDF色:</label>
-                                <input type="color" id="seatingPdfColor" value="#eef2ff"
-                                    style="width: 50px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; cursor: pointer;">
+                                <div id="seatingPdfPalette"
+                                    style="display: flex; gap: 4px; flex-wrap: wrap; width: 140px; align-items: center;">
+                                    <div class="color-swatch" data-color="#ffffff" style="background-color: #ffffff;"
+                                        title="White"></div>
+                                    <div class="color-swatch" data-color="#f1f5f9" style="background-color: #f1f5f9;"
+                                        title="Slate"></div>
+                                    <div class="color-swatch" data-color="#dbeafe" style="background-color: #dbeafe;"
+                                        title="Blue"></div>
+                                    <div class="color-swatch active" data-color="#e0e7ff"
+                                        style="background-color: #e0e7ff;" title="Indigo"></div>
+                                    <div class="color-swatch" data-color="#ede9fe" style="background-color: #ede9fe;"
+                                        title="Violet"></div>
+                                    <div class="color-swatch" data-color="#fce7f3" style="background-color: #fce7f3;"
+                                        title="Pink"></div>
+                                    <div class="color-swatch" data-color="#fee2e2" style="background-color: #fee2e2;"
+                                        title="Red"></div>
+                                    <div class="color-swatch" data-color="#ffedd5" style="background-color: #ffedd5;"
+                                        title="Orange"></div>
+                                    <div class="color-swatch" data-color="#fef3c7" style="background-color: #fef3c7;"
+                                        title="Amber"></div>
+                                    <div class="color-swatch" data-color="#fef9c3" style="background-color: #fef9c3;"
+                                        title="Yellow"></div>
+                                    <div class="color-swatch" data-color="#d1fae5" style="background-color: #d1fae5;"
+                                        title="Emerald"></div>
+                                    <div class="color-swatch" data-color="#cffafe" style="background-color: #cffafe;"
+                                        title="Cyan"></div>
+                                </div>
                             </div>
                             <div class="divider-v"></div>
                             <div class="control-group">
@@ -2120,15 +2145,15 @@
                     </div>
 
                     <div id="attendanceInfoBar"
-                        style="background: #f1f5f9; padding: 0.75rem 1rem; border-radius: 0.5rem; margin-bottom: 1rem; display: flex; justify-content: space-between; font-size: 0.85rem; color: #475569; border: 1px solid #e2e8f0;">
+                        style="background: #f1f5f9; padding: 0.75rem 1rem; border-radius: 0.5rem; margin-bottom: 1rem; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; font-size: 0.85rem; color: #475569; border: 1px solid #e2e8f0;">
                         <div id="attendancePeriodInfo">期間：未設定</div>
                         <div id="attendanceFileInfo">ファイル：未読込</div>
                     </div>
 
-
-                    <div id="attendanceCalendarGrid"
-                        style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: #e2e8f0; border: 1px solid #e2e8f0; border-radius: 0.5rem; overflow: hidden;">
-                        <!-- Grid cells populated by JS -->
+                    <div class="calendar-wrapper">
+                        <div id="attendanceCalendarGrid">
+                            <!-- Grid cells populated by JS -->
+                        </div>
                     </div>
 
                     <div class="card" style="margin-top: 1.5rem; padding: 1.2rem;">

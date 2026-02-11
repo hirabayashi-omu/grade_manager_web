@@ -1836,9 +1836,19 @@ function setupEventListeners() {
     document.getElementById('saveSeatingBtn')?.addEventListener('click', saveSeatingLayout);
     document.getElementById('loadSeatingBtn')?.addEventListener('click', loadSeatingLayout);
     document.getElementById('exportSeatingPdfBtn')?.addEventListener('click', exportSeatingPdf);
-    document.getElementById('seatingPdfColor')?.addEventListener('change', (e) => {
-        state.seating.pdfColor = e.target.value;
-        saveSessionState();
+    // Seating PDF Color Palette
+    document.querySelectorAll('#seatingPdfPalette .color-swatch').forEach(swatch => {
+        swatch.addEventListener('click', (e) => {
+            const color = e.target.dataset.color;
+            if (!color) return;
+            state.seating.pdfColor = color;
+
+            // Update UI
+            document.querySelectorAll('#seatingPdfPalette .color-swatch').forEach(s => s.classList.remove('active'));
+            e.target.classList.add('active');
+
+            saveSessionState();
+        });
     });
 
     document.getElementById('changePassBtn')?.addEventListener('click', openPasswordChange);
@@ -2015,83 +2025,83 @@ function setupAttendanceListeners() {
 
     // Global Touch Handlers for Drag Selection (Smartphones)
     let touchStartPos = null;
+    let touchStartTime = 0;
     let touchMoveStartedForDrag = false;
     let touchStartDate = null;
     let touchStartStudent = null;
     let touchStartType = null;
 
     window.addEventListener('touchstart', (e) => {
+        if (e.touches.length > 1) {
+            // Multi-touch: reset drag states to allow scrolling
+            isAttendanceDragging = false;
+            isGanttDragging = false;
+            touchStartPos = null;
+            return;
+        }
+
         const touch = e.touches[0];
         const target = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('.calendar-day-cell, .gantt-day-cell');
         if (!target) return;
 
         touchStartPos = { x: touch.clientX, y: touch.clientY };
+        touchStartTime = Date.now();
         touchMoveStartedForDrag = false;
         touchStartDate = target.dataset.date;
         touchStartStudent = target.dataset.student;
         touchStartType = target.classList.contains('calendar-day-cell') ? 'attendance' : 'gantt';
 
-        // Check if we touched outside existing multi-day selection to reset immediately
+        // Initial selection visuals for the touched cell
         if (touchStartType === 'attendance') {
             const hasRange = attendanceDragStart && attendanceDragEnd && attendanceDragStart !== attendanceDragEnd;
-            if (hasRange) {
-                const s = attendanceDragStart < attendanceDragEnd ? attendanceDragStart : attendanceDragEnd;
-                const end = attendanceDragStart < attendanceDragEnd ? attendanceDragEnd : attendanceDragStart;
-                if (touchStartDate < s || touchStartDate > end) {
-                    attendanceDragStart = touchStartDate;
-                    attendanceDragEnd = touchStartDate;
-                    updateAttendanceDragVisuals();
-                }
-            } else {
-                attendanceDragStart = touchStartDate;
-                attendanceDragEnd = touchStartDate;
-                updateAttendanceDragVisuals();
-            }
-        } else if (touchStartType === 'gantt') {
-            const hasRange = ganttDragStart && ganttDragEnd && ganttDragStart !== ganttDragEnd;
-            if (hasRange) {
-                const s = ganttDragStart < ganttDragEnd ? ganttDragStart : ganttDragEnd;
-                const end = ganttDragStart < ganttDragEnd ? ganttDragEnd : ganttDragStart;
-                if (touchStartStudent !== ganttDragStudent || touchStartDate < s || touchStartDate > end) {
-                    ganttDragStart = touchStartDate;
-                    ganttDragEnd = touchStartDate;
-                    ganttDragStudent = touchStartStudent;
-                    updateGanttDragVisuals();
-                }
-            } else {
-                ganttDragStart = touchStartDate;
-                ganttDragEnd = touchStartDate;
-                ganttDragStudent = touchStartStudent;
-                updateGanttDragVisuals();
+            if (!hasRange || (touchStartDate < Math.min(attendanceDragStart, attendanceDragEnd) || touchStartDate > Math.max(attendanceDragStart, attendanceDragEnd))) {
+                // Reset if outside range or no range exists
             }
         }
     }, { passive: true });
 
     window.addEventListener('touchmove', (e) => {
         if (!touchStartPos) return;
+
+        if (e.touches.length > 1) {
+            // Multi-touch: explicitly allow native scroll and zoom
+            isAttendanceDragging = false;
+            isGanttDragging = false;
+            touchStartPos = null;
+            return;
+        }
+
         const touch = e.touches[0];
         const dx = touch.clientX - touchStartPos.x;
         const dy = touch.clientY - touchStartPos.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
+        const timeElapsed = Date.now() - touchStartTime;
 
-        // threshold to distinguish drag-to-select from scrolling
-        if (!touchMoveStartedForDrag && dist > 15) {
-            touchMoveStartedForDrag = true;
-            // Now we are sure it is a drag. Set the start point to where the touch began.
-            if (touchStartType === 'attendance') {
-                attendanceDragStart = touchStartDate;
-                attendanceDragEnd = touchStartDate;
-                isAttendanceDragging = true;
-            } else if (touchStartType === 'gantt') {
-                ganttDragStart = touchStartDate;
-                ganttDragEnd = touchStartDate;
-                ganttDragStudent = touchStartStudent;
-                isGanttDragging = true;
+        // Threshold logic to distinguish drag-to-select from scrolling
+        if (!touchMoveStartedForDrag) {
+            // If user moves quickly (< 200ms) more than 15px, assume they want to SCROLL
+            if (timeElapsed < 200 && dist > 15) {
+                touchStartPos = null; // Disable selection for this gesture
+                return;
+            }
+            // If they move after a short delay (>= 200ms) or move significantly, start drag
+            if (timeElapsed >= 200 && dist > 10) {
+                touchMoveStartedForDrag = true;
+                if (touchStartType === 'attendance') {
+                    attendanceDragStart = touchStartDate;
+                    attendanceDragEnd = touchStartDate;
+                    isAttendanceDragging = true;
+                } else if (touchStartType === 'gantt') {
+                    ganttDragStart = touchStartDate;
+                    ganttDragEnd = touchStartDate;
+                    ganttDragStudent = touchStartStudent;
+                    isGanttDragging = true;
+                }
             }
         }
 
         if (isAttendanceDragging || isGanttDragging) {
-            if (e.cancelable) e.preventDefault(); // Prevent scrolling while selecting
+            if (e.cancelable) e.preventDefault(); // Lock scroll while selecting
             const target = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('.calendar-day-cell, .gantt-day-cell');
             if (isAttendanceDragging && target?.classList.contains('calendar-day-cell')) {
                 attendanceDragEnd = target.dataset.date;
@@ -6964,10 +6974,16 @@ function renderSeatingGrid() {
     const { cols, rows, perspective, pdfColor } = state.seating;
     const isTeacher = perspective === 'teacher';
 
-    // Sync color picker with state
-    const colorPicker = document.getElementById('seatingPdfColor');
-    if (colorPicker && pdfColor) {
-        colorPicker.value = pdfColor;
+    // Sync color palette with state
+    const palette = document.getElementById('seatingPdfPalette');
+    if (palette && pdfColor) {
+        palette.querySelectorAll('.color-swatch').forEach(swatch => {
+            if (swatch.dataset.color.toLowerCase() === pdfColor.toLowerCase()) {
+                swatch.classList.add('active');
+            } else {
+                swatch.classList.remove('active');
+            }
+        });
     }
 
     // Calculate dynamic sizing based on grid size

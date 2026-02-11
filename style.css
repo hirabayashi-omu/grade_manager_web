@@ -1132,6 +1132,32 @@ th {
 }
 
 /* ==================== ATTENDANCE STYLES ==================== */
+.calendar-wrapper {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 0.5rem;
+    margin-bottom: 1.5rem;
+}
+
+#attendanceCalendarGrid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 1px;
+    background: #e2e8f0;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    min-width: 100%;
+}
+
+@media (max-width: 768px) {
+    #attendanceCalendarGrid {
+        min-width: 750px;
+        /* Ensure columns are wide enough to be readable on mobile */
+    }
+}
+
 #attendanceCalendarGrid>div {
     transition: var(--transition);
 }
@@ -1243,4 +1269,24 @@ th {
     font-size: 0.9rem;
     color: #1e293b;
     border-left: 3px solid #3b82f6;
+}
+
+/* Color Swatches for Seating PDF */
+.color-swatch {
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    cursor: pointer;
+    border: 2px solid #e2e8f0;
+    transition: all 0.2s;
+}
+
+.color-swatch:hover {
+    transform: scale(1.1);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.color-swatch.active {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px white, 0 0 0 4px var(--primary);
 }
