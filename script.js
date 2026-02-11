@@ -11118,6 +11118,229 @@ function renderAttendanceStats() {
     }
 }
 
+function getExamPeriods(chartLabels) {
+    if (!state.annualEvents || !chartLabels || chartLabels.length === 0) return [];
+
+    const examKeywords = [
+        "前期中間", "前期末", "後期中間", "学年末",
+        "中間考査", "期末考査", "学年末考査", "定期考査",
+        "中間試験", "期末試験", "学年末試験", "定期試験",
+        "中間", "期末", "考査", "試験", "テスト", "ﾃｽﾄ", "模試", "実力"
+    ];
+    const foundEvents = [];
+
+    try {
+        Object.keys(state.annualEvents).forEach(acadYearKey => {
+            const yearData = state.annualEvents[acadYearKey];
+            if (!yearData || typeof yearData !== 'object') return;
+
+            // Extract a 4-digit year even if the key is "FY2023" or "2023年度"
+            const yearMatch = acadYearKey.match(/\d{4}/);
+            const baseYear = yearMatch ? parseInt(yearMatch[0]) : parseInt(acadYearKey);
+            if (isNaN(baseYear)) return;
+
+            Object.keys(yearData).forEach(monthStr => {
+                const m = parseInt(monthStr);
+                const calYear = (m >= 4) ? baseYear : baseYear + 1;
+                const dailyEvents = yearData[monthStr];
+                if (!Array.isArray(dailyEvents)) return;
+
+                dailyEvents.forEach(ev => {
+                    if (!ev || !ev.event || typeof ev.event !== 'string') return;
+
+                    const eventName = ev.event.trim();
+
+                    // Exclusions
+                    if (eventName.includes("入学試験")) return;
+                    if (eventName.includes("予備日")) return;
+                    if (eventName.includes("返却")) return;
+                    if (eventName === "試験") return; // Standalone "Exam" is often too vague/short
+
+                    const hit = examKeywords.find(k => eventName.includes(k));
+                    if (hit) {
+                        const dayNum = parseInt(ev.day);
+                        if (isNaN(dayNum)) return;
+                        const dateStr = `${calYear}/${m.toString().padStart(2, '0')}/${dayNum.toString().padStart(2, '0')}`;
+                        foundEvents.push({ date: dateStr, name: eventName });
+                    }
+                });
+            });
+        });
+    } catch (e) {
+        console.error('getExamPeriods extraction error:', e);
+    }
+
+    if (foundEvents.length === 0) {
+        console.log('Exam Periods: No matching events found in state.annualEvents keywords.');
+        return [];
+    }
+    foundEvents.sort((a, b) => a.date.localeCompare(b.date));
+
+    // 2. Cluster into periods (any exam-like events within 7 days)
+    const periods = [];
+    try {
+        let current = { name: foundEvents[0].name, start: foundEvents[0].date, end: foundEvents[0].date, lastDate: foundEvents[0].date };
+
+        for (let i = 1; i < foundEvents.length; i++) {
+            const ev = foundEvents[i];
+            const d1 = new Date(current.lastDate.replace(/\//g, '-'));
+            const d2 = new Date(ev.date.replace(/\//g, '-'));
+            const diffDays = (d2 - d1) / (1000 * 60 * 60 * 24);
+
+            if (diffDays <= 7) {
+                current.end = ev.date;
+                current.lastDate = ev.date;
+                if (ev.name.length > current.name.length) current.name = ev.name;
+            } else {
+                periods.push(current);
+                current = { name: ev.name, start: ev.date, end: ev.date, lastDate: ev.date };
+            }
+        }
+        periods.push(current);
+
+        // Final polish of names for chart labels
+        periods.forEach(p => {
+            if (p.name.length > 8) {
+                const match = p.name.match(/.*?(試験|考査|テスト|模試|実力)/);
+                if (match) p.name = match[0];
+            }
+        });
+
+        console.log(`Exam Periods: Found ${foundEvents.length} events, Clustered into ${periods.length} periods.`);
+    } catch (e) {
+        console.error('getExamPeriods clustering error:', e);
+    }
+    return periods;
+}
+
+function createExamPeriodPlugin(chartLabels) {
+    // Collect periods once for this chart instance
+    const periods = (typeof getExamPeriods === 'function') ? getExamPeriods(chartLabels) : [];
+
+    return {
+        id: 'examPeriodAnnotations',
+        beforeDatasetsDraw: (chart) => {
+            if (!periods || periods.length === 0) return;
+
+            const { ctx, chartArea, scales } = chart;
+            if (!ctx || !chartArea || !scales || !scales.x) return;
+
+            const { top, bottom, height } = chartArea;
+            const xScale = scales.x;
+
+            try {
+                ctx.save();
+
+                const getPixel = (scale, val) => {
+                    if (typeof scale.getPixelForValue === 'function') return scale.getPixelForValue(val);
+                    if (typeof scale.getPixelForIndex === 'function') return scale.getPixelForIndex(val);
+                    return 0;
+                };
+
+                function getXForDate(dateStr, labels, xScale) {
+                    const exactIdx = labels.indexOf(dateStr);
+                    if (exactIdx !== -1) return getPixel(xScale, exactIdx);
+
+                    // Interpolate between existing points
+                    for (let i = 0; i < labels.length - 1; i++) {
+                        if (labels[i] < dateStr && labels[i + 1] > dateStr) {
+                            const x0 = getPixel(xScale, i);
+                            const x1 = getPixel(xScale, i + 1);
+                            const d0 = new Date(labels[i].replace(/\//g, '-')).getTime();
+                            const d1 = new Date(labels[i + 1].replace(/\//g, '-')).getTime();
+                            const dt = new Date(dateStr.replace(/\//g, '-')).getTime();
+                            if (isNaN(d0) || isNaN(d1) || isNaN(dt)) return null;
+                            const ratio = (dt - d0) / (d1 - d0);
+                            return x0 + (x1 - x0) * ratio;
+                        }
+                    }
+
+                    // Slightly outside displayed range (up to 7 days)
+                    if (labels.length > 0) {
+                        const firstDate = new Date(labels[0].replace(/\//g, '-')).getTime();
+                        const lastDate = new Date(labels[labels.length - 1].replace(/\//g, '-')).getTime();
+                        const targetDate = new Date(dateStr.replace(/\//g, '-')).getTime();
+                        if (isNaN(firstDate) || isNaN(lastDate) || isNaN(targetDate)) return null;
+
+                        if (targetDate < firstDate) {
+                            const diff = (firstDate - targetDate) / (1000 * 60 * 60 * 24);
+                            if (diff <= 7) return getPixel(xScale, 0) - (diff * 15);
+                        } else if (targetDate > lastDate) {
+                            const diff = (targetDate - lastDate) / (1000 * 60 * 60 * 24);
+                            if (diff <= 7) return getPixel(xScale, labels.length - 1) + (diff * 15);
+                        }
+                    }
+                    return null;
+                }
+
+                periods.forEach(p => {
+                    const xStart = getXForDate(p.start, chartLabels, xScale);
+                    const xEnd = getXForDate(p.end, chartLabels, xScale);
+
+                    if (xStart !== null && xEnd !== null) {
+                        // Display if any part of the period is within visible bounds
+                        const left = Math.max(chartArea.left, Math.min(xStart, xEnd));
+                        const right = Math.min(chartArea.right, Math.max(xStart, xEnd));
+
+                        if (right <= chartArea.left || left >= chartArea.right) return;
+
+                        const rectWidth = Math.max(right - left, 4);
+                        const drawX = left;
+
+                        // Draw background rectangle
+                        ctx.fillStyle = 'rgba(239, 68, 68, 0.16)'; // High enough contrast
+                        ctx.fillRect(drawX, top, rectWidth, height);
+
+                        // Add distinctive vertical lines
+                        ctx.strokeStyle = '#ef4444'; // Solid red
+                        ctx.setLineDash([4, 4]);
+                        ctx.lineWidth = 1;
+                        ctx.beginPath();
+                        ctx.moveTo(drawX, top);
+                        ctx.lineTo(drawX, bottom);
+                        ctx.stroke();
+                        ctx.beginPath();
+                        ctx.moveTo(drawX + rectWidth, top);
+                        ctx.lineTo(drawX + rectWidth, bottom);
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+
+                        // Draw prominent label with background pill shape
+                        ctx.font = 'bold 11px "Noto Sans JP", sans-serif'; // Slightly larger
+                        const textWidth = ctx.measureText(p.name).width;
+                        const pillWidth = textWidth + 16;
+                        const pillX = drawX + (rectWidth / 2) - (pillWidth / 2);
+
+                        // Keep label within chart area
+                        const safePillX = Math.max(chartArea.left + 2, Math.min(pillX, chartArea.right - pillWidth - 2));
+
+                        ctx.fillStyle = '#ef4444';
+                        ctx.beginPath();
+                        if (ctx.roundRect) {
+                            ctx.roundRect(safePillX, top + 5, pillWidth, 20, 10); // Slightly taller
+                        } else {
+                            ctx.rect(safePillX, top + 5, pillWidth, 20);
+                        }
+                        ctx.fill();
+
+                        ctx.fillStyle = '#ffffff';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(p.name, safePillX + pillWidth / 2, top + 15);
+                    }
+                });
+
+                ctx.restore();
+            } catch (err) {
+                console.error("ExamPeriodPlugin drawing error:", err);
+                try { ctx.restore(); } catch (e) { }
+            }
+        }
+    };
+}
+
+
+
 function renderCumulativeAttendanceChart() {
     const ctxEl = document.getElementById('cumulativeAttendanceChart');
     if (!ctxEl) return;
@@ -11126,7 +11349,6 @@ function renderCumulativeAttendanceChart() {
 
     const studentName = state.currentStudent;
     if (!studentName || !state.attendance.records[studentName]) {
-        // Clear chart if no data
         return;
     }
 
@@ -11137,6 +11359,10 @@ function renderCumulativeAttendanceChart() {
     const cumulativeAbsents = [];
     const cumulativeLates = [];
 
+    // Arrays to store label text for each point
+    const absentPointLabels = [];
+    const latePointLabels = [];
+
     let totalAbsents = 0;
     let totalLates = 0;
 
@@ -11144,14 +11370,42 @@ function renderCumulativeAttendanceChart() {
         labels.push(dateStr);
         let dayAbs = 0;
         let dayLat = 0;
+
+        // Collect details for labels
+        let absDetails = [];
+        let latDetails = [];
+
         (records[dateStr] || []).forEach(ev => {
-            if (ev.status === "欠") dayAbs++;
-            else if (ev.status === "遅") dayLat++;
+            if (ev.status === "欠") {
+                dayAbs++;
+                absDetails.push(`${ev.p}限・${ev.subj}`);
+            } else if (ev.status === "遅") {
+                dayLat++;
+                latDetails.push(`${ev.p}限・${ev.subj}`);
+            }
         });
+
         totalAbsents += dayAbs;
         totalLates += dayLat;
         cumulativeAbsents.push(totalAbsents);
         cumulativeLates.push(totalLates);
+
+        // Format Label: Date + Day + Details
+        const dObj = new Date(dateStr.replace(/\//g, '-'));
+        const dayName = ["日", "月", "火", "水", "木", "金", "土"][dObj.getDay()];
+        const labelDate = dateStr.substring(5) + "(" + dayName + ")";
+
+        if (dayAbs > 0) {
+            absentPointLabels.push(labelDate + '\n' + absDetails.join('\n'));
+        } else {
+            absentPointLabels.push('');
+        }
+
+        if (dayLat > 0) {
+            latePointLabels.push(labelDate + '\n' + latDetails.join('\n'));
+        } else {
+            latePointLabels.push('');
+        }
     });
 
     attendanceChartInstance = new Chart(ctx, {
@@ -11166,7 +11420,19 @@ function renderCumulativeAttendanceChart() {
                     backgroundColor: 'rgba(239, 68, 68, 0.1)',
                     fill: true,
                     tension: 0.2,
-                    pointRadius: 2
+                    pointRadius: 3,
+                    pointHoverRadius: 5,
+                    datalabels: {
+                        align: 'top',
+                        color: '#b91c1c',
+                        font: { size: 10, weight: 'bold' },
+                        formatter: function (value, context) {
+                            return absentPointLabels[context.dataIndex];
+                        },
+                        display: function (context) {
+                            return absentPointLabels[context.dataIndex] !== '';
+                        }
+                    }
                 },
                 {
                     label: '累積遅刻 (Cumulative Lates)',
@@ -11175,7 +11441,19 @@ function renderCumulativeAttendanceChart() {
                     backgroundColor: 'rgba(245, 158, 11, 0.1)',
                     fill: true,
                     tension: 0.2,
-                    pointRadius: 2
+                    pointRadius: 3,
+                    pointHoverRadius: 5,
+                    datalabels: {
+                        align: 'bottom',
+                        color: '#b45309',
+                        font: { size: 10, weight: 'bold' },
+                        formatter: function (value, context) {
+                            return latePointLabels[context.dataIndex];
+                        },
+                        display: function (context) {
+                            return latePointLabels[context.dataIndex] !== '';
+                        }
+                    }
                 }
             ]
         },
@@ -11189,14 +11467,15 @@ function renderCumulativeAttendanceChart() {
             scales: {
                 x: {
                     display: true,
-                    title: { display: false },
                     ticks: {
                         autoSkip: true,
                         maxRotation: 0,
                         callback: function (val, index) {
-                            // Show month/day for cleaner labels
-                            const d = labels[index];
-                            return d.substring(5);
+                            const dStr = labels[index];
+                            if (!dStr) return "";
+                            const d = new Date(dStr.replace(/\//g, '-'));
+                            const day = ["日", "月", "火", "水", "木", "金", "土"][d.getDay()];
+                            return dStr.substring(5) + "(" + day + ")";
                         }
                     },
                     grid: { display: false }
@@ -11209,6 +11488,7 @@ function renderCumulativeAttendanceChart() {
                 }
             },
             plugins: {
+                annotation: false,
                 legend: { position: 'top', align: 'end' },
                 tooltip: {
                     callbacks: {
@@ -11216,9 +11496,16 @@ function renderCumulativeAttendanceChart() {
                             return `${context.dataset.label}: ${context.parsed.y} 回`;
                         }
                     }
-                }
+                },
+                datalabels: {
+                    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+                    borderRadius: 4,
+                    padding: 4
+                },
+
             }
-        }
+        },
+        plugins: [createExamPeriodPlugin(labels), window.ChartDataLabels].filter(p => p && typeof p === 'object' && p.id)
     });
 }
 
@@ -11232,7 +11519,6 @@ function renderSubjectAttendanceChart() {
     const subjectName = document.getElementById('attendanceSubjectFilter')?.value;
 
     if (!studentName || !subjectName || !state.attendance.records[studentName]) {
-        // Clear if not possible to render
         return;
     }
 
@@ -11243,21 +11529,36 @@ function renderSubjectAttendanceChart() {
     const cumulativeAbsents = [];
     const cumulativeLates = [];
 
+    // Arrays for custom labels
+    const absentPointLabels = [];
+    const latePointLabels = [];
+
     let totalAbsents = 0;
     let totalLates = 0;
+    let totalClasses = 0;
 
-    sortedDates.forEach(dateStr => {
+    // Variables for continuous display reduction
+    let lastAbsDate = null;
+    let lastLatDate = null;
+    let absRunStartIndex = -1;
+    let latRunStartIndex = -1;
+
+    sortedDates.forEach((dateStr, index) => {
         let dayAbs = 0;
         let dayLat = 0;
         let hasEvent = false;
+        let dayClassCount = 0;
 
         (records[dateStr] || []).forEach(ev => {
             if (ev.subj === subjectName) {
                 hasEvent = true;
+                dayClassCount++;
                 if (ev.status === "欠") dayAbs++;
                 else if (ev.status === "遅") dayLat++;
             }
         });
+
+        totalClasses += dayClassCount;
 
         if (hasEvent || dayAbs > 0 || dayLat > 0) {
             labels.push(dateStr);
@@ -11265,6 +11566,68 @@ function renderSubjectAttendanceChart() {
             totalLates += dayLat;
             cumulativeAbsents.push(totalAbsents);
             cumulativeLates.push(totalLates);
+
+            const currentIdx = labels.length - 1;
+            const thisDate = new Date(dateStr);
+
+            // --- Absent Logic ---
+            const dObj = new Date(dateStr.replace(/\//g, '-'));
+            const dayName = ["日", "月", "火", "水", "木", "金", "土"][dObj.getDay()];
+            const labelDate = dateStr.substring(5) + "(" + dayName + ")";
+
+            if (dayAbs > 0) {
+                const labelText = `${totalAbsents}/${totalClasses}`;
+                let merged = false;
+
+                if (lastAbsDate) {
+                    const diff = (thisDate - lastAbsDate) / (1000 * 60 * 60 * 24);
+                    // Standardize merging for small gaps (approx <= 3 days)
+                    if (diff <= 3) {
+                        merged = true;
+                        const startD = new Date(labels[absRunStartIndex].replace(/\//g, '-'));
+                        const startDay = ["日", "月", "火", "水", "木", "金", "土"][startD.getDay()];
+                        const startDateStr = labels[absRunStartIndex].substring(5) + "(" + startDay + ")";
+                        const endDateStr = labelDate;
+                        absentPointLabels[absRunStartIndex] = `${startDateStr}～${endDateStr}\n${labelText}`;
+                        absentPointLabels.push('');
+                    }
+                }
+
+                if (!merged) {
+                    absRunStartIndex = currentIdx;
+                    absentPointLabels.push(`${labelDate}\n${labelText}`);
+                }
+                lastAbsDate = thisDate;
+            } else {
+                absentPointLabels.push('');
+            }
+
+            // --- Late Logic ---
+            if (dayLat > 0) {
+                const labelText = `${totalLates}/${totalClasses}`;
+                let merged = false;
+
+                if (lastLatDate) {
+                    const diff = (thisDate - lastLatDate) / (1000 * 60 * 60 * 24);
+                    if (diff <= 3) {
+                        merged = true;
+                        const startD = new Date(labels[latRunStartIndex].replace(/\//g, '-'));
+                        const startDay = ["日", "月", "火", "水", "木", "金", "土"][startD.getDay()];
+                        const startDateStr = labels[latRunStartIndex].substring(5) + "(" + startDay + ")";
+                        const endDateStr = labelDate;
+                        latePointLabels[latRunStartIndex] = `${startDateStr}～${endDateStr}\n${labelText}`;
+                        latePointLabels.push('');
+                    }
+                }
+
+                if (!merged) {
+                    latRunStartIndex = currentIdx;
+                    latePointLabels.push(`${labelDate}\n${labelText}`);
+                }
+                lastLatDate = thisDate;
+            } else {
+                latePointLabels.push('');
+            }
         }
     });
 
@@ -11282,7 +11645,19 @@ function renderSubjectAttendanceChart() {
                     backgroundColor: 'rgba(239, 68, 68, 0.1)',
                     fill: true,
                     tension: 0.2,
-                    pointRadius: 3
+                    pointRadius: 3,
+                    pointHoverRadius: 5,
+                    datalabels: {
+                        align: 'top',
+                        color: '#b91c1c',
+                        font: { size: 10, weight: 'bold' },
+                        formatter: function (value, context) {
+                            return absentPointLabels[context.dataIndex];
+                        },
+                        display: function (context) {
+                            return absentPointLabels[context.dataIndex] !== '';
+                        }
+                    }
                 },
                 {
                     label: `累積遅刻 [${subjectName}]`,
@@ -11291,7 +11666,19 @@ function renderSubjectAttendanceChart() {
                     backgroundColor: 'rgba(245, 158, 11, 0.1)',
                     fill: true,
                     tension: 0.2,
-                    pointRadius: 3
+                    pointRadius: 3,
+                    pointHoverRadius: 5,
+                    datalabels: {
+                        align: 'bottom',
+                        color: '#b45309',
+                        font: { size: 10, weight: 'bold' },
+                        formatter: function (value, context) {
+                            return latePointLabels[context.dataIndex];
+                        },
+                        display: function (context) {
+                            return latePointLabels[context.dataIndex] !== '';
+                        }
+                    }
                 }
             ]
         },
@@ -11309,7 +11696,11 @@ function renderSubjectAttendanceChart() {
                         autoSkip: true,
                         maxRotation: 0,
                         callback: function (val, index) {
-                            return labels[index].substring(5); // MM/DD
+                            const dStr = labels[index];
+                            if (!dStr) return "";
+                            const d = new Date(dStr.replace(/\//g, '-'));
+                            const day = ["日", "月", "火", "水", "木", "金", "土"][d.getDay()];
+                            return dStr.substring(5) + "(" + day + ")";
                         }
                     },
                     grid: { display: false }
@@ -11322,6 +11713,7 @@ function renderSubjectAttendanceChart() {
                 }
             },
             plugins: {
+                annotation: false,
                 legend: { position: 'top', align: 'end' },
                 tooltip: {
                     callbacks: {
@@ -11329,9 +11721,16 @@ function renderSubjectAttendanceChart() {
                             return `${context.dataset.label}: ${context.parsed.y} 回`;
                         }
                     }
-                }
+                },
+                datalabels: {
+                    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+                    borderRadius: 4,
+                    padding: 4
+                },
+
             }
-        }
+        },
+        plugins: [createExamPeriodPlugin(labels), window.ChartDataLabels].filter(p => p && typeof p === 'object' && p.id)
     });
 }
 
@@ -11353,6 +11752,9 @@ function renderDayAttendanceChart() {
     const cumulativeAbsents = [];
     const cumulativeLates = [];
 
+    const absentPointLabels = [];
+    const latePointLabels = [];
+
     let totalAbsents = 0;
     let totalLates = 0;
 
@@ -11363,14 +11765,39 @@ function renderDayAttendanceChart() {
         labels.push(dateStr);
         let dayAbs = 0;
         let dayLat = 0;
+        let absDetails = [];
+        let latDetails = [];
+
         (records[dateStr] || []).forEach(ev => {
-            if (ev.status === "欠") dayAbs++;
-            else if (ev.status === "遅") dayLat++;
+            if (ev.status === "欠") {
+                dayAbs++;
+                absDetails.push(`${ev.p}限・${ev.subj}`);
+            } else if (ev.status === "遅") {
+                dayLat++;
+                latDetails.push(`${ev.p}限・${ev.subj}`);
+            }
         });
+
         totalAbsents += dayAbs;
         totalLates += dayLat;
         cumulativeAbsents.push(totalAbsents);
         cumulativeLates.push(totalLates);
+
+        const dObj = new Date(dateStr.replace(/\//g, '-'));
+        const dayName = ["日", "月", "火", "水", "木", "金", "土"][dObj.getDay()];
+        const labelDate = dateStr.substring(5) + "(" + dayName + ")";
+
+        if (dayAbs > 0) {
+            absentPointLabels.push(labelDate + '\n' + absDetails.join('\n'));
+        } else {
+            absentPointLabels.push('');
+        }
+
+        if (dayLat > 0) {
+            latePointLabels.push(labelDate + '\n' + latDetails.join('\n'));
+        } else {
+            latePointLabels.push('');
+        }
     });
 
     if (labels.length === 0) return;
@@ -11389,7 +11816,19 @@ function renderDayAttendanceChart() {
                     backgroundColor: 'rgba(239, 68, 68, 0.1)',
                     fill: true,
                     tension: 0.2,
-                    pointRadius: 3
+                    pointRadius: 3,
+                    pointHoverRadius: 5,
+                    datalabels: {
+                        align: 'top',
+                        color: '#b91c1c',
+                        font: { size: 10, weight: 'bold' },
+                        formatter: function (value, context) {
+                            return absentPointLabels[context.dataIndex];
+                        },
+                        display: function (context) {
+                            return absentPointLabels[context.dataIndex] !== '';
+                        }
+                    }
                 },
                 {
                     label: `累積遅刻 [${dayNames[targetDay]}]`,
@@ -11398,7 +11837,19 @@ function renderDayAttendanceChart() {
                     backgroundColor: 'rgba(245, 158, 11, 0.1)',
                     fill: true,
                     tension: 0.2,
-                    pointRadius: 3
+                    pointRadius: 3,
+                    pointHoverRadius: 5,
+                    datalabels: {
+                        align: 'bottom',
+                        color: '#b45309',
+                        font: { size: 10, weight: 'bold' },
+                        formatter: function (value, context) {
+                            return latePointLabels[context.dataIndex];
+                        },
+                        display: function (context) {
+                            return latePointLabels[context.dataIndex] !== '';
+                        }
+                    }
                 }
             ]
         },
@@ -11416,7 +11867,11 @@ function renderDayAttendanceChart() {
                         autoSkip: true,
                         maxRotation: 0,
                         callback: function (val, index) {
-                            return labels[index].substring(5); // MM/DD
+                            const dStr = labels[index];
+                            if (!dStr) return "";
+                            const d = new Date(dStr.replace(/\//g, '-'));
+                            const day = ["日", "月", "火", "水", "木", "金", "土"][d.getDay()];
+                            return dStr.substring(5) + "(" + day + ")";
                         }
                     },
                     grid: { display: false }
@@ -11429,6 +11884,7 @@ function renderDayAttendanceChart() {
                 }
             },
             plugins: {
+                annotation: false,
                 legend: { position: 'top', align: 'end' },
                 tooltip: {
                     callbacks: {
@@ -11436,9 +11892,16 @@ function renderDayAttendanceChart() {
                             return `${context.dataset.label}: ${context.parsed.y} 回`;
                         }
                     }
-                }
+                },
+                datalabels: {
+                    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+                    borderRadius: 4,
+                    padding: 4
+                },
+
             }
-        }
+        },
+        plugins: [createExamPeriodPlugin(labels), window.ChartDataLabels].filter(p => p && typeof p === 'object' && p.id)
     });
 }
 
@@ -11460,6 +11923,9 @@ function renderPeriodAttendanceChart() {
     const cumulativeAbsents = [];
     const cumulativeLates = [];
 
+    const absentPointLabels = [];
+    const latePointLabels = [];
+
     let totalAbsents = 0;
     let totalLates = 0;
 
@@ -11470,14 +11936,39 @@ function renderPeriodAttendanceChart() {
         labels.push(dateStr);
         let dayAbs = 0;
         let dayLat = 0;
+        let absDetails = [];
+        let latDetails = [];
+
         eventsForPeriod.forEach(ev => {
-            if (ev.status === "欠") dayAbs++;
-            else if (ev.status === "遅") dayLat++;
+            if (ev.status === "欠") {
+                dayAbs++;
+                absDetails.push(`${ev.p}限・${ev.subj}`);
+            } else if (ev.status === "遅") {
+                dayLat++;
+                latDetails.push(`${ev.p}限・${ev.subj}`);
+            }
         });
+
         totalAbsents += dayAbs;
         totalLates += dayLat;
         cumulativeAbsents.push(totalAbsents);
         cumulativeLates.push(totalLates);
+
+        const dObj = new Date(dateStr.replace(/\//g, '-'));
+        const dayName = ["日", "月", "火", "水", "木", "金", "土"][dObj.getDay()];
+        const labelDate = dateStr.substring(5) + "(" + dayName + ")";
+
+        if (dayAbs > 0) {
+            absentPointLabels.push(labelDate + '\n' + absDetails.join('\n'));
+        } else {
+            absentPointLabels.push('');
+        }
+
+        if (dayLat > 0) {
+            latePointLabels.push(labelDate + '\n' + latDetails.join('\n'));
+        } else {
+            latePointLabels.push('');
+        }
     });
 
     if (labels.length === 0) return;
@@ -11494,7 +11985,19 @@ function renderPeriodAttendanceChart() {
                     backgroundColor: 'rgba(239, 68, 68, 0.1)',
                     fill: true,
                     tension: 0.2,
-                    pointRadius: 3
+                    pointRadius: 3,
+                    pointHoverRadius: 5,
+                    datalabels: {
+                        align: 'top',
+                        color: '#b91c1c',
+                        font: { size: 10, weight: 'bold' },
+                        formatter: function (value, context) {
+                            return absentPointLabels[context.dataIndex];
+                        },
+                        display: function (context) {
+                            return absentPointLabels[context.dataIndex] !== '';
+                        }
+                    }
                 },
                 {
                     label: `累積遅刻 [${targetPeriod}限]`,
@@ -11503,7 +12006,19 @@ function renderPeriodAttendanceChart() {
                     backgroundColor: 'rgba(245, 158, 11, 0.1)',
                     fill: true,
                     tension: 0.2,
-                    pointRadius: 3
+                    pointRadius: 3,
+                    pointHoverRadius: 5,
+                    datalabels: {
+                        align: 'bottom',
+                        color: '#b45309',
+                        font: { size: 10, weight: 'bold' },
+                        formatter: function (value, context) {
+                            return latePointLabels[context.dataIndex];
+                        },
+                        display: function (context) {
+                            return latePointLabels[context.dataIndex] !== '';
+                        }
+                    }
                 }
             ]
         },
@@ -11521,7 +12036,11 @@ function renderPeriodAttendanceChart() {
                         autoSkip: true,
                         maxRotation: 0,
                         callback: function (val, index) {
-                            return labels[index].substring(5); // MM/DD
+                            const dStr = labels[index];
+                            if (!dStr) return "";
+                            const d = new Date(dStr.replace(/\//g, '-'));
+                            const day = ["日", "月", "火", "水", "木", "金", "土"][d.getDay()];
+                            return dStr.substring(5) + "(" + day + ")";
                         }
                     },
                     grid: { display: false }
@@ -11532,8 +12051,26 @@ function renderPeriodAttendanceChart() {
                     title: { display: true, text: '累積回数' },
                     ticks: { stepSize: 1 }
                 }
+            },
+            plugins: {
+                annotation: false,
+                legend: { position: 'top', align: 'end' },
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            return `${context.dataset.label}: ${context.parsed.y} 回`;
+                        }
+                    }
+                },
+                datalabels: {
+                    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+                    borderRadius: 4,
+                    padding: 4
+                },
+
             }
-        }
+        },
+        plugins: [createExamPeriodPlugin(labels), window.ChartDataLabels].filter(p => p && typeof p === 'object' && p.id)
     });
 }
 
@@ -13861,3 +14398,10 @@ function deleteFacultySource(sourceId) {
 }
 
 
+
+// Register the custom plugin globally (optional, but ensures availability)
+Chart.register({
+    id: 'examPeriodAnnotationsGlobal',
+    // This is a dummy registration to ensure Chart.js knows about custom plugins if needed
+    // The actual logic is in the per-chart created plugin instance
+});
