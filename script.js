@@ -2024,127 +2024,88 @@ function setupAttendanceListeners() {
     };
 
     // Touch State for Smart Gesture Detection
-    let touchStartPositions = null;
-    let touchStartTime = 0;
-    const SELECTION_DISTANCE_THRESHOLD = 30; // pixels - minimum movement to consider it a selection gesture
-    const SELECTION_TIME_THRESHOLD = 200; // ms - time to hold before considering it a selection
+    let touchStartPosition = null;
+    let touchStartTarget = null;
 
     // Global Touch Handlers for Drag Selection (Smartphones)
-    // Improved logic:
-    // - Only intercept touches that start within calendar/gantt containers
-    // - Distinguish between scrolling/pinch and intentional selection
-    // - 1 Finger: Normal interaction (Scroll, Tap, Long-press)
-    // - 2 Fingers: Range Selection (only if both fingers stay relatively stable)
+    // Correct behavior:
+    // - 1 Finger Drag: Range Selection within calendar/gantt cells
+    // - 2 Fingers: Allow normal scroll/pinch zoom (don't intercept)
     window.addEventListener('touchstart', (e) => {
-        if (e.touches.length === 2) {
-            const t0 = e.touches[0];
-            const t1 = e.touches[1];
-            const target0 = document.elementFromPoint(t0.clientX, t0.clientY)?.closest('.calendar-day-cell, .gantt-day-cell');
-            const target1 = document.elementFromPoint(t1.clientX, t1.clientY)?.closest('.calendar-day-cell, .gantt-day-cell');
+        // Only intercept single-finger touches for range selection
+        if (e.touches.length === 1) {
+            const touch = e.touches[0];
+            const target = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('.calendar-day-cell, .gantt-day-cell');
 
-            if (target0 && target1) {
-                const type0 = target0.classList.contains('calendar-day-cell') ? 'attendance' : 'gantt';
-                const type1 = target1.classList.contains('calendar-day-cell') ? 'attendance' : 'gantt';
+            if (target) {
+                // Check if touch is within a calendar or gantt container
+                const inContainer = target.closest('.calendar-grid-container, .gantt-grid-container, #classAttendanceGantt');
 
-                // Only proceed if both touches are on the same type of cell
-                if (type0 === type1) {
-                    // Check if both fingers are within a calendar or gantt container
-                    const inContainer0 = target0.closest('.calendar-grid-container, .gantt-grid-container, #classAttendanceGantt');
-                    const inContainer1 = target1.closest('.calendar-grid-container, .gantt-grid-container, #classAttendanceGantt');
+                if (inContainer) {
+                    // Store initial touch info
+                    touchStartPosition = { x: touch.clientX, y: touch.clientY };
+                    touchStartTarget = target;
 
-                    if (inContainer0 && inContainer1) {
-                        // Store initial positions to detect scroll vs selection
-                        touchStartPositions = {
-                            t0: { x: t0.clientX, y: t0.clientY },
-                            t1: { x: t1.clientX, y: t1.clientY }
-                        };
-                        touchStartTime = Date.now();
+                    const type = target.classList.contains('calendar-day-cell') ? 'attendance' : 'gantt';
 
-                        if (type0 === 'attendance') {
-                            isAttendanceDragging = true;
-                            attendanceDragStart = target0.dataset.date;
-                            attendanceDragEnd = target1.dataset.date;
-                            updateAttendanceDragVisuals();
-                        } else if (type0 === 'gantt' && target0.dataset.student === target1.dataset.student) {
-                            isGanttDragging = true;
-                            ganttDragStudent = target0.dataset.student;
-                            ganttDragStart = target0.dataset.date;
-                            ganttDragEnd = target1.dataset.date;
-                            updateGanttDragVisuals();
-                        }
-
-                        // Only prevent default after a short delay or if minimal movement
-                        // This allows normal scroll to work if user is just scrolling
-                        if (e.cancelable) e.preventDefault();
+                    if (type === 'attendance') {
+                        isAttendanceDragging = true;
+                        attendanceDragStart = target.dataset.date;
+                        attendanceDragEnd = target.dataset.date;
+                        updateAttendanceDragVisuals();
+                    } else if (type === 'gantt') {
+                        isGanttDragging = true;
+                        ganttDragStudent = target.dataset.student;
+                        ganttDragStart = target.dataset.date;
+                        ganttDragEnd = target.dataset.date;
+                        updateGanttDragVisuals();
                     }
+
+                    // Prevent default to avoid text selection during drag
+                    if (e.cancelable) e.preventDefault();
                 }
             }
         }
+        // For 2+ fingers, don't intercept - allow normal scroll/pinch
     }, { passive: false });
 
     window.addEventListener('touchmove', (e) => {
-        if (e.touches.length === 2 && (isAttendanceDragging || isGanttDragging)) {
-            const t0 = e.touches[0];
-            const t1 = e.touches[1];
+        // Only handle single-finger drags for selection
+        if (e.touches.length === 1 && (isAttendanceDragging || isGanttDragging)) {
+            const touch = e.touches[0];
+            const target = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('.calendar-day-cell, .gantt-day-cell');
 
-            // Check if this looks like a scroll/pinch gesture vs. selection
-            if (touchStartPositions) {
-                const dist0 = Math.hypot(t0.clientX - touchStartPositions.t0.x, t0.clientY - touchStartPositions.t0.y);
-                const dist1 = Math.hypot(t1.clientX - touchStartPositions.t1.x, t1.clientY - touchStartPositions.t1.y);
-
-                // If both fingers moved significantly in the same direction, it's likely a scroll
-                // Cancel selection mode and allow scroll
-                if (dist0 > SELECTION_DISTANCE_THRESHOLD && dist1 > SELECTION_DISTANCE_THRESHOLD) {
-                    const dx0 = t0.clientX - touchStartPositions.t0.x;
-                    const dy0 = t0.clientY - touchStartPositions.t0.y;
-                    const dx1 = t1.clientX - touchStartPositions.t1.x;
-                    const dy1 = t1.clientY - touchStartPositions.t1.y;
-
-                    // Check if movement is in the same direction (scroll) vs opposite (pinch/selection)
-                    const sameDirection = (dx0 * dx1 > 0 && dy0 * dy1 > 0);
-                    if (sameDirection) {
-                        // This is a scroll gesture, cancel selection
-                        isAttendanceDragging = false;
-                        isGanttDragging = false;
-                        touchStartPositions = null;
-                        return; // Don't prevent default, allow scroll
-                    }
-                }
-            }
-
-            const target0 = document.elementFromPoint(t0.clientX, t0.clientY)?.closest('.calendar-day-cell, .gantt-day-cell');
-            const target1 = document.elementFromPoint(t1.clientX, t1.clientY)?.closest('.calendar-day-cell, .gantt-day-cell');
-
-            if (isAttendanceDragging && target0?.classList.contains('calendar-day-cell') && target1?.classList.contains('calendar-day-cell')) {
-                attendanceDragStart = target0.dataset.date;
-                attendanceDragEnd = target1.dataset.date;
+            if (isAttendanceDragging && target?.classList.contains('calendar-day-cell')) {
+                attendanceDragEnd = target.dataset.date;
                 updateAttendanceDragVisuals();
                 if (e.cancelable) e.preventDefault();
-            } else if (isGanttDragging && target0?.classList.contains('gantt-day-cell') && target1?.classList.contains('gantt-day-cell')) {
-                if (target0.dataset.student === ganttDragStudent && target1.dataset.student === ganttDragStudent) {
-                    ganttDragStart = target0.dataset.date;
-                    ganttDragEnd = target1.dataset.date;
+            } else if (isGanttDragging && target?.classList.contains('gantt-day-cell')) {
+                if (target.dataset.student === ganttDragStudent) {
+                    ganttDragEnd = target.dataset.date;
                     updateGanttDragVisuals();
                     if (e.cancelable) e.preventDefault();
                 }
             }
-        } else if (e.touches.length !== 2) {
-            // If finger count changed, cancel selection
+        } else if (e.touches.length > 1) {
+            // Multiple fingers detected - cancel selection to allow scroll/pinch
             if (isAttendanceDragging || isGanttDragging) {
                 isAttendanceDragging = false;
                 isGanttDragging = false;
-                touchStartPositions = null;
+                touchStartPosition = null;
+                touchStartTarget = null;
             }
         }
     }, { passive: false });
 
     window.addEventListener('touchend', (e) => {
-        // Reset selection state when touches end
-        if (e.touches.length < 2) {
+        // Reset selection state when all touches end
+        if (e.touches.length === 0) {
             if (isAttendanceDragging || isGanttDragging) {
+                // Selection completed
                 isAttendanceDragging = false;
                 isGanttDragging = false;
-                touchStartPositions = null;
+                touchStartPosition = null;
+                touchStartTarget = null;
             }
         }
     });
