@@ -334,8 +334,8 @@ CAM/CAE,2,5,必履修,基盤専門,DP-D,プロダクトデザイン,
 インターンシップ,1,4,選,応用専門,DP-E,コース共通,
 生活と物質,1,4,選必,応用専門,DP-E,コース共通,
 社会と環境,1,4,選必,応用専門,DP-E,コース共通,
-物質プロセス基礎,2,5,選必,応用専門,DP-E,コース共通,
-物質デザイン概論,2,5,選必,応用専門,DP-E,コース共通,
+物質プロセス基礎,2,4,選必,応用専門,DP-E,コース共通,
+物質デザイン概論,2,4,選必,応用専門,DP-E,コース共通,
 防災工学,2,4,選必,応用専門,DP-E,コース共通,
 エルゴノミクス,2,4,選必,応用専門,DP-E,コース共通,
 食品エンジニアリング,2,5,選必,応用専門,DP-E,コース共通,
@@ -14401,3 +14401,4 @@ Chart.register({
     // This is a dummy registration to ensure Chart.js knows about custom plugins if needed
     // The actual logic is in the per-chart created plugin instance
 });
+
