@@ -8801,7 +8801,17 @@ function confirmImportFromBoard() {
         }
     });
 
-    state.students = newStudents;
+    // Remove default placeholder students if they have no grades or attendance
+    const defaultList = ['学生太郎', '学生次郎', '学生花子', '学生A', '学生B', '学生C', '学生D', '学生E'];
+    newStudents = newStudents.filter(name => {
+        if (!defaultList.includes(name)) return true;
+        const hasGrades = Object.values(state.scores[name] || {}).some(subj => Object.keys(subj).length > 0);
+        const hasAttendance = state.attendance && state.attendance.records && state.attendance.records[name] && Object.keys(state.attendance.records[name]).length > 0;
+        return hasGrades || hasAttendance; 
+    });
+
+    // Ensure sorted order globally
+    state.students = sortStudentsByRoster(newStudents);
     state.studentMetadata = newMetadata;
 
     // Update State Current Year if detected and different
@@ -8931,6 +8941,8 @@ function confirmImportFromBoard() {
 
     alert(`取り込みが完了しました。\n(${state.students.length} 名登録)`);
 
+    render(); // Update all active views/tabs with new students globally
+    
     // Maybe switch to Settings or Roster? Stay on Roster Board.
     renderRosterBoardTable();
 }
@@ -12528,7 +12540,7 @@ function getStudentSummaryHtml(studentName, testKey, targetYear) {
 
 
     // C. Attendance Analysis (Matching At-Risk Extraction Logic)
-    const records = (state.attendance && state.attendance.records) ? state.attendance.records[studentName] : {};
+    const records = (state.attendance && state.attendance.records && state.attendance.records[studentName]) ? state.attendance.records[studentName] : {};
     let totalAbs = 0, totalLat = 0;
     const subjectAttendance = {}; // Track per subject
     const alerts = []; // For "At-Risk" items
