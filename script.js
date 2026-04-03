@@ -4222,7 +4222,8 @@ function getClassStudents(year, course, sourceList = null) {
 
         if (m) {
             const yStr = getMetaValue(m, ['年', '学年', 'year', 'Grade', '年次']);
-            stYear = parseInt(yStr) || 1;
+            stYear = parseInt(yStr);
+            if (isNaN(stYear) || stYear === 9) stYear = targetYear; // Prevent missing year from hiding students
             stCourse = getMetaValue(m, ['コース', '学科', 'course', 'Dept', '応用専門分野・領域', '所属']);
         } else {
             // Fallback for current student
@@ -5460,7 +5461,9 @@ function calculateRank(year, key, targetStudent) {
     let cohortYear = year;
     const m = getStudentMetadataSafe(targetStudent);
     if (m) {
-        cohortYear = parseInt(getMetaValue(m, ['年', '学年', 'year', 'Grade', '年次'])) || year;
+        let chYear = parseInt(getMetaValue(m, ['年', '学年', 'year', 'Grade', '年次']));
+        if (isNaN(chYear) || chYear === 9) chYear = year;
+        cohortYear = chYear;
     } else if (targetStudent === state.currentStudent) {
         cohortYear = state.currentYear;
     }
