@@ -6884,6 +6884,11 @@ function initSeating() {
     renderSeatingGrid();
 }
 
+function renderSeatingChart() {
+    renderSeatingRoster();
+    renderSeatingGrid();
+}
+
 function renderSeatingRoster() {
     const list = document.getElementById('seatingRosterList');
     if (!list) return;
