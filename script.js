@@ -1,4 +1,4 @@
-﻿
+
 // ==================== SIDEBAR CONTROL ====================
 function toggleSidebar(show) {
     const sidebar = document.querySelector('.sidebar');
@@ -1628,6 +1628,7 @@ function setupEventListeners() {
         document.getElementById('rosterFileInput')?.click();
     });
     document.getElementById('applyRosterImportBtn')?.addEventListener('click', confirmImportFromBoard);
+    document.getElementById('deleteRosterStudentBtn')?.addEventListener('click', deleteSelectedStudents);
     document.getElementById('teamsChatSelectedBtn')?.addEventListener('click', openTeamsChatForSelected);
     document.getElementById('sendMailSelectedBtn')?.addEventListener('click', openMailForSelected);
 
@@ -8571,10 +8572,14 @@ function showRosterContextMenu(x, y) {
         `;
         menu.innerHTML = `
             <div class="ctx-item" data-action="teams">
-                <span class="ctx-icon">??</span> Teamsチャット
+                <span class="ctx-icon">💬</span> Teamsチャット
             </div>
             <div class="ctx-item" data-action="mail">
-                <span class="ctx-icon">??</span> メール送信
+                <span class="ctx-icon">✉️</span> メール送信
+            </div>
+            <div style="height: 1px; background: #e2e8f0; margin: 0.4rem 0;"></div>
+            <div class="ctx-item" data-action="delete" style="color: #ef4444; font-weight: 600;">
+                <span class="ctx-icon">🗑️</span> 退学者として削除
             </div>
         `;
         document.body.appendChild(menu);
@@ -8595,6 +8600,7 @@ function showRosterContextMenu(x, y) {
             const action = item.dataset.action;
             if (action === 'teams') openTeamsChatForSelected();
             if (action === 'mail') openMailForSelected();
+            if (action === 'delete') deleteSelectedStudents();
             menu.style.display = 'none';
         });
 
@@ -8614,6 +8620,75 @@ function showRosterContextMenu(x, y) {
     menu.style.top = y + 'px';
 }
 
+
+// ==================== 退学者削除 ====================
+function deleteSelectedStudents() {
+    const selectedNames = Array.from(importState.selected);
+
+    if (selectedNames.length === 0) {
+        alert('削除する学生が選択されていません。');
+        return;
+    }
+
+    const nameList = selectedNames.join('、');
+    if (!confirm(`以下の学生を退学者として削除しますか？\n\n${nameList}\n\n※ 成績・出欠データもすべて削除されます。この操作は元に戻せません。`)) return;
+
+    selectedNames.forEach(name => {
+        // Remove from students list
+        const idx = state.students.indexOf(name);
+        if (idx !== -1) state.students.splice(idx, 1);
+
+        // Remove metadata
+        delete state.studentMetadata[name];
+
+        // Remove scores
+        if (state.scores && state.scores[name]) {
+            delete state.scores[name];
+        }
+
+        // Remove attendance
+        if (state.attendance && state.attendance.records && state.attendance.records[name]) {
+            delete state.attendance.records[name];
+        }
+
+        // Remove from roster sources
+        if (state.rosterSources) {
+            state.rosterSources.forEach(src => {
+                if (src.students) {
+                    const si = src.students.indexOf(name);
+                    if (si !== -1) src.students.splice(si, 1);
+                }
+                if (src.metadata) {
+                    delete src.metadata[name];
+                }
+            });
+        }
+    });
+
+    // Update currentStudent if it was deleted
+    if (!state.students.includes(state.currentStudent)) {
+        state.currentStudent = state.students[0] || null;
+    }
+
+    // Sync importState.candidates to reflect deletions
+    importState.candidates = importState.candidates.filter(c => !selectedNames.includes(c.name));
+    importState.selected.clear();
+
+    invalidateCandidateCache();
+    saveSessionState();
+    populateControls();
+    updateSourceSummaryDisplay();
+
+    // Update status display
+    const statusDiv = document.getElementById('rosterBoardStatus');
+    if (statusDiv) {
+        statusDiv.textContent = `現在登録済みのデータ (${state.students.length}名)`;
+        statusDiv.style.color = '#475569';
+    }
+
+    renderRosterBoardTable();
+    alert(`${selectedNames.length} 名を退学者として削除しました。`);
+}
 
 function confirmImportFromBoard() {
     const selectedNames = Array.from(importState.selected);
