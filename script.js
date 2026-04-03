@@ -8733,7 +8733,7 @@ function confirmImportFromBoard() {
     }
 
     // MERGE logic: Keep current students to preserve history, update matched ones, add new ones.
-    const newStudents = [...state.students];
+    let newStudents = [...state.students];
     const newMetadata = { ...state.studentMetadata };
 
     // Auto-Detect Current Year from Imported Data (Majority Vote)
